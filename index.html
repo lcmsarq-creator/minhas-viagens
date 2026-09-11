@@ -115,6 +115,11 @@
         <div class="draw-copy">
           <strong id="highwayBannerTitle">Carregando rodovia…</strong>
           <span id="highwayBannerStatus">Consultando o OpenStreetMap.</span>
+          <div id="highwayProgress" class="highway-progress hidden">
+            <strong id="highwayProgressPercent">0% concluída</strong>
+            <span id="highwayProgressDistance">0 km de 0 km percorridos</span>
+            <div class="highway-progress-track" role="progressbar" aria-label="Progresso percorrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="highwayProgressBar"></i></div>
+          </div>
         </div>
         <button id="closeHighwayBtn" class="ghost-btn small" type="button">Fechar rodovia</button>
       </section>

@@ -17,8 +17,16 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.private.coffee/api/interpreter"
 ];
-const HIGHWAY_CACHE_PREFIX = "minhasViagens.highwayGeometry.v1:";
 const HIGHWAY_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
+const HIGHWAY_DB_NAME = "minhasViagensHighways.v1";
+const HIGHWAY_GEOMETRY_STORE = "geometries";
+const HIGHWAY_PROGRESS_STORE = "progress";
+const HIGHWAY_CACHE_VERSION = 2;
+const ROAD_MATCH_TOLERANCE_KM = .08;
+const ROAD_MATCH_MIN_KM = .5;
+const OFFICIAL_ROAD_NAME_REFS = [
+  [/\bassis\s+chateaubriand\b/i, "SP-425"]
+];
 
 const state = {
   trips: [],
@@ -59,6 +67,13 @@ const state = {
   highwayRequest: null,
   highwayKey: "",
   highwaySelection: 0,
+  highwayBounds: null,
+  highwayProgressLayer: null,
+  tripRoadLayer: null,
+  tripRoadKey: "",
+  highwayQueue: [],
+  highwayQueueKeys: new Set(),
+  highwayQueueRunning: false,
   cityHighlight: null,
   cityHighlightTimer: null
 };
@@ -136,6 +151,10 @@ const els = {
   highwayBanner: document.getElementById("highwayBanner"),
   highwayBannerTitle: document.getElementById("highwayBannerTitle"),
   highwayBannerStatus: document.getElementById("highwayBannerStatus"),
+  highwayProgress: document.getElementById("highwayProgress"),
+  highwayProgressPercent: document.getElementById("highwayProgressPercent"),
+  highwayProgressDistance: document.getElementById("highwayProgressDistance"),
+  highwayProgressBar: document.getElementById("highwayProgressBar"),
   closeHighwayBtn: document.getElementById("closeHighwayBtn"),
   tripList: document.getElementById("tripList"),
   tripCount: document.getElementById("tripCount"),
@@ -498,6 +517,7 @@ function ensureTripSchema(trip) {
   if (!Array.isArray(trip.routeWaypoints)) trip.routeWaypoints = [];
   if (!Array.isArray(trip.stopPlaces)) trip.stopPlaces = [];
   if (!Array.isArray(trip.roadLabels)) trip.roadLabels = [];
+  if (!trip.roadSegments || typeof trip.roadSegments !== "object") trip.roadSegments = {};
   if (!trip.color) trip.color = DEFAULT_ROUTE_COLOR;
   if (!Array.isArray(trip.flightAirports)) trip.flightAirports = [];
   if (!trip.createdAt) trip.createdAt = new Date().toISOString();
@@ -523,6 +543,10 @@ function ensureTripSchema(trip) {
         seen.add(key);
         uniqueRoads.push(label);
       }
+    }
+    for (const road of trip.conquests.roads) {
+      const key = normalizeKey(road);
+      if (road && !seen.has(key)) { seen.add(key); uniqueRoads.push(road); }
     }
     trip.conquests.roads = uniqueRoads;
   }
@@ -655,11 +679,15 @@ function roadRefsFromStep(step, countryCode = "") {
     }
   };
   add(step?.ref);
+  add(step?.nat_ref);
+  add(step?.official_ref);
   const name = String(step?.name || "");
   const br = name.match(/\b(?:BR|SP|PR|SC|RS|MG|GO|MT|MS|BA|RJ|ES|PE|CE|PB|RN|SE|AL|TO|MA|PI|PA|AM|RO|RR|AC|AP|DF)\s*-?\s*\d{1,4}\b/gi) || [];
   br.forEach(add);
   const ruta = name.match(/\b(?:Ruta(?:\s+Nacional)?|Route|Rodovia|Estrada|RN)\s*[A-Za-z-]*\s*\d+[A-Za-z-]*/gi) || [];
   ruta.forEach(add);
+  const simpleName = normalizeSimple(name);
+  for (const [pattern, ref] of OFFICIAL_ROAD_NAME_REFS) if (pattern.test(simpleName)) add(ref);
   return refs;
 }
 
@@ -697,6 +725,24 @@ function extractRoadLabelsFromRoute(route, trip = null) {
   }
   finish();
   return groups;
+}
+
+function extractRoadSegmentsFromRoute(route, trip = null) {
+  const result = {};
+  const countryCode = tripRoadCountry(trip);
+  for (const leg of route?.legs || []) {
+    for (const step of leg.steps || []) {
+      const coords = (step?.geometry?.coordinates || []).map(([lng, lat]) => [lat, lng]);
+      if (coords.length < 2) continue;
+      for (const label of roadRefsFromStep(step, countryCode)) {
+        if (!result[label]) result[label] = [];
+        const previous = result[label].at(-1);
+        if (previous && haversineKm({ lat: previous.at(-1)[0], lng: previous.at(-1)[1] }, { lat: coords[0][0], lng: coords[0][1] }) < .15) previous.push(...coords.slice(1));
+        else result[label].push(coords);
+      }
+    }
+  }
+  return result;
 }
 
 function csvSplitLine(line) {
@@ -884,7 +930,7 @@ function getAchievementSnapshot(excludeTripId = null) {
     }
     for (const road of trip.conquests.roads || []) {
       const key = normalizeKey(road);
-      if (key && !roads.has(key)) roads.set(key, { label: road, countryCode: roadCountryForAchievement(road, trip), tripName: trip.name, date: trip.date });
+      if (key && !roads.has(key)) roads.set(key, { label: road, countryCode: roadCountryForAchievement(road, trip) });
     }
   }
   return { cities, roads };
@@ -903,6 +949,8 @@ function focusCityAchievement(city) {
     return;
   }
   closeFullHighway();
+  closeTripRoadHighlight();
+  if (window.matchMedia("(max-width: 820px)").matches) document.getElementById("map")?.scrollIntoView({ behavior: "smooth", block: "center" });
   map.flyTo([lat, lng], 12, { duration: .8 });
   if (state.cityHighlight) map.removeLayer(state.cityHighlight);
   clearTimeout(state.cityHighlightTimer);
@@ -918,44 +966,66 @@ function focusCityAchievement(city) {
 function overpassRoadDescriptor(item) {
   const parsed = parseRoadCode(item.label);
   if (parsed?.international) {
-    return { countryCode: parsed.countryCode, ref: `${parsed.network} ${parsed.number}`, alternatives: [parsed.number, `${parsed.network}-${parsed.number}`] };
+    const n = parsed.number;
+    return {
+      countryCode: parsed.countryCode, network: parsed.network, number: n,
+      ref: `${parsed.network} ${n}`,
+      alternatives: [n, `${parsed.network}-${n}`, `${parsed.network}${n}`, `Ruta ${n}`, `Ruta Nacional ${n}`, `RN ${n}`]
+    };
   }
-  return { countryCode: item.countryCode || "BR", ref: cleanRoadRef(item.label), alternatives: [cleanRoadRef(item.label).replace("-", " ")] };
+  const ref = cleanRoadRef(item.label);
+  const local = parseRoadCode(ref);
+  return {
+    countryCode: "BR", network: local?.prefix || "BR", number: local?.number || "",
+    stateCode: local && !local.federal ? local.prefix : "", ref,
+    alternatives: [ref.replace("-", " "), ref.replace("-", "")]
+  };
 }
 
 function escapeOverpassRegex(value) {
   return String(value).replace(/[\\.^$|?*+()[{]/g, "\\$&");
 }
 
+function overpassArea(descriptor) {
+  if (descriptor.stateCode) return `area["ISO3166-2"="BR-${descriptor.stateCode}"][admin_level=4]->.searchArea;`;
+  return `area["ISO3166-1"="${descriptor.countryCode || "BR"}"][admin_level=2]->.searchArea;`;
+}
+
 function overpassRoadQuery(descriptor, kind) {
-  const refs = [descriptor.ref, ...(descriptor.alternatives || [])].filter(Boolean);
+  const refs = [...new Set([descriptor.ref, ...(descriptor.alternatives || [])].filter(Boolean))];
   const pattern = refs.map(escapeOverpassRegex).join("|");
-  const area = descriptor.countryCode
-    ? `area["ISO3166-1"="${descriptor.countryCode}"][admin_level=2]->.country;`
-    : "";
-  const scope = descriptor.countryCode ? "(area.country)" : "";
-  if (kind === "relation") {
-    return `[out:json][timeout:55];${area}relation${scope}["type"="route"]["route"="road"]["ref"~"^(${pattern})$",i];out body geom;>;out skel geom;`;
+  const tags = ["ref", "nat_ref", "official_ref"];
+  const selectors = tags.map(tag => `["${tag}"~"(^|;[ ]*)(${pattern})([ ]*;|$)",i]`);
+  const area = overpassArea(descriptor);
+  if (kind === "primary") {
+    const network = descriptor.network ? `["network"~"${escapeOverpassRegex(descriptor.network)}",i]` : "";
+    return `[out:json][timeout:45];${area}relation(area.searchArea)["type"="route"]["route"="road"]${network}["ref"~"^(${pattern})$",i];out body geom;`;
   }
-  return `[out:json][timeout:55];${area}way${scope}["highway"]["ref"~"(^|;[ ]*)(${pattern})([ ]*;|$)",i];out geom;`;
+  if (kind === "relations") {
+    return `[out:json][timeout:55];${area}(${selectors.map(tag => `relation(area.searchArea)["type"="route"]["route"="road"]${tag};`).join("")});out body geom;`;
+  }
+  return `[out:json][timeout:55];${area}(${selectors.map(tag => `way(area.searchArea)["highway"]${tag};`).join("")});out geom;`;
 }
 
 async function requestOverpass(query, signal) {
   let lastError;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
+  const start = Math.floor(Math.random() * OVERPASS_ENDPOINTS.length);
+  for (let attempt = 0; attempt < OVERPASS_ENDPOINTS.length; attempt++) {
+    const endpoint = OVERPASS_ENDPOINTS[(start + attempt) % OVERPASS_ENDPOINTS.length];
     try {
       const timeoutController = new AbortController();
-      const timeout = setTimeout(() => timeoutController.abort(), 60000);
+      const timeout = setTimeout(() => timeoutController.abort(), 50000);
       const relayAbort = () => timeoutController.abort();
       signal?.addEventListener("abort", relayAbort, { once: true });
       try {
         const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-          body: `data=${encodeURIComponent(query)}`,
-          signal: timeoutController.signal
+          method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: `data=${encodeURIComponent(query)}`, signal: timeoutController.signal
         });
-        if (!response.ok) throw new Error(`Overpass ${response.status}`);
+        if (!response.ok) {
+          const retryable = [429, 502, 503, 504].includes(response.status);
+          throw new Error(`Overpass ${response.status}${retryable ? " (temporário)" : ""}`);
+        }
         return await response.json();
       } finally {
         clearTimeout(timeout);
@@ -975,7 +1045,7 @@ function linesFromOverpass(data) {
     const line = (geometry || []).map(point => [Number(point.lat), Number(point.lon)])
       .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
     if (line.length < 2) return;
-    const key = `${line[0].join(",")}:${line[line.length - 1].join(",")}:${line.length}`;
+    const key = `${line[0].map(n => n.toFixed(5))}:${line.at(-1).map(n => n.toFixed(5))}:${line.length}`;
     if (!seen.has(key)) { seen.add(key); lines.push(line); }
   };
   for (const element of data?.elements || []) {
@@ -986,49 +1056,175 @@ function linesFromOverpass(data) {
 }
 
 function highwayCacheKey(descriptor) {
-  return `${HIGHWAY_CACHE_PREFIX}${descriptor.countryCode || "XX"}:${normalizeKey(descriptor.ref)}`;
+  return `${descriptor.countryCode || "XX"}|${descriptor.network || "XX"}|${descriptor.number || normalizeKey(descriptor.ref)}`.toUpperCase();
 }
 
-function cachedHighway(descriptor) {
+function openHighwayDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject(new Error("IndexedDB indisponível"));
+    const request = indexedDB.open(HIGHWAY_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(HIGHWAY_GEOMETRY_STORE)) db.createObjectStore(HIGHWAY_GEOMETRY_STORE, { keyPath: "key" });
+      if (!db.objectStoreNames.contains(HIGHWAY_PROGRESS_STORE)) db.createObjectStore(HIGHWAY_PROGRESS_STORE, { keyPath: "key" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function highwayDbGet(store, key) {
+  const db = await openHighwayDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(store, "readonly").objectStore(store).get(key);
+    request.onsuccess = () => { db.close(); resolve(request.result || null); };
+    request.onerror = () => { db.close(); reject(request.error); };
+  });
+}
+
+async function highwayDbPut(store, value) {
+  const db = await openHighwayDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => { db.close(); resolve(value); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+function lineLengthKm(line) {
+  let total = 0;
+  for (let i = 1; i < line.length; i++) total += haversineKm({ lat: line[i - 1][0], lng: line[i - 1][1] }, { lat: line[i][0], lng: line[i][1] });
+  return total;
+}
+
+function geometryMetadata(lines) {
+  const flat = lines.flat();
+  const lats = flat.map(p => p[0]), lngs = flat.map(p => p[1]);
+  return {
+    bounds: flat.length ? [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]] : null,
+    totalKm: lines.reduce((sum, line) => sum + lineLengthKm(line), 0)
+  };
+}
+
+async function cachedHighway(descriptor, allowExpired = false) {
   try {
-    const cached = JSON.parse(localStorage.getItem(highwayCacheKey(descriptor)) || "null");
-    if (cached?.version === 1 && Date.now() - cached.savedAt < HIGHWAY_CACHE_TTL && Array.isArray(cached.lines)) return cached.lines;
-  } catch {}
+    const entry = await highwayDbGet(HIGHWAY_GEOMETRY_STORE, highwayCacheKey(descriptor));
+    if (entry?.version === HIGHWAY_CACHE_VERSION && (allowExpired || Date.now() - entry.updatedAt < HIGHWAY_CACHE_TTL)) return entry;
+  } catch (error) { console.warn("Cache de rodovias indisponível", error); }
   return null;
 }
 
-function cacheHighway(descriptor, lines) {
-  try { localStorage.setItem(highwayCacheKey(descriptor), JSON.stringify({ version: 1, savedAt: Date.now(), lines })); } catch {}
+async function cacheHighway(descriptor, lines, partial = false) {
+  const meta = geometryMetadata(lines);
+  const entry = { key: highwayCacheKey(descriptor), version: HIGHWAY_CACHE_VERSION, updatedAt: Date.now(), ttl: HIGHWAY_CACHE_TTL, lines, partial, ...meta };
+  await highwayDbPut(HIGHWAY_GEOMETRY_STORE, entry);
+  return entry;
+}
+
+async function fetchFullHighway(descriptor, signal, onStatus = () => {}) {
+  let lines = [];
+  onStatus("Buscando relação principal…");
+  try { lines.push(...linesFromOverpass(await requestOverpass(overpassRoadQuery(descriptor, "primary"), signal))); } catch (error) { if (signal?.aborted) throw error; }
+  onStatus("Buscando relações parciais…");
+  try { lines.push(...linesFromOverpass(await requestOverpass(overpassRoadQuery(descriptor, "relations"), signal))); } catch (error) { if (signal?.aborted) throw error; }
+  lines = linesFromOverpass({ elements: lines.map(line => ({ geometry: line.map(([lat, lon]) => ({ lat, lon })) })) });
+  let partial = false;
+  if (!lines.length) {
+    onStatus("Buscando trechos por referência…");
+    lines = linesFromOverpass(await requestOverpass(overpassRoadQuery(descriptor, "ways"), signal));
+    partial = true;
+  }
+  if (!lines.length) throw new Error("Não foi possível localizar a rodovia completa no OpenStreetMap");
+  onStatus("Processando geometria…");
+  return cacheHighway(descriptor, lines, partial);
+}
+
+function pointSegmentDistanceKm(point, a, b) {
+  const latScale = 111.32, lngScale = Math.cos(point[0] * Math.PI / 180) * 111.32;
+  const px = point[1] * lngScale, py = point[0] * latScale;
+  const ax = a[1] * lngScale, ay = a[0] * latScale, bx = b[1] * lngScale, by = b[0] * latScale;
+  const dx = bx - ax, dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function matchingRoadSegments(lines, tripLines) {
+  const traveled = [];
+  let traveledKm = 0;
+  const tripEdges = [];
+  for (const route of tripLines) for (let i = 1; i < route.length; i++) tripEdges.push([route[i - 1], route[i]]);
+  for (const line of lines) {
+    let run = [], runKm = 0;
+    const flush = () => {
+      if (runKm >= ROAD_MATCH_MIN_KM && run.length > 1) { traveled.push(run); traveledKm += runKm; }
+      run = []; runKm = 0;
+    };
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1], b = line[i];
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const close = tripEdges.some(([x, y]) => pointSegmentDistanceKm(a, x, y) <= ROAD_MATCH_TOLERANCE_KM && pointSegmentDistanceKm(b, x, y) <= ROAD_MATCH_TOLERANCE_KM && pointSegmentDistanceKm(mid, x, y) <= ROAD_MATCH_TOLERANCE_KM);
+      if (close) { if (!run.length) run.push(a); run.push(b); runKm += lineLengthKm([a, b]); } else flush();
+    }
+    flush();
+  }
+  return { segments: traveled, traveledKm };
+}
+
+function progressSignature(entry) {
+  return `${entry.updatedAt}|${state.trips.map(t => `${t.id}:${t.updatedAt || t.createdAt || t.date || ""}`).sort().join("|")}`;
+}
+
+async function highwayProgress(descriptor, entry) {
+  const key = highwayCacheKey(descriptor), signature = progressSignature(entry);
+  const cached = await highwayDbGet(HIGHWAY_PROGRESS_STORE, key).catch(() => null);
+  if (cached?.version === HIGHWAY_CACHE_VERSION && cached.signature === signature) return cached;
+  const tripLines = state.trips.filter(t => ["carro", "moto"].includes(t.mode)).map(tripLatLngs).filter(line => line.length > 1);
+  const matched = matchingRoadSegments(entry.lines, tripLines);
+  const traveledKm = Math.min(entry.totalKm, matched.traveledKm);
+  const result = { key, version: HIGHWAY_CACHE_VERSION, signature, totalKm: entry.totalKm, traveledKm, percent: entry.totalKm ? Math.min(100, traveledKm / entry.totalKm * 100) : 0, segments: matched.segments, updatedAt: Date.now() };
+  await highwayDbPut(HIGHWAY_PROGRESS_STORE, result).catch(() => {});
+  return result;
 }
 
 function setTripsSecondary(secondary) {
-  state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .28 : .9 }));
+  state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .22 : .9 }));
 }
 
-function drawFullHighway(lines, label) {
+function fitHighwayBounds() {
+  if (state.highwayBounds?.isValid()) map.fitBounds(state.highwayBounds, { padding: [28, 28], maxZoom: 10 });
+}
+
+async function drawFullHighway(entry, item, descriptor) {
   const group = L.featureGroup();
-  for (const line of lines) {
-    L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: 10, opacity: .95, interactive: false }).addTo(group);
-    L.polyline(line, { pane: "fullHighwayMain", color: "#d18200", weight: 6, opacity: 1, interactive: false }).addTo(group);
+  for (const line of entry.lines) {
+    L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: 9, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
+    L.polyline(line, { pane: "fullHighwayMain", color: "#c77b00", weight: 5, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
   }
   state.highwayLayer = group.addTo(map);
+  state.highwayBounds = group.getBounds();
   setTripsSecondary(true);
-  const bounds = group.getBounds();
-  if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 });
-  els.highwayBannerTitle.textContent = roadDisplayLabel(label);
-  els.highwayBannerStatus.textContent = "Rodovia integral destacada sobre as viagens.";
+  fitHighwayBounds();
+  els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
+  els.highwayBannerStatus.textContent = entry.partial ? "Geometria parcial encontrada" : "Rodovia carregada";
+  const progress = await highwayProgress(descriptor, entry);
+  if (state.highwayKey !== highwayCacheKey(descriptor)) return;
+  state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: "#168447", weight: 7, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
+  els.highwayProgress.classList.remove("hidden");
+  els.highwayProgressPercent.textContent = `${Math.round(progress.percent)}% concluída`;
+  els.highwayProgressDistance.textContent = `${progress.traveledKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km de ${progress.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km percorridos`;
+  els.highwayProgressBar.style.width = `${progress.percent}%`;
+  els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
 }
 
 function closeFullHighway(restoreFocus = false) {
   state.highwaySelection += 1;
-  state.highwayRequest?.abort();
-  state.highwayRequest = null;
-  state.highwayKey = "";
+  state.highwayRequest?.abort(); state.highwayRequest = null; state.highwayKey = ""; state.highwayBounds = null;
   if (state.highwayLayer) map.removeLayer(state.highwayLayer);
-  state.highwayLayer = null;
+  if (state.highwayProgressLayer) map.removeLayer(state.highwayProgressLayer);
+  state.highwayLayer = null; state.highwayProgressLayer = null;
   setTripsSecondary(false);
-  els.highwayBanner.classList.add("hidden");
-  els.highwayBanner.classList.remove("is-error");
+  els.highwayBanner.classList.add("hidden"); els.highwayBanner.classList.remove("is-error"); els.highwayProgress.classList.add("hidden");
   if (restoreFocus) {
     const visiblePoints = state.trips.filter(trip => trip.visible !== false).flatMap(tripLatLngs);
     if (visiblePoints.length) map.fitBounds(L.latLngBounds(visiblePoints).pad(.12), { maxZoom: 14 });
@@ -1037,39 +1233,111 @@ function closeFullHighway(restoreFocus = false) {
 }
 
 async function showFullHighway(item) {
-  const descriptor = overpassRoadDescriptor(item);
-  const requestedKey = highwayCacheKey(descriptor);
-  if (state.highwayKey === requestedKey && (state.highwayRequest || state.highwayLayer)) return;
-  closeFullHighway();
-  const selection = state.highwaySelection;
-  const controller = new AbortController();
-  state.highwayRequest = controller;
-  state.highwayKey = requestedKey;
-  els.highwayBanner.classList.remove("hidden", "is-error");
+  const descriptor = overpassRoadDescriptor(item), requestedKey = highwayCacheKey(descriptor);
+  if (state.highwayKey === requestedKey && state.highwayLayer) { fitHighwayBounds(); return; }
+  if (state.highwayKey === requestedKey && state.highwayRequest) return;
+  closeTripRoadHighlight(); closeFullHighway();
+  const selection = state.highwaySelection, controller = new AbortController();
+  state.highwayRequest = controller; state.highwayKey = requestedKey;
+  els.highwayBanner.classList.remove("hidden", "is-error"); els.highwayProgress.classList.add("hidden");
   els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
-  els.highwayBannerStatus.textContent = "Buscando a geometria integral no OpenStreetMap…";
   try {
-    let lines = cachedHighway(descriptor);
-    if (!lines) {
-      const relationData = await requestOverpass(overpassRoadQuery(descriptor, "relation"), controller.signal);
-      lines = linesFromOverpass(relationData);
-      if (!lines.length) {
-        els.highwayBannerStatus.textContent = "Relação completa não encontrada; buscando trechos da via…";
-        const wayData = await requestOverpass(overpassRoadQuery(descriptor, "way"), controller.signal);
-        lines = linesFromOverpass(wayData);
-      }
-      if (!lines.length) throw new Error("Geometria não encontrada");
-      cacheHighway(descriptor, lines);
-    }
+    let entry = await cachedHighway(descriptor);
+    if (!entry) entry = await fetchFullHighway(descriptor, controller.signal, status => { if (selection === state.highwaySelection) els.highwayBannerStatus.textContent = status; });
     if (selection !== state.highwaySelection || controller.signal.aborted) return;
-    drawFullHighway(lines, item.label);
+    await drawFullHighway(entry, item, descriptor);
   } catch (error) {
     if (error.name === "AbortError" || selection !== state.highwaySelection) return;
     els.highwayBanner.classList.add("is-error");
-    els.highwayBannerStatus.textContent = "Não foi possível carregar esta rodovia agora. Suas viagens continuam disponíveis.";
-  } finally {
-    if (state.highwayRequest === controller) state.highwayRequest = null;
+    els.highwayBannerStatus.textContent = "Não foi possível localizar a rodovia completa no OpenStreetMap";
+  } finally { if (state.highwayRequest === controller) state.highwayRequest = null; }
+}
+
+function closeTripRoadHighlight() {
+  if (state.tripRoadLayer) map.removeLayer(state.tripRoadLayer);
+  state.tripRoadLayer = null;
+  state.tripRoadKey = "";
+  els.tripDetailContent?.querySelectorAll(".detail-road-list .active").forEach(button => button.classList.remove("active"));
+  if (!state.highwayLayer) setTripsSecondary(false);
+}
+
+async function showTripRoadSegment(trip, label, button) {
+  const key = `${trip.id}|${normalizeKey(label)}`;
+  if (state.tripRoadKey === key && state.tripRoadLayer) {
+    const bounds = state.tripRoadLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds.pad(.15), { maxZoom: 15 });
+    return;
   }
+  closeFullHighway();
+  closeTripRoadHighlight();
+  let segments = trip.roadSegments?.[label] || [];
+  if (!segments.length) {
+    const descriptor = overpassRoadDescriptor({ label, countryCode: roadCountryForAchievement(label, trip) });
+    const entry = await cachedHighway(descriptor, true);
+    if (entry) {
+      segments = matchingRoadSegments(entry.lines, [tripLatLngs(trip)]).segments;
+      if (segments.length) { trip.roadSegments[label] = segments; saveTrips(); }
+    }
+  }
+  if (!segments.length) {
+    alert("O trecho desta rodovia ainda não pôde ser reconstruído para esta viagem antiga.");
+    return;
+  }
+  state.tripRoadLayer = L.featureGroup(segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: "#ef8d00", weight: 8, opacity: 1, interactive: false }))).addTo(map);
+  state.tripRoadKey = key;
+  setTripsSecondary(true);
+  button?.classList.add("active");
+  const bounds = state.tripRoadLayer.getBounds();
+  if (bounds.isValid()) map.fitBounds(bounds.pad(.15), { maxZoom: 15 });
+}
+
+function queueRoadsForPreload(roads) {
+  const snapshot = getAchievementSnapshot();
+  for (const road of roads || []) {
+    const item = snapshot.roads.get(normalizeKey(road)) || { label: road, countryCode: "BR" };
+    const key = highwayCacheKey(overpassRoadDescriptor(item));
+    if (!state.highwayQueueKeys.has(key)) { state.highwayQueueKeys.add(key); state.highwayQueue.push(item); }
+  }
+  scheduleHighwayQueue();
+}
+
+function scheduleHighwayQueue() {
+  if (state.highwayQueueRunning || !state.highwayQueue.length) return;
+  const run = () => processHighwayQueue();
+  if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 2500 });
+  else setTimeout(run, 100);
+}
+
+async function reviewTripsAgainstHighway(item, descriptor, entry) {
+  let changed = false;
+  for (const trip of state.trips) {
+    if (!["carro", "moto"].includes(trip.mode) || tripLatLngs(trip).length < 2) continue;
+    const matched = matchingRoadSegments(entry.lines, [tripLatLngs(trip)]);
+    if (matched.traveledKm < ROAD_MATCH_MIN_KM) continue;
+    let tripChanged = false;
+    const existing = (trip.conquests.roads || []).some(road => normalizeKey(road) === normalizeKey(item.label));
+    if (!existing) { trip.conquests.roads.push(item.label); tripChanged = true; }
+    if (!trip.roadSegments[item.label]?.length) { trip.roadSegments[item.label] = matched.segments; tripChanged = true; }
+    if (tripChanged) { trip.updatedAt = new Date().toISOString(); changed = true; }
+  }
+  if (changed) { saveTrips(); renderTrips(); }
+}
+
+async function processHighwayQueue() {
+  if (state.highwayQueueRunning) return;
+  state.highwayQueueRunning = true;
+  while (state.highwayQueue.length) {
+    const item = state.highwayQueue.shift();
+    const descriptor = overpassRoadDescriptor(item), key = highwayCacheKey(descriptor);
+    try {
+      let entry = await cachedHighway(descriptor);
+      if (!entry) entry = await fetchFullHighway(descriptor, null);
+      await reviewTripsAgainstHighway(item, descriptor, entry);
+    } catch (error) { console.warn(`Pré-carregamento de ${item.label} adiado`, error); }
+    finally { state.highwayQueueKeys.delete(key); }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  state.highwayQueueRunning = false;
 }
 
 function setTripConquests(trip, route = null) {
@@ -1077,6 +1345,8 @@ function setTripConquests(trip, route = null) {
     cities: cityConquestsForTrip(trip),
     roads: trip.mode === "aviao" ? [] : (route ? extractHighwaysFromRoute(route, trip) : (trip.conquests?.roads || []))
   };
+  if (route) trip.roadSegments = extractRoadSegmentsFromRoute(route, trip);
+  trip.updatedAt = new Date().toISOString();
 }
 
 function newConquestsAgainstSnapshot(trip, snapshot) {
@@ -1113,7 +1383,7 @@ function renderAchievements() {
         <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
         <div>
           <strong>${escapeHtml(roadDisplayLabel(item.label))}</strong>
-          <small>${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small>
+          <small>${type === "road" ? "Rodovia conquistada" : `${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}`}</small>
         </div>`;
       card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
       container.appendChild(card);
@@ -1182,6 +1452,7 @@ async function deleteTrip(trip) {
   if (!confirm(`Excluir a viagem "${trip.name}"?`)) return;
   if (state.editingTripId === trip.id) finishRouteEdit();
   state.trips = state.trips.filter(t => t.id !== trip.id);
+  if (state.tripRoadKey.startsWith(`${trip.id}|`)) closeTripRoadHighlight();
   saveTrips();
   try { await deleteMediaByTrip(trip.id); } catch {}
   state.activeTripDetailId = null;
@@ -1224,7 +1495,7 @@ function renderTripDetail() {
       </div>
       <div class="detail-section-title">Rodovias desta viagem</div>
       ${roads.length
-        ? `<div class="detail-road-list">${roads.map(road => `<span title="${escapeHtml(roadDisplayLabel(road))}">${roadShieldMarkup(road, "achievement")}</span>`).join("")}</div>`
+        ? `<div class="detail-road-list">${roads.map(road => `<button type="button" data-road="${escapeHtml(road)}" title="Destacar ${escapeHtml(roadDisplayLabel(road))} nesta viagem" aria-label="Destacar ${escapeHtml(roadDisplayLabel(road))} nesta viagem">${roadShieldMarkup(road, "achievement")}</button>`).join("")}</div>`
         : `<p class="micro-hint detail-no-roads">Nenhuma rodovia foi identificada automaticamente nesta viagem.</p>`}
       <div class="trip-detail-actions">
         <button type="button" class="focus-btn">Ver no mapa</button>
@@ -1272,6 +1543,7 @@ function renderTripDetail() {
   els.tripDetailContent.querySelector(".edit-places-btn")?.addEventListener("click", () => openEditPlacesDialog(trip));
   els.tripDetailContent.querySelector(".edit-route-btn")?.addEventListener("click", () => beginRouteEdit(trip));
   els.tripDetailContent.querySelector(".refresh-roads-btn")?.addEventListener("click", () => refreshTripRoads(trip));
+  els.tripDetailContent.querySelectorAll(".detail-road-list [data-road]").forEach(button => button.addEventListener("click", () => showTripRoadSegment(trip, button.dataset.road, button)));
   const detailColorWheel = els.tripDetailContent.querySelector(".trip-color-wheel");
   if (detailColorWheel) {
     setupColorWheel(detailColorWheel, routeColor, color => {
@@ -2379,6 +2651,7 @@ function applyRouteToTrip(trip, route) {
   trip.duration = Number.isFinite(route.duration) ? route.duration : null;
   trip.points = [];
   trip.roadLabels = extractRoadLabelsFromRoute(route, trip);
+  trip.roadSegments = extractRoadSegmentsFromRoute(route, trip);
   (trip.stopPlaces || []).forEach(stop => {
     if (Number.isFinite(Number(stop.lat)) && Number.isFinite(Number(stop.lng))) {
       stop.progress = nearestRouteProgress(trip, L.latLng(stop.lat, stop.lng));
@@ -2402,6 +2675,7 @@ function saveSelectedRoute() {
   renderTrips();
   focusTrip(trip);
   celebrateConquests(newItems, trip.name);
+  queueRoadsForPreload(trip.conquests?.roads || []);
 }
 
 function cleanupRouteChooser() {
@@ -2562,6 +2836,7 @@ async function finishManualTrip() {
   renderTrips();
   focusTrip(trip);
   celebrateConquests(newItems, trip.name);
+  queueRoadsForPreload(trip.conquests?.roads || []);
   els.finishTripBtn.disabled = false;
   els.finishTripBtn.textContent = "Concluir viagem";
 }
@@ -2641,8 +2916,11 @@ async function refreshTripRoads(trip) {
     const route = routes[0];
     trip.roadLabels = extractRoadLabelsFromRoute(route, trip);
     trip.conquests.roads = extractHighwaysFromRoute(route, trip);
+    trip.roadSegments = extractRoadSegmentsFromRoute(route, trip);
+    trip.updatedAt = new Date().toISOString();
     saveTrips();
     renderTrips();
+    queueRoadsForPreload(trip.conquests.roads);
   } catch (error) {
     console.error("Falha ao atualizar rodovias", error);
     alert("Não foi possível reidentificar as rodovias desta viagem agora.");
@@ -2818,6 +3096,7 @@ async function applyEditedWaypoints(trip, nextWaypoints, message) {
     renderTrips();
     createEditLayers(trip);
     celebrateConquests(newItems, trip.name);
+    queueRoadsForPreload(trip.conquests?.roads || []);
     return true;
   } catch {
     alert("Não foi possível recalcular esse ajuste. Tente outro ponto da via.");
@@ -3186,4 +3465,5 @@ if (saveTrips()) {
   for (const key of LEGACY_KEYS) { try { localStorage.removeItem(key); } catch {} }
 }
 renderTrips();
+queueRoadsForPreload([...getAchievementSnapshot().roads.values()].map(item => item.label));
 requestAnimationFrame(() => map.invalidateSize());

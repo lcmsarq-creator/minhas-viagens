@@ -106,6 +106,11 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .highway-banner { position: absolute; z-index: 910; right: 18px; top: 18px; width: min(430px, calc(100% - 36px)); padding: 12px 14px; display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.97); border: 1px solid #d09a2a; border-radius: 14px; box-shadow: var(--shadow); }
 .highway-banner .ghost-btn { flex: 0 0 auto; }
 .highway-banner.is-error { border-color: var(--danger); }
+.highway-progress { display: grid; gap: 4px; margin-top: 7px; min-width: 240px; }
+.highway-progress > strong { font-size: .88rem; }
+.highway-progress > span { font-size: .76rem; color: var(--muted); }
+.highway-progress-track { height: 9px; overflow: hidden; border-radius: 999px; background: #d9ddd9; }
+.highway-progress-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: #21854c; transition: width .25s ease; }
 
 .achievement-toast { position: absolute; z-index: 1200; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(390px, calc(100% - 30px)); background: white; border: 2px solid #e4c671; box-shadow: 0 22px 55px rgba(43,35,16,.25); border-radius: 18px; padding: 18px; display: flex; gap: 14px; align-items: center; animation: achievementIn .55s cubic-bezier(.18,.89,.32,1.28); }
 .achievement-toast::before, .achievement-toast::after { content: "✦"; position: absolute; color: #d29a2a; font-size: 1.1rem; animation: sparkle 1.2s ease infinite alternate; }
@@ -233,7 +238,8 @@ textarea { resize: vertical; }
   .form-grid-three { grid-template-columns: 1fr; }
 }
 .detail-road-list { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
-.detail-road-list > span { width: 44px; height: 53px; display: inline-block; }
+.detail-road-list > button { width: 48px; height: 57px; display: inline-block; padding: 2px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+.detail-road-list > button:hover, .detail-road-list > button:focus-visible, .detail-road-list > button.active { outline: 2px solid #d09a2a; background: #fff5dc; }
 
 /* v0.6.5 — paradas, foco de viagem e edição de nome */
 .stops-section { margin: 2px 0 14px; padding: 11px; border: 1px solid var(--border); border-radius: 12px; background: #fafbfa; }

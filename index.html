@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Minhas Viagens</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">MV</div>
+        <div>
+          <h1>Minhas Viagens</h1>
+          <p>Seu mapa pessoal de caminhos percorridos.</p>
+        </div>
+      </div>
+
+      <button id="newTripBtn" class="primary-btn">+ Nova viagem</button>
+
+      <div class="sidebar-tabs" role="tablist" aria-label="Navegação lateral">
+        <button id="tripsTabBtn" class="sidebar-tab active" type="button" role="tab" aria-selected="true">Viagens</button>
+        <button id="achievementsTabBtn" class="sidebar-tab" type="button" role="tab" aria-selected="false">Conquistas</button>
+      </div>
+
+      <section id="tripsPanel" class="panel tab-panel">
+        <div class="panel-header">
+          <h2>Viagens</h2>
+          <span id="tripCount" class="badge">0</span>
+        </div>
+        <div id="tripList" class="trip-list">
+          <p class="empty">Nenhuma viagem cadastrada ainda.</p>
+        </div>
+      </section>
+
+      <section id="tripDetailPanel" class="panel tab-panel hidden" aria-live="polite">
+        <button id="backToTripsBtn" class="detail-back-btn" type="button">← Voltar às viagens</button>
+        <div id="tripDetailContent"></div>
+      </section>
+
+      <section id="achievementsPanel" class="panel tab-panel hidden">
+        <div class="achievement-summary">
+          <div><strong id="cityAchievementCount">0</strong><span>Cidades</span></div>
+          <div><strong id="roadAchievementCount">0</strong><span>Rodovias</span></div>
+        </div>
+        <div class="achievement-section">
+          <h2>Cidades conquistadas</h2>
+          <div id="cityAchievementList" class="achievement-list"></div>
+        </div>
+        <div class="achievement-section">
+          <h2>Rodovias conquistadas</h2>
+          <div id="roadAchievementList" class="achievement-list"></div>
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <h2>Backup</h2>
+        <div class="button-row">
+          <button id="exportBtn" class="secondary-btn">Exportar</button>
+          <label class="secondary-btn file-btn">
+            Importar
+            <input id="importInput" type="file" accept=".json,application/json" hidden />
+          </label>
+        </div>
+        <p class="micro-hint">O backup JSON inclui rotas, pontos e conquistas. Fotos e vídeos ainda ficam apenas neste navegador.</p>
+      </section>
+
+      <p class="hint">Os dados ficam neste navegador. A busca aceita somente cidades; as rotas usam serviços online gratuitos.</p>
+    </aside>
+
+    <main class="map-area">
+      <div id="map"></div>
+
+      <section id="routeChooser" class="route-chooser hidden" aria-live="polite">
+        <div class="route-chooser-head">
+          <div>
+            <strong id="routeChooserTitle">Escolha a rota percorrida</strong>
+            <span id="routeChooserEndpoints"></span>
+          </div>
+          <button id="closeRouteChooserBtn" class="icon-btn" type="button" aria-label="Cancelar">×</button>
+        </div>
+        <div id="routeOptions" class="route-options"></div>
+        <div class="route-chooser-actions">
+          <button id="manualRouteBtn" type="button" class="secondary-btn">Desenhar manualmente</button>
+          <button id="saveSelectedRouteBtn" type="button" class="primary-btn" disabled>Salvar rota escolhida</button>
+        </div>
+      </section>
+
+      <section id="drawBanner" class="draw-banner hidden" aria-live="polite">
+        <div class="draw-copy">
+          <strong id="drawTitle">Desenhando rota</strong>
+          <span id="drawRouteText">Clique no mapa para marcar o caminho.</span>
+        </div>
+        <div class="draw-actions">
+          <button id="undoPointBtn" class="secondary-btn small" type="button">Desfazer ponto</button>
+          <button id="finishTripBtn" class="primary-btn small" type="button">Concluir viagem</button>
+          <button id="cancelTripBtn" class="ghost-btn small" type="button">Cancelar</button>
+        </div>
+      </section>
+
+      <section id="editBanner" class="draw-banner edit-banner hidden" aria-live="polite">
+        <div class="draw-copy">
+          <strong>Ajustando rota</strong>
+          <span>Clique, segure e arraste qualquer trecho da linha. Ao soltar, a rota será recalculada passando pelo ponto escolhido.</span>
+        </div>
+        <div class="draw-actions">
+          <button id="cancelEditBtn" class="ghost-btn small" type="button">Cancelar ajuste</button>
+          <button id="finishEditBtn" class="primary-btn small" type="button">Concluir ajuste</button>
+        </div>
+      </section>
+
+      <div id="achievementToast" class="achievement-toast hidden" aria-live="assertive">
+        <div class="achievement-burst">★</div>
+        <div>
+          <span>Nova conquista!</span>
+          <strong id="achievementToastTitle">Cidade conquistada</strong>
+          <small id="achievementToastSubtitle"></small>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="tripDialog">
+    <form id="tripForm" novalidate>
+      <div class="dialog-head">
+        <div>
+          <h2>Nova viagem</h2>
+          <p>Escolha as cidades de partida e chegada e, se quiser, adicione paradas intermediárias.</p>
+        </div>
+        <button type="button" id="closeDialogBtn" class="icon-btn" aria-label="Fechar">×</button>
+      </div>
+
+      <label>
+        Nome da viagem
+        <input id="tripName" required maxlength="80" placeholder="Ex.: Paraná 2026" />
+      </label>
+
+      <div class="form-grid form-grid-three">
+        <label>
+          Data inicial <span class="optional-label">(opcional)</span>
+          <input id="tripDate" type="date" />
+        </label>
+        <label>
+          Meio de transporte
+          <select id="tripMode">
+            <option value="carro">Carro</option>
+            <option value="moto">Moto</option>
+            <option value="bicicleta">Bicicleta</option>
+            <option value="a-pe">A pé</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+        <label class="color-wheel-field">
+          Cor da rota
+          <input id="tripColor" type="hidden" value="#2f6d50" />
+          <canvas id="newTripColorWheel" class="color-wheel" width="76" height="76" tabindex="0" role="slider" aria-label="Escolher cor da rota arrastando pelo globo de cores"></canvas>
+        </label>
+      </div>
+
+      <div class="autocomplete-field">
+        <label for="startAddress">Cidade de partida</label>
+        <div class="search-wrap">
+          <input id="startAddress" maxlength="180" placeholder="Ex.: Santa Maria, RS" autocomplete="off" aria-autocomplete="list" aria-controls="startSuggestions" />
+          <span id="startStatus" class="search-status"></span>
+          <div id="startSuggestions" class="suggestions hidden" role="listbox"></div>
+        </div>
+        <small id="startSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+      </div>
+
+      <div class="stops-section">
+        <div class="stops-section-head">
+          <div>
+            <strong>Paradas intermediárias</strong>
+            <small>Opcional. Adicione as cidades na ordem em que passou por elas.</small>
+          </div>
+          <button type="button" id="addStopBtn" class="secondary-btn small">+ Adicionar parada</button>
+        </div>
+        <div id="stopsContainer" class="stops-container"></div>
+      </div>
+
+      <div class="autocomplete-field">
+        <label for="endAddress">Cidade de chegada</label>
+        <div class="search-wrap">
+          <input id="endAddress" maxlength="180" placeholder="Ex.: Montevidéu" autocomplete="off" aria-autocomplete="list" aria-controls="endSuggestions" />
+          <span id="endStatus" class="search-status"></span>
+          <div id="endSuggestions" class="suggestions hidden" role="listbox"></div>
+        </div>
+        <small id="endSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+      </div>
+
+      <label>
+        Observações
+        <textarea id="tripNotes" rows="3" maxlength="400" placeholder="Opcional"></textarea>
+      </label>
+
+      <div id="formMessage" class="form-message hidden" role="status"></div>
+
+      <div class="dialog-actions split-actions">
+        <button type="button" id="cancelDialogBtn" class="ghost-btn">Cancelar</button>
+        <div class="right-actions">
+          <button type="button" id="manualFromDialogBtn" class="secondary-btn" disabled>Desenhar manualmente</button>
+          <button type="submit" id="suggestRoutesBtn" class="primary-btn" disabled>Sugerir rotas</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="editPlacesDialog">
+    <form id="editPlacesForm" novalidate>
+      <div class="dialog-head">
+        <div>
+          <h2>Editar início, fim e paradas</h2>
+          <p>Altere as cidades e salve para recalcular o trajeto. Ajustes manuais antigos da rota serão limpos.</p>
+        </div>
+        <button type="button" id="closeEditPlacesBtn" class="icon-btn" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="autocomplete-field">
+        <label for="editStartAddress">Cidade de partida</label>
+        <div class="search-wrap">
+          <input id="editStartAddress" maxlength="180" placeholder="Ex.: São José do Rio Preto, SP" autocomplete="off" aria-autocomplete="list" aria-controls="editStartSuggestions" />
+          <span id="editStartStatus" class="search-status"></span>
+          <div id="editStartSuggestions" class="suggestions hidden" role="listbox"></div>
+        </div>
+        <small id="editStartSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+      </div>
+
+      <div class="stops-section">
+        <div class="stops-section-head">
+          <div>
+            <strong>Paradas intermediárias</strong>
+            <small>Adicione ou remova cidades na ordem em que foram percorridas.</small>
+          </div>
+          <button type="button" id="editAddStopBtn" class="secondary-btn small">+ Adicionar parada</button>
+        </div>
+        <div id="editStopsContainer" class="stops-container"></div>
+      </div>
+
+      <div class="autocomplete-field">
+        <label for="editEndAddress">Cidade de chegada</label>
+        <div class="search-wrap">
+          <input id="editEndAddress" maxlength="180" placeholder="Ex.: Delfinópolis, MG" autocomplete="off" aria-autocomplete="list" aria-controls="editEndSuggestions" />
+          <span id="editEndStatus" class="search-status"></span>
+          <div id="editEndSuggestions" class="suggestions hidden" role="listbox"></div>
+        </div>
+        <small id="editEndSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+      </div>
+
+      <div id="editPlacesMessage" class="form-message hidden" role="status"></div>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancelEditPlacesBtn" class="ghost-btn">Cancelar</button>
+        <button type="submit" id="saveEditPlacesBtn" class="primary-btn">Salvar e recalcular rota</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="routePointDialog" class="point-dialog">
+    <form id="routePointForm">
+      <div class="dialog-head">
+        <div>
+          <h2 id="routePointDialogTitle">Adicionar ponto</h2>
+          <p>Este ponto ficará vinculado exatamente à rota.</p>
+        </div>
+        <button type="button" id="closePointDialogBtn" class="icon-btn" aria-label="Fechar">×</button>
+      </div>
+
+      <label>
+        Descrição
+        <textarea id="routePointDescription" rows="4" maxlength="700" placeholder="Ex.: Parada para almoço, mirante, camping, cachoeira..."></textarea>
+      </label>
+
+      <label class="media-picker">
+        Fotos ou vídeos
+        <input id="routePointMedia" type="file" accept="image/*,video/*" multiple />
+        <small>Você pode selecionar vários arquivos. Eles ficam armazenados neste navegador.</small>
+      </label>
+
+      <div id="routePointMediaPreview" class="media-preview"></div>
+      <div id="pointFormMessage" class="form-message hidden" role="status"></div>
+
+      <div class="dialog-actions">
+        <button type="button" id="deletePointBtn" class="danger-btn hidden">Excluir ponto</button>
+        <button type="button" id="cancelPointDialogBtn" class="ghost-btn">Cancelar</button>
+        <button type="submit" class="primary-btn">Salvar ponto</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="script.js"></script>
+</body>
+</html>

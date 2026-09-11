@@ -5,8 +5,6 @@ const OSRM_ENDPOINTS = [
   "https://router.project-osrm.org/route/v1/driving/",
   "https://routing.openstreetmap.de/routed-car/route/v1/driving/"
 ];
-const MEDIA_DB_NAME = "minhasViagensMedia.v1";
-const MEDIA_STORE = "media";
 const AIRPORTS_CSV_URLS = [
   "https://davidmegginson.github.io/ourairports-data/airports.csv",
   "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
@@ -164,8 +162,6 @@ const els = {
   routePointForm: document.getElementById("routePointForm"),
   routePointDialogTitle: document.getElementById("routePointDialogTitle"),
   routePointDescription: document.getElementById("routePointDescription"),
-  routePointMedia: document.getElementById("routePointMedia"),
-  routePointMediaPreview: document.getElementById("routePointMediaPreview"),
   pointFormMessage: document.getElementById("pointFormMessage"),
   closePointDialogBtn: document.getElementById("closePointDialogBtn"),
   cancelPointDialogBtn: document.getElementById("cancelPointDialogBtn"),
@@ -593,7 +589,7 @@ function saveTrips() {
       return true;
     } catch (secondError) {
       console.error("Falha ao salvar viagens", secondError);
-      alert("O navegador ficou sem espaço para salvar a rota. Exporte um backup e remova viagens antigas ou mídias pesadas.");
+      alert("O navegador ficou sem espaço para salvar a rota. Exporte um backup e remova viagens antigas.");
       return false;
     }
   }
@@ -1454,7 +1450,6 @@ async function deleteTrip(trip) {
   state.trips = state.trips.filter(t => t.id !== trip.id);
   if (state.tripRoadKey.startsWith(`${trip.id}|`)) closeTripRoadHighlight();
   saveTrips();
-  try { await deleteMediaByTrip(trip.id); } catch {}
   state.activeTripDetailId = null;
   showTripList();
 }
@@ -3180,83 +3175,8 @@ function cancelRouteEdit() {
   finishRouteEdit();
 }
 
-function openMediaDb() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) return reject(new Error("IndexedDB indisponível"));
-    const request = indexedDB.open(MEDIA_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      const store = db.createObjectStore(MEDIA_STORE, { keyPath: "id" });
-      store.createIndex("pointId", "pointId", { unique: false });
-      store.createIndex("tripId", "tripId", { unique: false });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function getMediaForPoint(pointId) {
-  const db = await openMediaDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(MEDIA_STORE, "readonly");
-    const request = tx.objectStore(MEDIA_STORE).index("pointId").getAll(pointId);
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-  });
-}
-
-async function saveMediaFiles(tripId, pointId, files) {
-  if (!files.length) return;
-  const db = await openMediaDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(MEDIA_STORE, "readwrite");
-    const store = tx.objectStore(MEDIA_STORE);
-    files.forEach(file => store.put({
-      id: uid(), tripId, pointId, name: file.name, type: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString(), blob: file
-    }));
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-    tx.onabort = () => { db.close(); reject(tx.error || new Error("Falha ao salvar mídia")); };
-  });
-}
-
-async function deleteMediaIds(ids) {
-  if (!ids.length) return;
-  const db = await openMediaDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(MEDIA_STORE, "readwrite");
-    const store = tx.objectStore(MEDIA_STORE);
-    ids.forEach(id => store.delete(id));
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-
-async function deleteMediaByTrip(tripId) {
-  const db = await openMediaDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(MEDIA_STORE, "readwrite");
-    const store = tx.objectStore(MEDIA_STORE);
-    const index = store.index("tripId");
-    const request = index.openCursor(IDBKeyRange.only(tripId));
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (cursor) { cursor.delete(); cursor.continue(); }
-    };
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-
-function clearPointEditorUrls() {
-  for (const url of state.pointEditor?.objectUrls || []) URL.revokeObjectURL(url);
-  if (state.pointEditor) state.pointEditor.objectUrls = [];
-}
-
-async function openRoutePointDialog(trip, latlng = null, existingPoint = null) {
+function openRoutePointDialog(trip, latlng = null, existingPoint = null) {
   if (state.drawing || state.editingTripId) return;
-  clearPointEditorUrls();
   const snapped = existingPoint ? L.latLng(existingPoint.lat, existingPoint.lng) : nearestLatLngOnRoute(trip, latlng);
   const pointId = existingPoint?.id || uid();
   state.pointEditor = {
@@ -3264,63 +3184,17 @@ async function openRoutePointDialog(trip, latlng = null, existingPoint = null) {
     pointId,
     isExisting: Boolean(existingPoint),
     lat: snapped.lat,
-    lng: snapped.lng,
-    existingMedia: [],
-    pendingFiles: [],
-    removedIds: new Set(),
-    objectUrls: []
+    lng: snapped.lng
   };
   els.routePointDialogTitle.textContent = existingPoint ? "Editar ponto" : "Adicionar ponto";
   els.routePointDescription.value = existingPoint?.description || "";
-  els.routePointMedia.value = "";
   els.deletePointBtn.classList.toggle("hidden", !existingPoint);
   els.pointFormMessage.classList.add("hidden");
   els.pointFormMessage.textContent = "";
-  els.routePointMediaPreview.innerHTML = '<p class="empty">Carregando mídia…</p>';
   els.routePointDialog.showModal();
-
-  try {
-    state.pointEditor.existingMedia = await getMediaForPoint(pointId);
-  } catch {
-    state.pointEditor.existingMedia = [];
-  }
-  renderPointMediaPreview();
-}
-
-function renderPointMediaPreview() {
-  if (!state.pointEditor) return;
-  clearPointEditorUrls();
-  const editor = state.pointEditor;
-  const items = [
-    ...editor.existingMedia.filter(item => !editor.removedIds.has(item.id)).map(item => ({ kind: "existing", id: item.id, name: item.name, type: item.type, blob: item.blob })),
-    ...editor.pendingFiles.map(item => ({ kind: "pending", id: item.id, name: item.file.name, type: item.file.type, blob: item.file }))
-  ];
-  els.routePointMediaPreview.innerHTML = "";
-  if (!items.length) {
-    els.routePointMediaPreview.innerHTML = '<p class="empty">Nenhuma mídia adicionada.</p>';
-    return;
-  }
-
-  items.forEach(item => {
-    const url = URL.createObjectURL(item.blob);
-    editor.objectUrls.push(url);
-    const wrapper = document.createElement("div");
-    wrapper.className = "media-item";
-    const media = item.type.startsWith("video/")
-      ? `<video src="${url}" muted controls preload="metadata"></video>`
-      : `<img src="${url}" alt="${escapeHtml(item.name)}">`;
-    wrapper.innerHTML = `${media}<button class="remove-media" type="button" aria-label="Remover mídia">×</button><span>${escapeHtml(item.name)}</span>`;
-    wrapper.querySelector(".remove-media").addEventListener("click", () => {
-      if (item.kind === "existing") editor.removedIds.add(item.id);
-      else editor.pendingFiles = editor.pendingFiles.filter(file => file.id !== item.id);
-      renderPointMediaPreview();
-    });
-    els.routePointMediaPreview.appendChild(wrapper);
-  });
 }
 
 function closeRoutePointDialog() {
-  clearPointEditorUrls();
   state.pointEditor = null;
   if (els.routePointDialog.open) els.routePointDialog.close();
 }
@@ -3341,12 +3215,6 @@ async function saveRoutePoint(event) {
   }
   saveTrips();
 
-  try {
-    await deleteMediaIds([...editor.removedIds]);
-    await saveMediaFiles(trip.id, point.id, editor.pendingFiles.map(item => item.file));
-  } catch {
-    alert("O ponto foi salvo, mas alguma mídia não pôde ser armazenada. O navegador pode estar sem espaço disponível.");
-  }
   closeRoutePointDialog();
   renderTrips();
 }
@@ -3354,13 +3222,9 @@ async function saveRoutePoint(event) {
 async function deleteCurrentPoint() {
   const editor = state.pointEditor;
   if (!editor || !editor.isExisting) return;
-  if (!confirm("Excluir este ponto e as mídias vinculadas a ele?")) return;
+  if (!confirm("Excluir este ponto?")) return;
   const trip = state.trips.find(t => t.id === editor.tripId);
   if (!trip) return;
-  try {
-    const media = await getMediaForPoint(editor.pointId);
-    await deleteMediaIds(media.map(item => item.id));
-  } catch {}
   trip.pointsOfInterest = trip.pointsOfInterest.filter(point => point.id !== editor.pointId);
   saveTrips();
   closeRoutePointDialog();
@@ -3368,7 +3232,7 @@ async function deleteCurrentPoint() {
 }
 
 function exportBackup() {
-  const payload = { app: "Minhas Viagens", version: "0.6.6", exportedAt: new Date().toISOString(), note: "Mídias do IndexedDB não estão incluídas neste JSON.", trips: state.trips };
+  const payload = { app: "Minhas Viagens", version: "0.8.0", exportedAt: new Date().toISOString(), trips: state.trips };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -3440,14 +3304,6 @@ els.closePointDialogBtn.addEventListener("click", closeRoutePointDialog);
 els.cancelPointDialogBtn.addEventListener("click", closeRoutePointDialog);
 els.routePointForm.addEventListener("submit", saveRoutePoint);
 els.deletePointBtn.addEventListener("click", deleteCurrentPoint);
-els.routePointMedia.addEventListener("change", event => {
-  if (!state.pointEditor) return;
-  const files = [...event.target.files];
-  state.pointEditor.pendingFiles.push(...files.map(file => ({ id: uid(), file })));
-  event.target.value = "";
-  renderPointMediaPreview();
-});
-
 map.on("click", event => { if (state.drawing) addDraftPoint(event.latlng); });
 map.on("mousemove", updateEditDrag);
 map.on("mouseup", finishEditDrag);

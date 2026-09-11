@@ -1,6 +1,6 @@
 (() => {
   const STORAGE_KEY = "minhasViagens.v0.6.7";
-  const APP_VERSION = "0.7.1";
+  const APP_VERSION = "0.8.0";
 
   // A fila de abertura da v0.7.0 já foi preenchida, mas seu início foi bloqueado
   // pelo hotfix-pre.js. Limpa essa fila para que abrir o app nunca reprocese todas
@@ -222,7 +222,7 @@
       app: "Minhas Viagens",
       version: APP_VERSION,
       exportedAt: new Date().toISOString(),
-      note: "Mídias e cache de segmentos de rodovia do IndexedDB não estão incluídos neste JSON.",
+      note: "O cache de segmentos de rodovia do IndexedDB não está incluído neste JSON.",
       trips: state.trips
     };
     const json = JSON.stringify(payload, (key, value) => key === "roadSegments" ? undefined : value, 2);

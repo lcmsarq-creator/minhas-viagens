@@ -60,3 +60,73 @@ test("migração do armazenamento legado é não destrutiva", () => {
   const migrated = sync.serializeTripForCloud(legacy);
   assert.equal(migrated.id, "legacy"); assert.equal(migrated.roadSegments, undefined); assert.ok(legacy.roadSegments);
 });
+
+function memoryStorage(initial = {}, failKey = null) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem(key, value) { if (key === failKey) { const error = new Error("quota"); error.name = "QuotaExceededError"; throw error; } values.set(key, value); },
+    removeItem: key => values.delete(key),
+    has: key => values.has(key),
+    value: key => values.get(key)
+  };
+}
+
+function migrationFixture({ remote = [], failCache = false } = {}) {
+  const legacyTrip = trip("legacy", "2026-01-01");
+  const legacyKey = "minhasViagens.v0.6.7", cacheKey = "account", migrationKey = "migration";
+  const storage = memoryStorage({ [legacyKey]: JSON.stringify([legacyTrip]) }, failCache ? cacheKey : null);
+  let rows = remote.slice(), uploads = 0;
+  return {
+    legacyTrip, legacyKey, cacheKey, migrationKey, storage,
+    get uploads() { return uploads; },
+    options: {
+      storage, legacyEntries: sync.findLegacyTrips(storage), cacheKey, migrationKey,
+      fetchRemote: async () => rows,
+      uploadTrips: async trips => { uploads++; rows = trips.map(value => row(value)); }
+    }
+  };
+}
+
+test("upload remoto concluído + escrita local falha", async () => {
+  const fixture = migrationFixture({ failCache: true });
+  await assert.rejects(sync.completeLegacyMigration(fixture.options), error => error.remoteSafe && error.legacyRetired);
+  assert.equal(fixture.storage.has(fixture.legacyKey), false);
+});
+
+test("remoto já contém todas as viagens + legado ainda existe", async () => {
+  const value = trip("legacy", "2026-01-01");
+  const fixture = migrationFixture({ remote: [row(value)] });
+  const result = await sync.completeLegacyMigration(fixture.options);
+  assert.equal(result.uploaded, false); assert.equal(fixture.uploads, 0);
+});
+
+test("remoto contém somente parte das viagens → legado NÃO pode ser apagado", () => {
+  const storage = memoryStorage({ "minhasViagens.v0.6.7": JSON.stringify([trip("a", "2026-01-01"), trip("b", "2026-01-01")]) });
+  const entries = sync.findLegacyTrips(storage);
+  assert.deepEqual(sync.retireVerifiedLegacyStorage(storage, entries, [row(trip("a", "2026-01-01"))]), []);
+  assert.equal(storage.has("minhasViagens.v0.6.7"), true);
+});
+
+test("remoto tem mesmo trip_id mas payload diferente → legado NÃO pode ser apagado", () => {
+  const fixture = migrationFixture({ remote: [row(trip("legacy", "2026-01-01", "diferente"))] });
+  assert.equal(sync.verifyTripsAreRemote([fixture.legacyTrip], [row(trip("legacy", "2026-01-01", "diferente"))]), false);
+  assert.deepEqual(sync.retireVerifiedLegacyStorage(fixture.storage, fixture.options.legacyEntries,
+    [row(trip("legacy", "2026-01-01", "diferente"))]), []);
+});
+
+test("remoto íntegro → legado removido e cache por usuário criado", async () => {
+  const value = trip("legacy", "2026-01-01");
+  const fixture = migrationFixture({ remote: [row(value)] });
+  await sync.completeLegacyMigration(fixture.options);
+  assert.equal(fixture.storage.has(fixture.legacyKey), false);
+  assert.deepEqual(JSON.parse(fixture.storage.value(fixture.cacheKey)), [value]);
+  assert.equal(fixture.storage.has(fixture.migrationKey), true);
+});
+
+test("retry não cria duplicatas", async () => {
+  const value = trip("legacy", "2026-01-01");
+  const fixture = migrationFixture({ remote: [row(value)] });
+  await sync.completeLegacyMigration(fixture.options);
+  assert.equal(fixture.uploads, 0);
+});

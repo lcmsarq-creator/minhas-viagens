@@ -73,7 +73,8 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .achievement-section { margin-top: 16px; }
 .achievement-section h2 { margin-bottom: 8px; }
 .achievement-list { display: grid; gap: 7px; }
-.achievement-card { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; display: flex; align-items: center; gap: 9px; background: #fbfcfb; }
+.achievement-card { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; display: flex; align-items: center; gap: 9px; background: #fbfcfb; color: var(--text); text-align: left; }
+.achievement-card:hover, .achievement-card:focus-visible { border-color: var(--accent); background: var(--accent-soft); outline: none; }
 .achievement-icon { width: 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-soft); color: var(--gold); flex: 0 0 auto; font-size: .9rem; }
 .achievement-card div { min-width: 0; }
 .achievement-card strong { display: block; font-size: .82rem; overflow-wrap: anywhere; }
@@ -102,6 +103,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .draw-copy { min-width: 0; flex: 1; display: grid; gap: 3px; }
 .draw-copy span { color: var(--muted); font-size: .84rem; line-height: 1.35; }
 .draw-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.highway-banner { position: absolute; z-index: 910; right: 18px; top: 18px; width: min(430px, calc(100% - 36px)); padding: 12px 14px; display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.97); border: 1px solid #d09a2a; border-radius: 14px; box-shadow: var(--shadow); }
+.highway-banner .ghost-btn { flex: 0 0 auto; }
+.highway-banner.is-error { border-color: var(--danger); }
 
 .achievement-toast { position: absolute; z-index: 1200; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(390px, calc(100% - 30px)); background: white; border: 2px solid #e4c671; box-shadow: 0 22px 55px rgba(43,35,16,.25); border-radius: 18px; padding: 18px; display: flex; gap: 14px; align-items: center; animation: achievementIn .55s cubic-bezier(.18,.89,.32,1.28); }
 .achievement-toast::before, .achievement-toast::after { content: "✦"; position: absolute; color: #d29a2a; font-size: 1.1rem; animation: sparkle 1.2s ease infinite alternate; }
@@ -202,6 +206,7 @@ textarea { resize: vertical; }
   .route-chooser { left: 10px; top: 10px; width: calc(100% - 20px); max-height: calc(58vh - 20px); overflow-y: auto; }
   .route-chooser-actions { flex-direction: column; }
   .draw-banner { top: 10px; }
+  .highway-banner { top: 10px; right: 10px; width: calc(100% - 20px); align-items: stretch; flex-direction: column; }
 }
 
 /* v0.6 */

@@ -12,6 +12,13 @@ const AIRPORTS_CSV_URLS = [
   "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
 ];
 const DEFAULT_ROUTE_COLOR = "#2f6d50";
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter"
+];
+const HIGHWAY_CACHE_PREFIX = "minhasViagens.highwayGeometry.v1:";
+const HIGHWAY_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
 
 const state = {
   trips: [],
@@ -47,7 +54,13 @@ const state = {
   editingPlacesTripId: null,
   editStartPlace: null,
   editEndPlace: null,
-  editStopPlaces: []
+  editStopPlaces: [],
+  highwayLayer: null,
+  highwayRequest: null,
+  highwayKey: "",
+  highwaySelection: 0,
+  cityHighlight: null,
+  cityHighlightTimer: null
 };
 
 const map = L.map("map", { zoomControl: true }).setView([-14.235, -51.9253], 4);
@@ -60,6 +73,10 @@ const tripLayers = L.layerGroup().addTo(map);
 const pointLayers = L.layerGroup().addTo(map);
 const previewGroup = L.layerGroup().addTo(map);
 const editGroup = L.layerGroup().addTo(map);
+map.createPane("fullHighwayOutline");
+map.getPane("fullHighwayOutline").style.zIndex = 625;
+map.createPane("fullHighwayMain");
+map.getPane("fullHighwayMain").style.zIndex = 626;
 
 const els = {
   newTripBtn: document.getElementById("newTripBtn"),
@@ -116,6 +133,10 @@ const els = {
   achievementToast: document.getElementById("achievementToast"),
   achievementToastTitle: document.getElementById("achievementToastTitle"),
   achievementToastSubtitle: document.getElementById("achievementToastSubtitle"),
+  highwayBanner: document.getElementById("highwayBanner"),
+  highwayBannerTitle: document.getElementById("highwayBannerTitle"),
+  highwayBannerStatus: document.getElementById("highwayBannerStatus"),
+  closeHighwayBtn: document.getElementById("closeHighwayBtn"),
   tripList: document.getElementById("tripList"),
   tripCount: document.getElementById("tripCount"),
   exportBtn: document.getElementById("exportBtn"),
@@ -576,7 +597,10 @@ function cityConquestsForTrip(trip) {
         label,
         city: place.city || label,
         region: place.region || "",
-        country: place.country || ""
+        country: place.country || "",
+        countryCode: place.countryCode || "",
+        lat: Number.isFinite(Number(place.lat)) ? Number(place.lat) : undefined,
+        lng: Number.isFinite(Number(place.lng)) ? Number(place.lng) : undefined
       });
     }
   }
@@ -843,14 +867,209 @@ function getAchievementSnapshot(excludeTripId = null) {
     for (const city of trip.conquests.cities || []) {
       const label = city.label || city.city;
       const key = normalizeKey(label);
-      if (key && !cities.has(key)) cities.set(key, { ...city, label, tripName: trip.name, date: trip.date });
+      if (key && !cities.has(key)) {
+        const source = [trip.startPlace, ...(trip.stopPlaces || []), trip.endPlace].find(place => {
+          const placeLabel = place?.label || [place?.city, place?.region, place?.country].filter(Boolean).join(", ");
+          return normalizeKey(placeLabel) === key || (city.city && normalizeKey(place?.city) === normalizeKey(city.city));
+        });
+        cities.set(key, {
+          ...city,
+          label,
+          lat: Number.isFinite(Number(city.lat)) ? Number(city.lat) : Number(source?.lat),
+          lng: Number.isFinite(Number(city.lng)) ? Number(city.lng) : Number(source?.lng),
+          tripName: trip.name,
+          date: trip.date
+        });
+      }
     }
     for (const road of trip.conquests.roads || []) {
       const key = normalizeKey(road);
-      if (key && !roads.has(key)) roads.set(key, { label: road, tripName: trip.name, date: trip.date });
+      if (key && !roads.has(key)) roads.set(key, { label: road, countryCode: roadCountryForAchievement(road, trip), tripName: trip.name, date: trip.date });
     }
   }
   return { cities, roads };
+}
+
+function roadCountryForAchievement(label, trip) {
+  const parsed = parseRoadCode(label);
+  if (parsed?.international) return parsed.countryCode;
+  return "BR";
+}
+
+function focusCityAchievement(city) {
+  const lat = Number(city.lat), lng = Number(city.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    alert("Não foi possível localizar esta cidade nos dados salvos da viagem.");
+    return;
+  }
+  closeFullHighway();
+  map.flyTo([lat, lng], 12, { duration: .8 });
+  if (state.cityHighlight) map.removeLayer(state.cityHighlight);
+  clearTimeout(state.cityHighlightTimer);
+  state.cityHighlight = L.circleMarker([lat, lng], {
+    radius: 12, color: "#a46f18", weight: 4, fillColor: "#fff4cf", fillOpacity: .8
+  }).addTo(map).bindTooltip(city.label, { direction: "top" }).openTooltip();
+  state.cityHighlightTimer = setTimeout(() => {
+    if (state.cityHighlight) map.removeLayer(state.cityHighlight);
+    state.cityHighlight = null;
+  }, 4500);
+}
+
+function overpassRoadDescriptor(item) {
+  const parsed = parseRoadCode(item.label);
+  if (parsed?.international) {
+    return { countryCode: parsed.countryCode, ref: `${parsed.network} ${parsed.number}`, alternatives: [parsed.number, `${parsed.network}-${parsed.number}`] };
+  }
+  return { countryCode: item.countryCode || "BR", ref: cleanRoadRef(item.label), alternatives: [cleanRoadRef(item.label).replace("-", " ")] };
+}
+
+function escapeOverpassRegex(value) {
+  return String(value).replace(/[\\.^$|?*+()[{]/g, "\\$&");
+}
+
+function overpassRoadQuery(descriptor, kind) {
+  const refs = [descriptor.ref, ...(descriptor.alternatives || [])].filter(Boolean);
+  const pattern = refs.map(escapeOverpassRegex).join("|");
+  const area = descriptor.countryCode
+    ? `area["ISO3166-1"="${descriptor.countryCode}"][admin_level=2]->.country;`
+    : "";
+  const scope = descriptor.countryCode ? "(area.country)" : "";
+  if (kind === "relation") {
+    return `[out:json][timeout:55];${area}relation${scope}["type"="route"]["route"="road"]["ref"~"^(${pattern})$",i];out body geom;>;out skel geom;`;
+  }
+  return `[out:json][timeout:55];${area}way${scope}["highway"]["ref"~"(^|;[ ]*)(${pattern})([ ]*;|$)",i];out geom;`;
+}
+
+async function requestOverpass(query, signal) {
+  let lastError;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const timeoutController = new AbortController();
+      const timeout = setTimeout(() => timeoutController.abort(), 60000);
+      const relayAbort = () => timeoutController.abort();
+      signal?.addEventListener("abort", relayAbort, { once: true });
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: timeoutController.signal
+        });
+        if (!response.ok) throw new Error(`Overpass ${response.status}`);
+        return await response.json();
+      } finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", relayAbort);
+      }
+    } catch (error) {
+      if (signal?.aborted) throw new DOMException("Cancelado", "AbortError");
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Serviços Overpass indisponíveis");
+}
+
+function linesFromOverpass(data) {
+  const lines = [], seen = new Set();
+  const addGeometry = geometry => {
+    const line = (geometry || []).map(point => [Number(point.lat), Number(point.lon)])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (line.length < 2) return;
+    const key = `${line[0].join(",")}:${line[line.length - 1].join(",")}:${line.length}`;
+    if (!seen.has(key)) { seen.add(key); lines.push(line); }
+  };
+  for (const element of data?.elements || []) {
+    addGeometry(element.geometry);
+    if (element.type === "relation") for (const member of element.members || []) addGeometry(member.geometry);
+  }
+  return lines;
+}
+
+function highwayCacheKey(descriptor) {
+  return `${HIGHWAY_CACHE_PREFIX}${descriptor.countryCode || "XX"}:${normalizeKey(descriptor.ref)}`;
+}
+
+function cachedHighway(descriptor) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(highwayCacheKey(descriptor)) || "null");
+    if (cached?.version === 1 && Date.now() - cached.savedAt < HIGHWAY_CACHE_TTL && Array.isArray(cached.lines)) return cached.lines;
+  } catch {}
+  return null;
+}
+
+function cacheHighway(descriptor, lines) {
+  try { localStorage.setItem(highwayCacheKey(descriptor), JSON.stringify({ version: 1, savedAt: Date.now(), lines })); } catch {}
+}
+
+function setTripsSecondary(secondary) {
+  state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .28 : .9 }));
+}
+
+function drawFullHighway(lines, label) {
+  const group = L.featureGroup();
+  for (const line of lines) {
+    L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: 10, opacity: .95, interactive: false }).addTo(group);
+    L.polyline(line, { pane: "fullHighwayMain", color: "#d18200", weight: 6, opacity: 1, interactive: false }).addTo(group);
+  }
+  state.highwayLayer = group.addTo(map);
+  setTripsSecondary(true);
+  const bounds = group.getBounds();
+  if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 });
+  els.highwayBannerTitle.textContent = roadDisplayLabel(label);
+  els.highwayBannerStatus.textContent = "Rodovia integral destacada sobre as viagens.";
+}
+
+function closeFullHighway(restoreFocus = false) {
+  state.highwaySelection += 1;
+  state.highwayRequest?.abort();
+  state.highwayRequest = null;
+  state.highwayKey = "";
+  if (state.highwayLayer) map.removeLayer(state.highwayLayer);
+  state.highwayLayer = null;
+  setTripsSecondary(false);
+  els.highwayBanner.classList.add("hidden");
+  els.highwayBanner.classList.remove("is-error");
+  if (restoreFocus) {
+    const visiblePoints = state.trips.filter(trip => trip.visible !== false).flatMap(tripLatLngs);
+    if (visiblePoints.length) map.fitBounds(L.latLngBounds(visiblePoints).pad(.12), { maxZoom: 14 });
+    else map.setView([-14.235, -51.9253], 4);
+  }
+}
+
+async function showFullHighway(item) {
+  const descriptor = overpassRoadDescriptor(item);
+  const requestedKey = highwayCacheKey(descriptor);
+  if (state.highwayKey === requestedKey && (state.highwayRequest || state.highwayLayer)) return;
+  closeFullHighway();
+  const selection = state.highwaySelection;
+  const controller = new AbortController();
+  state.highwayRequest = controller;
+  state.highwayKey = requestedKey;
+  els.highwayBanner.classList.remove("hidden", "is-error");
+  els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
+  els.highwayBannerStatus.textContent = "Buscando a geometria integral no OpenStreetMap…";
+  try {
+    let lines = cachedHighway(descriptor);
+    if (!lines) {
+      const relationData = await requestOverpass(overpassRoadQuery(descriptor, "relation"), controller.signal);
+      lines = linesFromOverpass(relationData);
+      if (!lines.length) {
+        els.highwayBannerStatus.textContent = "Relação completa não encontrada; buscando trechos da via…";
+        const wayData = await requestOverpass(overpassRoadQuery(descriptor, "way"), controller.signal);
+        lines = linesFromOverpass(wayData);
+      }
+      if (!lines.length) throw new Error("Geometria não encontrada");
+      cacheHighway(descriptor, lines);
+    }
+    if (selection !== state.highwaySelection || controller.signal.aborted) return;
+    drawFullHighway(lines, item.label);
+  } catch (error) {
+    if (error.name === "AbortError" || selection !== state.highwaySelection) return;
+    els.highwayBanner.classList.add("is-error");
+    els.highwayBannerStatus.textContent = "Não foi possível carregar esta rodovia agora. Suas viagens continuam disponíveis.";
+  } finally {
+    if (state.highwayRequest === controller) state.highwayRequest = null;
+  }
 }
 
 function setTripConquests(trip, route = null) {
@@ -886,14 +1105,17 @@ function renderAchievements() {
       return;
     }
     items.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true })).forEach(item => {
-      const card = document.createElement("div");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = `achievement-card${type === "road" ? " road-achievement-card" : ""}`;
+      card.setAttribute("aria-label", type === "city" ? `Focar ${item.label} no mapa` : `Mostrar a rodovia ${roadDisplayLabel(item.label)} inteira`);
       card.innerHTML = `
         <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
         <div>
           <strong>${escapeHtml(roadDisplayLabel(item.label))}</strong>
           <small>${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small>
         </div>`;
+      card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
       container.appendChild(card);
     });
   };
@@ -2924,6 +3146,7 @@ els.finishTripBtn.addEventListener("click", finishManualTrip);
 els.cancelTripBtn.addEventListener("click", cancelDrawing);
 els.finishEditBtn.addEventListener("click", finishRouteEdit);
 els.cancelEditBtn.addEventListener("click", cancelRouteEdit);
+els.closeHighwayBtn.addEventListener("click", () => closeFullHighway(true));
 els.exportBtn.addEventListener("click", exportBackup);
 els.importInput.addEventListener("change", event => importBackup(event.target.files[0]));
 

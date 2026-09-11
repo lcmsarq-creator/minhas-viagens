@@ -376,30 +376,89 @@ function normalizeKey(value) {
   return String(value || "").trim().toLocaleLowerCase("pt-BR");
 }
 
+const INTERNATIONAL_ROADS = {
+  UY: { name: "URUGUAY", network: "RU" },
+  AR: { name: "ARGENTINA", network: "RN" },
+  PY: { name: "PARAGUAY", network: "PY" },
+  CL: { name: "CHILE", network: "CH" },
+  BO: { name: "BOLIVIA", network: "F" },
+  PE: { name: "PERU", network: "PE" },
+  CO: { name: "COLOMBIA", network: "RN" },
+  VE: { name: "VENEZUELA", network: "T" },
+  EC: { name: "ECUADOR", network: "E" }
+};
+
+const COUNTRY_CODE_BY_NAME = {
+  uruguay: "UY", argentina: "AR", paraguay: "PY", chile: "CL", bolivia: "BO",
+  peru: "PE", colombia: "CO", venezuela: "VE", ecuador: "EC"
+};
+
+function tripRoadCountry(trip) {
+  const places = [trip?.startPlace, ...(trip?.stopPlaces || []), trip?.endPlace].filter(Boolean);
+  const codes = places.map(place => {
+    const direct = String(place.countryCode || "").toUpperCase();
+    return INTERNATIONAL_ROADS[direct] ? direct : COUNTRY_CODE_BY_NAME[normalizeSimple(place.country)] || "";
+  }).filter(Boolean);
+  return codes.length && codes.every(code => code === codes[0]) ? codes[0] : "";
+}
+
 function parseRoadCode(label) {
   const value = String(label || "").toUpperCase().replace(/[–—]/g, "-").trim();
+  const international = value.match(/^INT:([A-Z]{2}):([A-Z]{1,3}):(\d{1,4}[A-Z]?)$/);
+  if (international && INTERNATIONAL_ROADS[international[1]]) {
+    return { countryCode: international[1], network: international[2], number: international[3], international: true };
+  }
   const match = value.match(/\b(BR|AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\s*[- ]?\s*(\d{2,3})\b/);
   if (!match) return null;
   return { prefix: match[1], number: match[2], federal: match[1] === "BR" };
 }
 
+function internationalFlagMarkup(code) {
+  const common = 'x="31" y="40" width="58" height="25"';
+  const flags = {
+    UY: `<g><rect ${common} fill="#fff"/><path d="M31 45h58M31 55h58M31 65h58" stroke="#1670d2" stroke-width="4"/><circle cx="40" cy="47" r="5" fill="#f4bf18"/></g>`,
+    AR: `<g><rect ${common} fill="#fff"/><path d="M31 44h58M31 61h58" stroke="#75aadb" stroke-width="8"/><circle cx="60" cy="52.5" r="3" fill="#f6b40e"/></g>`,
+    PY: `<g><rect ${common} fill="#fff"/><path d="M31 44h58" stroke="#d52b1e" stroke-width="8"/><path d="M31 61h58" stroke="#0038a8" stroke-width="8"/></g>`,
+    CL: `<g><rect ${common} fill="#fff"/><rect x="31" y="40" width="22" height="13" fill="#0039a6"/><rect x="31" y="53" width="58" height="12" fill="#d52b1e"/><text x="42" y="47" fill="#fff" font-size="7">★</text></g>`,
+    BO: `<g><rect ${common} fill="#f9e300"/><path d="M31 44h58" stroke="#d52b1e" stroke-width="8"/><path d="M31 61h58" stroke="#178a3d" stroke-width="8"/></g>`,
+    PE: `<g><rect ${common} fill="#fff"/><rect x="31" y="40" width="19" height="25" fill="#d91023"/><rect x="70" y="40" width="19" height="25" fill="#d91023"/></g>`,
+    CO: `<g><rect ${common} fill="#fcd116"/><rect x="31" y="53" width="58" height="6" fill="#003893"/><rect x="31" y="59" width="58" height="6" fill="#ce1126"/></g>`,
+    VE: `<g><rect ${common} fill="#f4d900"/><rect x="31" y="48" width="58" height="9" fill="#003da5"/><rect x="31" y="57" width="58" height="8" fill="#cf142b"/><text x="60" y="53" fill="#fff" font-size="6">••••</text></g>`,
+    EC: `<g><rect ${common} fill="#ffdd00"/><rect x="31" y="53" width="58" height="6" fill="#034ea2"/><rect x="31" y="59" width="58" height="6" fill="#ed1c24"/></g>`
+  };
+  return flags[code] || "";
+}
+
 function roadShieldMarkup(label, size = "achievement") {
   const parsed = parseRoadCode(label);
   if (!parsed) return `<span class="road-shield-fallback">${escapeHtml(label)}</span>`;
+  if (parsed.international) {
+    const country = INTERNATIONAL_ROADS[parsed.countryCode];
+    return `<svg class="road-emblem-svg international ${size}" viewBox="0 0 100 120" role="img" aria-label="${escapeHtml(`${country.name}, ${parsed.network} ${parsed.number}`)}">
+      <path d="M4 4H96V91L50 117L4 91Z" fill="#fff" stroke="#171717" stroke-width="4"/>
+      <path d="M9 9H91V87L50 110L9 87Z" fill="none" stroke="#171717" stroke-width="2"/>
+      <rect x="10" y="11" width="80" height="27" fill="#fff" stroke="#171717" stroke-width="2"/>
+      <text x="50" y="25" fill="#171717" font-size="13">${country.name}</text>
+      <rect x="10" y="39" width="20" height="27" fill="#fff" stroke="#171717" stroke-width="2"/>
+      <text x="20" y="53" fill="#171717" font-size="13">${escapeHtml(parsed.network)}</text>
+      ${internationalFlagMarkup(parsed.countryCode)}
+      <text x="50" y="87" fill="#171717" font-size="36">${escapeHtml(parsed.number)}</text>
+    </svg>`;
+  }
   const { prefix, number, federal } = parsed;
   if (federal) {
     return `<svg class="road-emblem-svg ${size}" viewBox="0 0 100 110" role="img" aria-label="${escapeHtml(`${prefix}-${number}`)}">
-      <path d="M3 3H97V81L50 107L3 81Z" fill="#078807" stroke="#078807" stroke-width="4"/>
-      <path d="M8 8H92V77L50 100L8 77Z" fill="none" stroke="#fff" stroke-width="3"/>
-      <text x="50" y="38" fill="#fff" font-size="31">${prefix}</text>
-      <text x="50" y="76" fill="#fff" font-size="42">${number}</text>
+      <path d="M2 2H98V87L50 108L2 87Z" fill="#078807"/>
+      <path d="M6 6H94V83L50 102L6 83Z" fill="none" stroke="#fff" stroke-width="3"/>
+      <text x="50" y="34" fill="#fff" font-size="30">${prefix}</text>
+      <text x="50" y="72" fill="#fff" font-size="43">${number}</text>
     </svg>`;
   }
   return `<svg class="road-emblem-svg ${size}" viewBox="0 0 100 110" role="img" aria-label="${escapeHtml(`${prefix}-${number}`)}">
-    <path d="M50 3L97 23L82 107H18L3 23Z" fill="#fff" stroke="#111" stroke-width="3"/>
-    <path d="M50 9L91 27L77 101H23L9 27Z" fill="none" stroke="#111" stroke-width="5"/>
-    <text x="50" y="42" fill="#111" font-size="28">${prefix}</text>
-    <text x="50" y="78" fill="#111" font-size="39">${number}</text>
+    <path d="M50 2L98 24L82 108H18L2 24Z" fill="#fff" stroke="#111" stroke-width="1.5"/>
+    <path d="M50 7L92 27L78 102H22L8 27Z" fill="none" stroke="#111" stroke-width="4.5"/>
+    <text x="50" y="42" fill="#111" font-size="27">${prefix}</text>
+    <text x="50" y="78" fill="#111" font-size="38">${number}</text>
   </svg>`;
 }
 
@@ -424,6 +483,8 @@ function ensureTripSchema(trip) {
   if (!trip.conquests || typeof trip.conquests !== "object") trip.conquests = {};
   if (!Array.isArray(trip.conquests.cities)) trip.conquests.cities = cityConquestsForTrip(trip);
   if (!Array.isArray(trip.conquests.roads)) trip.conquests.roads = [];
+  const roadCountry = tripRoadCountry(trip);
+  trip.conquests.roads = trip.conquests.roads.map(road => internationalRoadRef(road, roadCountry) || cleanRoadRef(road));
 
   // Migração v0.6.5: as conquistas de rodovias passam a usar exatamente
   // as placas principais exibidas sobre a rota. Isso remove referências
@@ -432,7 +493,9 @@ function ensureTripSchema(trip) {
     const uniqueRoads = [];
     const seen = new Set();
     for (const badge of trip.roadLabels) {
-      const label = cleanRoadRef(typeof badge === "string" ? badge : badge?.label);
+      const rawLabel = typeof badge === "string" ? badge : badge?.label;
+      const label = internationalRoadRef(rawLabel, roadCountry) || cleanRoadRef(rawLabel);
+      if (badge && typeof badge === "object") badge.label = label;
       if (!label || !isHighwayRef(label)) continue;
       const key = normalizeKey(label);
       if (!seen.has(key)) {
@@ -444,6 +507,12 @@ function ensureTripSchema(trip) {
   }
   trip.conquests.cities = cityConquestsForTrip(trip);
   return trip;
+}
+
+function roadDisplayLabel(label) {
+  const parsed = parseRoadCode(label);
+  if (!parsed?.international) return label;
+  return `${parsed.network} ${parsed.number} · ${INTERNATIONAL_ROADS[parsed.countryCode].name}`;
 }
 
 function loadTrips() {
@@ -533,14 +602,30 @@ function normalizeSimple(value) {
 
 function isHighwayRef(value) {
   const cleaned = cleanRoadRef(value);
+  if (/^INT:[A-Z]{2}:[A-Z]{1,3}:\d{1,4}[A-Z]?$/i.test(cleaned)) return true;
   return /^(BR|SP|PR|SC|RS|MG|GO|MT|MS|BA|RJ|ES|PE|CE|PB|RN|SE|AL|TO|MA|PI|PA|AM|RO|RR|AC|AP|DF)-\d{1,4}$/i.test(cleaned)
     || /\b(ruta|route|rodovia|estrada)\s*[\w-]*\d+/i.test(cleaned);
 }
 
-function roadRefsFromStep(step) {
+function internationalRoadRef(raw, countryCode) {
+  const country = INTERNATIONAL_ROADS[countryCode];
+  if (!country) return "";
+  const value = String(raw || "").trim();
+  const match = value.match(/\b(?:ruta(?:\s+nacional)?|route|rodovia|estrada|RN|RUTA\s*NACIONAL)\s*[- ]?\s*(\d{1,4}[A-Z]?)\b/i);
+  if (!match) return "";
+  const explicitNetwork = value.match(/\bRN\b/i) ? "RN" : country.network;
+  return `INT:${countryCode}:${explicitNetwork}:${match[1].toUpperCase()}`;
+}
+
+function roadRefsFromStep(step, countryCode = "") {
   const refs = [];
   const add = raw => {
     for (const token of String(raw || "").split(/[;,/]/)) {
+      const foreign = internationalRoadRef(token, countryCode);
+      if (foreign && !refs.includes(foreign)) {
+        refs.push(foreign);
+        continue;
+      }
       const cleaned = cleanRoadRef(token);
       if (cleaned && isHighwayRef(cleaned) && !refs.includes(cleaned)) refs.push(cleaned);
     }
@@ -549,13 +634,14 @@ function roadRefsFromStep(step) {
   const name = String(step?.name || "");
   const br = name.match(/\b(?:BR|SP|PR|SC|RS|MG|GO|MT|MS|BA|RJ|ES|PE|CE|PB|RN|SE|AL|TO|MA|PI|PA|AM|RO|RR|AC|AP|DF)\s*-?\s*\d{1,4}\b/gi) || [];
   br.forEach(add);
-  const ruta = name.match(/\b(?:Ruta|Route|Rodovia|Estrada)\s+[A-Za-z-]*\s*\d+[A-Za-z-]*/gi) || [];
+  const ruta = name.match(/\b(?:Ruta(?:\s+Nacional)?|Route|Rodovia|Estrada|RN)\s*[A-Za-z-]*\s*\d+[A-Za-z-]*/gi) || [];
   ruta.forEach(add);
   return refs;
 }
 
-function extractRoadLabelsFromRoute(route) {
+function extractRoadLabelsFromRoute(route, trip = null) {
   const groups = [];
+  const countryCode = tripRoadCountry(trip);
   let current = null;
   const finish = () => {
     if (!current) return;
@@ -569,7 +655,7 @@ function extractRoadLabelsFromRoute(route) {
 
   for (const leg of route?.legs || []) {
     for (const step of leg.steps || []) {
-      const refs = roadRefsFromStep(step);
+      const refs = roadRefsFromStep(step, countryCode);
       const label = refs[0] || "";
       if (!label) {
         finish();
@@ -732,12 +818,12 @@ function buildFlightRoute(airports) {
   };
 }
 
-function extractHighwaysFromRoute(route) {
+function extractHighwaysFromRoute(route, trip = null) {
   // A conquista usa a mesma referência PRINCIPAL que gera as placas do mapa.
   // Alguns trechos do OpenStreetMap possuem várias refs secundárias no mesmo
   // caminho; usar todas elas criava rodovias que a viagem não percorreu.
   const roads = new Map();
-  for (const badge of extractRoadLabelsFromRoute(route)) {
+  for (const badge of extractRoadLabelsFromRoute(route, trip)) {
     const cleaned = cleanRoadRef(badge?.label);
     if (!cleaned || !isHighwayRef(cleaned)) continue;
     const key = normalizeKey(cleaned);
@@ -770,7 +856,7 @@ function getAchievementSnapshot(excludeTripId = null) {
 function setTripConquests(trip, route = null) {
   trip.conquests = {
     cities: cityConquestsForTrip(trip),
-    roads: trip.mode === "aviao" ? [] : (route ? extractHighwaysFromRoute(route) : (trip.conquests?.roads || []))
+    roads: trip.mode === "aviao" ? [] : (route ? extractHighwaysFromRoute(route, trip) : (trip.conquests?.roads || []))
   };
 }
 
@@ -805,7 +891,7 @@ function renderAchievements() {
       card.innerHTML = `
         <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
         <div>
-          <strong>${escapeHtml(item.label)}</strong>
+          <strong>${escapeHtml(roadDisplayLabel(item.label))}</strong>
           <small>${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small>
         </div>`;
       container.appendChild(card);
@@ -916,7 +1002,7 @@ function renderTripDetail() {
       </div>
       <div class="detail-section-title">Rodovias desta viagem</div>
       ${roads.length
-        ? `<div class="detail-road-list">${roads.map(road => `<span title="${escapeHtml(road)}">${roadShieldMarkup(road, "achievement")}</span>`).join("")}</div>`
+        ? `<div class="detail-road-list">${roads.map(road => `<span title="${escapeHtml(roadDisplayLabel(road))}">${roadShieldMarkup(road, "achievement")}</span>`).join("")}</div>`
         : `<p class="micro-hint detail-no-roads">Nenhuma rodovia foi identificada automaticamente nesta viagem.</p>`}
       <div class="trip-detail-actions">
         <button type="button" class="focus-btn">Ver no mapa</button>
@@ -2070,7 +2156,7 @@ function applyRouteToTrip(trip, route) {
   trip.distance = route.distance;
   trip.duration = Number.isFinite(route.duration) ? route.duration : null;
   trip.points = [];
-  trip.roadLabels = extractRoadLabelsFromRoute(route);
+  trip.roadLabels = extractRoadLabelsFromRoute(route, trip);
   (trip.stopPlaces || []).forEach(stop => {
     if (Number.isFinite(Number(stop.lat)) && Number.isFinite(Number(stop.lng))) {
       stop.progress = nearestRouteProgress(trip, L.latLng(stop.lat, stop.lng));
@@ -2331,8 +2417,8 @@ async function refreshTripRoads(trip) {
     if (points.length < 2) throw new Error("Pontos insuficientes");
     const routes = await fetchOsrmRoute(points, false);
     const route = routes[0];
-    trip.roadLabels = extractRoadLabelsFromRoute(route);
-    trip.conquests.roads = extractHighwaysFromRoute(route);
+    trip.roadLabels = extractRoadLabelsFromRoute(route, trip);
+    trip.conquests.roads = extractHighwaysFromRoute(route, trip);
     saveTrips();
     renderTrips();
   } catch (error) {

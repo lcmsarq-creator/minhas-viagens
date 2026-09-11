@@ -13,7 +13,14 @@
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
   let client = null;
+  let currentSession = null;
   let appLoaded = false;
+
+  window.MinhasViagensAuth = {
+    getClient: () => client,
+    getSession: () => currentSession,
+    getUser: () => currentSession?.user || null
+  };
 
   function configured() {
     return /^https:\/\/.+\.supabase\.co\/?$/i.test(config.supabaseUrl || "") &&
@@ -38,7 +45,7 @@
   function loadAppScripts() {
     if (appLoaded) return;
     appLoaded = true;
-    const sources = ["hotfix-pre.js?v=0.8.0", "script.js?v=0.8.0", "hotfix.js?v=0.8.0"];
+    const sources = ["hotfix-pre.js?v=0.9.0", "script.js?v=0.9.0", "hotfix.js?v=0.9.0", "sync.js?v=0.9.0"];
     sources.reduce((promise, src) => promise.then(() => new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = src;
@@ -52,6 +59,7 @@
 
   function showApp(session) {
     if (!session) return showLogin();
+    currentSession = session;
     accountEmail.textContent = session.user?.email || "Conta conectada";
     gate.classList.add("hidden");
     application.classList.remove("hidden");
@@ -85,6 +93,7 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
     client.auth.onAuthStateChange((event, session) => {
+      currentSession = session || null;
       if (session) showApp(session);
       else if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
         showLogin(event === "TOKEN_REFRESHED" ? "Sua sessão expirou. Solicite um novo link de acesso." : "Você saiu da sua conta.");
@@ -133,7 +142,8 @@
     try {
       const { error } = await client.auth.signOut();
       if (error) throw error;
-      showLogin("Você saiu da sua conta.");
+      currentSession = null;
+      window.location.reload();
     } catch {
       setStatus("Não foi possível sair. Verifique sua conexão e tente novamente.", "error");
       panel.classList.remove("hidden");

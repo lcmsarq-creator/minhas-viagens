@@ -321,5 +321,9 @@ textarea { resize: vertical; }
 .auth-status.success { color: var(--accent-dark); font-weight: 650; }
 .account-area { display: flex; align-items: center; gap: 8px; margin: -10px 0 18px 58px; font-size: .75rem; color: var(--muted); }
 .account-area span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-copy { min-width: 0; display: grid; gap: 2px; flex: 1; }
+.account-copy small { color: var(--muted); font-size: .68rem; }
+.account-copy small[data-state="error"] { color: var(--danger); }
+.account-copy small[data-state="synced"] { color: var(--accent-dark); }
 .account-signout { border: 0; background: transparent; padding: 3px; color: var(--accent-dark); font-weight: 700; }
 .account-signout:hover { text-decoration: underline; }

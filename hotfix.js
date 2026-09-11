@@ -1,6 +1,7 @@
 (() => {
-  const STORAGE_KEY = "minhasViagens.v0.6.7";
-  const APP_VERSION = "0.8.0";
+  const userId = window.MinhasViagensAuth?.getUser()?.id;
+  const STORAGE_KEY = `minhasViagens.trips.${userId}.v1`;
+  const APP_VERSION = "0.9.0";
 
   // A fila de abertura da v0.7.0 já foi preenchida, mas seu início foi bloqueado
   // pelo hotfix-pre.js. Limpa essa fila para que abrir o app nunca reprocese todas
@@ -29,19 +30,12 @@
     const nativeSetItem = window.__mvNativeStorageSetItem || Storage.prototype.setItem;
     try {
       nativeSetItem.call(localStorage, STORAGE_KEY, payload);
+      window.MinhasViagensSync?.schedule();
       return true;
-    } catch (firstError) {
-      for (const key of LEGACY_KEYS) {
-        try { localStorage.removeItem(key); } catch {}
-      }
-      try {
-        nativeSetItem.call(localStorage, STORAGE_KEY, payload);
-        return true;
-      } catch (secondError) {
-        console.error("Falha ao salvar viagens", secondError);
-        alert("Ainda não há espaço suficiente para salvar os dados locais. Exporte um backup antes de continuar.");
-        return false;
-      }
+    } catch (error) {
+      console.error("Falha ao salvar viagens", error);
+      alert("Ainda não há espaço suficiente para salvar os dados locais. Exporte um backup antes de continuar.");
+      return false;
     }
   };
 

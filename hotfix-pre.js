@@ -1,5 +1,6 @@
 (() => {
-  const STORAGE_KEY = "minhasViagens.v0.6.7";
+  const userId = window.MinhasViagensAuth?.getUser()?.id;
+  const STORAGE_KEY = `minhasViagens.trips.${userId}.v1`;
   const SEGMENT_DB_NAME = "minhasViagensTripRoadSegments.v1";
   const SEGMENT_STORE = "segments";
 

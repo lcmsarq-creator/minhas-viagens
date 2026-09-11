@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=0.8.0" />
+  <link rel="stylesheet" href="style.css?v=0.9.0" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -31,12 +31,13 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.8.0</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.9.0</p>
         </div>
       </div>
 
       <div class="account-area">
-        <span id="accountEmail"></span>
+        <div class="account-copy"><span id="accountEmail"></span><small id="syncStatus">Alterações pendentes</small></div>
+        <button id="syncNowBtn" class="account-signout" type="button">Sincronizar agora</button>
         <button id="signOutBtn" class="account-signout" type="button">Sair</button>
       </div>
 
@@ -156,6 +157,15 @@
       </div>
     </main>
   </div>
+
+  <dialog id="legacyMigrationDialog">
+    <div class="dialog-head"><div><h2>Vincular viagens à conta</h2><p id="legacyMigrationText"></p></div></div>
+    <p id="legacyMigrationStatus" class="form-message hidden" role="status"></p>
+    <div class="dialog-actions">
+      <button id="legacyMigrationLater" class="ghost-btn" type="button">Agora não</button>
+      <button id="legacyMigrationConfirm" class="primary-btn" type="button">Vincular à minha conta</button>
+    </div>
+  </dialog>
 
   <dialog id="tripDialog">
     <form id="tripForm" novalidate>
@@ -318,8 +328,8 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="config.js?v=0.8.0"></script>
+  <script src="config.js?v=0.9.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.8.0"></script>
+  <script src="auth.js?v=0.9.0"></script>
 </body>
 </html>

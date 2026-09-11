@@ -1,4 +1,6 @@
-const STORAGE_KEY = "minhasViagens.v0.6.7";
+const AUTH_USER_ID = window.MinhasViagensAuth?.getUser()?.id;
+if (!AUTH_USER_ID) throw new Error("A aplicação requer uma sessão autenticada.");
+const STORAGE_KEY = `minhasViagens.trips.${AUTH_USER_ID}.v1`;
 const LEGACY_KEYS = ["minhasViagens.v0.6.6", "minhasViagens.v0.6.5", "minhasViagens.v0.6.4", "minhasViagens.v0.6.3", "minhasViagens.v0.6.2", "minhasViagens.v0.6.1", "minhasViagens.v0.6", "minhasViagens.v0.5", "minhasViagens.v0.4", "minhasViagens.v0.3", "minhasViagens.v0.2", "minhasViagens.v0.1"];
 const CITY_SEARCH_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search";
 const OSRM_ENDPOINTS = [
@@ -558,13 +560,7 @@ function roadDisplayLabel(label) {
 
 function loadTrips() {
   try {
-    let raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      for (const key of LEGACY_KEYS) {
-        raw = localStorage.getItem(key);
-        if (raw) break;
-      }
-    }
+    const raw = localStorage.getItem(STORAGE_KEY);
     state.trips = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(state.trips)) state.trips = [];
     state.trips = state.trips.map(ensureTripSchema);
@@ -579,19 +575,10 @@ function saveTrips() {
   try {
     localStorage.setItem(STORAGE_KEY, payload);
     return true;
-  } catch (firstError) {
-    // Versões antigas podem duplicar rotas grandes e consumir a cota do navegador.
-    for (const key of LEGACY_KEYS) {
-      try { localStorage.removeItem(key); } catch {}
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, payload);
-      return true;
-    } catch (secondError) {
-      console.error("Falha ao salvar viagens", secondError);
-      alert("O navegador ficou sem espaço para salvar a rota. Exporte um backup e remova viagens antigas.");
-      return false;
-    }
+  } catch (error) {
+    console.error("Falha ao salvar viagens", error);
+    alert("O navegador ficou sem espaço para salvar a rota. Exporte um backup antes de continuar.");
+    return false;
   }
 }
 
@@ -1447,6 +1434,7 @@ function switchSidebarTab(tab) {
 async function deleteTrip(trip) {
   if (!confirm(`Excluir a viagem "${trip.name}"?`)) return;
   if (state.editingTripId === trip.id) finishRouteEdit();
+  window.MinhasViagensSync?.recordDeletion(trip.id);
   state.trips = state.trips.filter(t => t.id !== trip.id);
   if (state.tripRoadKey.startsWith(`${trip.id}|`)) closeTripRoadHighlight();
   saveTrips();
@@ -3232,8 +3220,8 @@ async function deleteCurrentPoint() {
 }
 
 function exportBackup() {
-  const payload = { app: "Minhas Viagens", version: "0.8.0", exportedAt: new Date().toISOString(), trips: state.trips };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const payload = { app: "Minhas Viagens", version: "0.9.0", exportedAt: new Date().toISOString(), trips: state.trips };
+  const blob = new Blob([JSON.stringify(payload, (key, value) => key === "roadSegments" ? undefined : value, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -3317,9 +3305,18 @@ newTripColorWheelController = setupColorWheel(els.newTripColorWheel, els.tripCol
 });
 
 loadTrips();
-if (saveTrips()) {
-  for (const key of LEGACY_KEYS) { try { localStorage.removeItem(key); } catch {} }
-}
+saveTrips();
 renderTrips();
+window.MinhasViagensApp = {
+  getTrips: () => state.trips,
+  replaceTrips: trips => {
+    state.trips = trips.map(ensureTripSchema);
+    saveTrips();
+    renderTrips();
+  },
+  saveLocal: () => saveTrips(),
+  render: () => renderTrips(),
+  storageKey: STORAGE_KEY
+};
 queueRoadsForPreload([...getAchievementSnapshot().roads.values()].map(item => item.label));
 requestAnimationFrame(() => map.invalidateSize());

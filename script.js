@@ -3220,7 +3220,7 @@ async function deleteCurrentPoint() {
 }
 
 function exportBackup() {
-  const payload = { app: "Minhas Viagens", version: "0.9.0", exportedAt: new Date().toISOString(), trips: state.trips };
+  const payload = { app: "Minhas Viagens", version: "0.9.1", exportedAt: new Date().toISOString(), trips: state.trips };
   const blob = new Blob([JSON.stringify(payload, (key, value) => key === "roadSegments" ? undefined : value, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

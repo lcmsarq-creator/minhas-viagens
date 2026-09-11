@@ -45,7 +45,7 @@
   function loadAppScripts() {
     if (appLoaded) return;
     appLoaded = true;
-    const sources = ["hotfix-pre.js?v=0.9.0", "script.js?v=0.9.0", "hotfix.js?v=0.9.0", "sync.js?v=0.9.0"];
+    const sources = ["hotfix-pre.js?v=0.9.1", "script.js?v=0.9.1", "hotfix.js?v=0.9.1", "sync.js?v=0.9.1"];
     sources.reduce((promise, src) => promise.then(() => new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = src;

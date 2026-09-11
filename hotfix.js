@@ -1,7 +1,7 @@
 (() => {
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   const STORAGE_KEY = `minhasViagens.trips.${userId}.v1`;
-  const APP_VERSION = "0.9.0";
+  const APP_VERSION = "0.9.1";
 
   // A fila de abertura da v0.7.0 já foi preenchida, mas seu início foi bloqueado
   // pelo hotfix-pre.js. Limpa essa fila para que abrir o app nunca reprocese todas

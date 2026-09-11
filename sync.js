@@ -57,6 +57,65 @@
     };
   }
 
+  function findLegacyTrips(storage) {
+    const found = [];
+    for (const key of LEGACY_KEYS) {
+      try {
+        const trips = JSON.parse(storage.getItem(key));
+        if (Array.isArray(trips) && trips.length) found.push({ key, trips: trips.map(serializeTripForCloud) });
+      } catch {}
+    }
+    return found;
+  }
+
+  function verifyTripsAreRemote(trips, remoteRows) {
+    const remote = new Map((remoteRows || []).map(row => [String(row.trip_id), row]));
+    return (trips || []).every(trip => {
+      const row = remote.get(String(trip.id));
+      return row && !row.deleted_at && fingerprint(row.payload) === fingerprint(trip);
+    });
+  }
+
+  function retireVerifiedLegacyStorage(storage, legacyEntries, remoteRows) {
+    const retired = [];
+    for (const entry of legacyEntries || []) {
+      if (!verifyTripsAreRemote(entry.trips, remoteRows)) continue;
+      storage.removeItem(entry.key);
+      retired.push(entry.key);
+    }
+    return retired;
+  }
+
+  function uniqueLegacyTrips(entries) {
+    const trips = new Map();
+    for (const entry of entries) for (const trip of entry.trips) trips.set(String(trip.id), trip);
+    return [...trips.values()];
+  }
+
+  async function completeLegacyMigration(options) {
+    const { storage, legacyEntries, fetchRemote, uploadTrips, cacheKey, migrationKey } = options;
+    const compact = uniqueLegacyTrips(legacyEntries);
+    let remoteRows = await fetchRemote();
+    let uploaded = false;
+    if (!verifyTripsAreRemote(compact, remoteRows)) {
+      await uploadTrips(compact);
+      uploaded = true;
+      remoteRows = await fetchRemote();
+    }
+    if (!verifyTripsAreRemote(compact, remoteRows)) throw new Error("Não foi possível confirmar todas as viagens no servidor");
+    const retiredKeys = retireVerifiedLegacyStorage(storage, legacyEntries, remoteRows);
+    const cacheTrips = remoteRows.filter(row => !row.deleted_at).map(row => normalizeTripFromCloud(row.payload, row.trip_id));
+    try {
+      storage.setItem(cacheKey, JSON.stringify(cacheTrips));
+      storage.setItem(migrationKey, new Date().toISOString());
+    } catch (error) {
+      error.remoteSafe = true;
+      error.legacyRetired = retiredKeys.length > 0;
+      throw error;
+    }
+    return { trips: cacheTrips, remoteRows, retiredKeys, uploaded };
+  }
+
   function isMissingTable(error) {
     return error?.code === "42P01" || /relation .*trips.* does not exist/i.test(error?.message || "");
   }
@@ -159,24 +218,42 @@
       }
     }
 
+    async function fetchRemoteTrips() {
+      const { data, error } = await client.from("trips").select("trip_id,payload,client_updated_at,server_updated_at,deleted_at").eq("user_id", userId);
+      if (error) throw error;
+      return data || [];
+    }
+
     async function syncNow() {
       if (syncing) { rerun = true; return; }
       if (!win.navigator.onLine) { pendingStatus(); return; }
       syncing = true;
       setStatus("Sincronizando…");
+      let confirmedLegacyRetired = false;
       try {
-        const { data, error } = await client.from("trips").select("trip_id,payload,client_updated_at,server_updated_at,deleted_at").eq("user_id", userId);
-        if (error) throw error;
-        const result = reconcile(app.getTrips(), data || [], tombstones());
+        const data = await fetchRemoteTrips();
+        const legacyEntries = app.getTrips().length ? [] : findLegacyTrips(win.localStorage);
+        const allLegacy = uniqueLegacyTrips(legacyEntries);
+        const retiredKeys = allLegacy.length && verifyTripsAreRemote(allLegacy, data)
+          ? retireVerifiedLegacyStorage(win.localStorage, legacyEntries, data) : [];
+        confirmedLegacyRetired = retiredKeys.length > 0;
+        const result = reconcile(app.getTrips(), data, tombstones());
         await uploadTrips(result.uploads);
         await uploadDeletes(result.remoteDeletes);
         writeJson(tombstoneKey, result.tombstones);
-        if (fingerprint({ trips: app.getTrips() }) !== fingerprint({ trips: result.trips })) app.replaceTrips(result.trips);
+        if (fingerprint({ trips: app.getTrips() }) !== fingerprint({ trips: result.trips })) {
+          if (retiredKeys.length) {
+            writeJson(keys.trips, result.trips.map(serializeTripForCloud));
+            win.localStorage.setItem(migrationKey, new Date().toISOString());
+          }
+          app.replaceTrips(result.trips);
+        }
         initialized = true;
         setStatus("Sincronizado", "synced");
       } catch (error) {
         console.error("Falha ao sincronizar viagens", error);
-        if (isMissingTable(error)) setStatus("A sincronização ainda não foi configurada no banco. Suas viagens continuam salvas neste dispositivo.", "error");
+        if (confirmedLegacyRetired) setStatus("Suas viagens já estão seguras na sua conta, mas não foi possível criar o cache local neste dispositivo.", "error");
+        else if (isMissingTable(error)) setStatus("A sincronização ainda não foi configurada no banco. Suas viagens continuam salvas neste dispositivo.", "error");
         else setStatus("Erro ao sincronizar", "error");
       } finally {
         syncing = false;
@@ -199,11 +276,8 @@
 
     async function offerLegacyMigration() {
       if (app.getTrips().length || win.localStorage.getItem(migrationKey)) return;
-      let legacy = [];
-      for (const key of LEGACY_KEYS) {
-        const candidate = readJson(key, []);
-        if (Array.isArray(candidate) && candidate.length) { legacy = candidate; break; }
-      }
+      const initialEntries = findLegacyTrips(win.localStorage);
+      const legacy = uniqueLegacyTrips(initialEntries);
       if (!legacy.length) return;
       const dialog = win.document.getElementById("legacyMigrationDialog");
       const message = win.document.getElementById("legacyMigrationText");
@@ -216,18 +290,22 @@
         confirm.disabled = true;
         feedback.classList.remove("hidden"); feedback.textContent = "Vinculando viagens…";
         try {
-          const compact = legacy.map(serializeTripForCloud);
-          await uploadTrips(compact);
-          writeJson(app.storageKey, compact);
-          const verified = readJson(app.storageKey, null);
-          if (!Array.isArray(verified) || verified.length !== compact.length) throw new Error("Falha ao confirmar cache local");
-          win.localStorage.setItem(migrationKey, new Date().toISOString());
-          app.replaceTrips(compact);
+          const result = await completeLegacyMigration({
+            storage: win.localStorage,
+            legacyEntries: findLegacyTrips(win.localStorage),
+            fetchRemote: fetchRemoteTrips,
+            uploadTrips,
+            cacheKey: app.storageKey,
+            migrationKey
+          });
+          app.replaceTrips(result.trips);
           dialog.close();
           setStatus("Sincronizado", "synced");
         } catch (error) {
           console.error("Falha na migração legada", error);
-          feedback.textContent = "Não foi possível vincular agora. As viagens originais continuam salvas neste dispositivo.";
+          feedback.textContent = error.remoteSafe && error.legacyRetired
+            ? "Suas viagens já estão seguras na sua conta, mas não foi possível criar o cache local neste dispositivo."
+            : "Não foi possível vincular agora. As viagens originais continuam salvas neste dispositivo.";
           confirm.disabled = false;
         }
       };
@@ -245,5 +323,6 @@
     return { get initialized() { return initialized; } };
   }
 
-  return { serializeTripForCloud, normalizeTripFromCloud, tripTimestamp, fingerprint, userStorageKeys, isMissingTable, reconcile, start };
+  return { serializeTripForCloud, normalizeTripFromCloud, tripTimestamp, fingerprint, userStorageKeys, isMissingTable,
+    findLegacyTrips, verifyTripsAreRemote, retireVerifiedLegacyStorage, completeLegacyMigration, reconcile, start };
 });

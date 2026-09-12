@@ -37,7 +37,8 @@
     cachedHighway = async function cachedHighwayNetworkAware(descriptor, allowExpired = false) {
       const entry = await baseCachedHighway(descriptor, allowExpired);
       if (!entry) return null;
-      return entry.networkFetchSchema === NETWORK_SCHEMA ? entry : null;
+      entry.needsNetworkRefresh = entry.networkFetchSchema !== NETWORK_SCHEMA;
+      return entry;
     };
   }
 
@@ -46,6 +47,7 @@
       const entry = await baseCacheHighway(descriptor, dedupeLines(lines), partial);
       if (!entry) return entry;
       entry.networkFetchSchema = NETWORK_SCHEMA;
+      entry.needsNetworkRefresh = false;
       try { await highwayDbPut(HIGHWAY_GEOMETRY_STORE, entry); } catch {}
       return entry;
     };
@@ -54,8 +56,6 @@
   fetchFullHighway = async function fetchFullHighwayAdditive(descriptor, signal, onStatus = () => {}) {
     const collected = [];
     const succeeded = new Set();
-    // A busca por relações já inclui a relação principal quando o ref coincide. A consulta
-    // separada "primary" era redundante e triplicava o custo da atualização em massa.
     const kinds = [
       ["relations", "Buscando relações da rodovia…"],
       ["ways", "Buscando todos os trechos por referência…"]
@@ -77,8 +77,6 @@
     const lines = dedupeLines(collected);
     if (!lines.length) throw new Error("Não foi possível localizar a rodovia completa no OpenStreetMap");
     onStatus("Consolidando todos os trechos encontrados…");
-    // Relations trazem trechos cujo ref some em travessias urbanas; ways traz todos os
-    // fragmentos explicitamente referenciados. Os dois conjuntos são sempre somados.
     return cacheHighway(descriptor, lines, !succeeded.has("ways") || !succeeded.has("relations"));
   };
 
@@ -218,9 +216,6 @@
     const totalKm = Number(entry.totalKm) || entry.lines.reduce((sum, line) => sum + lineLengthKm(line), 0);
     const traveledKm = evidence.complete ? totalKm : Math.min(totalKm, matched.traveledKm);
     const percent = evidence.complete ? 100 : (totalKm ? Math.min(100, traveledKm / totalKm * 100) : 0);
-    // Quando há evidência de percurso de ponta a ponta, todas as partes conhecidas da
-    // rodovia são mostradas como concluídas. Interrupções de ref dentro de cidades não
-    // reduzem artificialmente o status global.
     const segments = evidence.complete ? entry.lines : matched.segments;
     const result = {
       key,

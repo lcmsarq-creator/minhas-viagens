@@ -56,32 +56,33 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.11.7");
-      await loadScript("storage-pre.js?v=0.11.7");
+      await loadScript("fetch-base.js?v=0.11.8");
+      await loadScript("storage-pre.js?v=0.11.8");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.11.7",
-        "achievements.js?v=0.11.7",
-        "city-flags.js?v=0.11.7",
-        "route-interaction.js?v=0.11.7",
-        "script.js?v=0.11.7",
-        "hotfix.js?v=0.11.7",
-        "road-threshold-hotfix.js?v=0.11.7",
-        "secondary-roads-hotfix.js?v=0.11.7",
-        "ux-hotfix.js?v=0.11.7",
-        "endpoint-hotfix.js?v=0.11.7",
-        "city-search-fast.js?v=0.11.7",
-        "place-search-hotfix.js?v=0.11.7",
-        "edit-dialog-hotfix.js?v=0.11.7",
-        "route-click-hotfix.js?v=0.11.7",
-        "geometry-compact-hotfix.js?v=0.11.7",
-        "highway-render-hotfix.js?v=0.11.7",
-        "road-network-hotfix.js?v=0.11.7",
-        "road-catalog-hotfix.js?v=0.11.7",
-        "sync.js?v=0.11.7",
-        "road-cloud-hotfix.js?v=0.11.7",
-        "road-sweep-hotfix.js?v=0.11.7",
-        "escape-navigation.js?v=0.11.7"
+        "hotfix-pre.js?v=0.11.8",
+        "achievements.js?v=0.11.8",
+        "city-flags.js?v=0.11.8",
+        "route-interaction.js?v=0.11.8",
+        "script.js?v=0.11.8",
+        "hotfix.js?v=0.11.8",
+        "road-threshold-hotfix.js?v=0.11.8",
+        "secondary-roads-hotfix.js?v=0.11.8",
+        "ux-hotfix.js?v=0.11.8",
+        "endpoint-hotfix.js?v=0.11.8",
+        "city-search-fast.js?v=0.11.8",
+        "place-search-hotfix.js?v=0.11.8",
+        "edit-dialog-hotfix.js?v=0.11.8",
+        "route-click-hotfix.js?v=0.11.8",
+        "geometry-compact-hotfix.js?v=0.11.8",
+        "highway-render-hotfix.js?v=0.11.8",
+        "road-progress-core.js?v=0.11.8",
+        "road-network-hotfix.js?v=0.11.8",
+        "road-catalog-hotfix.js?v=0.11.8",
+        "sync.js?v=0.11.8",
+        "road-cloud-hotfix.js?v=0.11.8",
+        "road-sweep-hotfix.js?v=0.11.8",
+        "escape-navigation.js?v=0.11.8"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

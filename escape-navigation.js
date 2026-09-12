@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.11.7";
+  const APP_VERSION = "0.11.8";
 
   function isEditingText(target) {
     return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));

@@ -24,8 +24,8 @@
     return out;
   }
 
-  // Correspondência geométrica (Overpass/OSM): cada sequência contínua precisa
-  // ter pelo menos 2 km. Trechos separados não são somados para atingir o limite.
+  // Validação da conquista: cada sequência contínua precisa ter pelo menos 2 km.
+  // O progresso visual usa um motor separado e não passa por este filtro.
   if (baseMatchingRoadSegments) {
     matchingRoadSegments = function matchingRoadSegmentsMin2Km(lines, tripLines) {
       const result = baseMatchingRoadSegments(lines, tripLines) || { segments: [], traveledKm: 0 };
@@ -60,21 +60,6 @@
       const allowed = new Set(Object.keys(segments).map(normalizeKey));
       return roads.filter(label => allowed.has(normalizeKey(label)));
     };
-  }
-
-  async function clearProgressCache() {
-    try {
-      const db = await highwayDb();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction(HIGHWAY_PROGRESS_STORE, "readwrite");
-        tx.objectStore(HIGHWAY_PROGRESS_STORE).clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error);
-      });
-    } catch (error) {
-      console.warn("Não foi possível limpar o cache antigo de progresso de rodovias", error);
-    }
   }
 
   // Corrige conquistas antigas quando o trecho correspondente já existe no IndexedDB.
@@ -120,7 +105,6 @@
     }
   }
 
-  clearProgressCache();
   reconcileStoredRoads();
 
   const brandCopy = document.querySelector(".brand p");

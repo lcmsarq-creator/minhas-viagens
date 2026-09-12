@@ -3,6 +3,7 @@
 
   const APP_VERSION = "0.10.17";
   const SWEEP_SCHEMA_VERSION = "0.10.12";
+  // A geração v3 da geometria é validada pelo road-network-hotfix antes de entrar na fila como concluída.
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   if (!userId) return;
 

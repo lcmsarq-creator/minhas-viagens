@@ -1380,6 +1380,7 @@ function renderAchievements() {
         </div>`;
       card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
       container.appendChild(card);
+      if (type === "city") window.MinhasViagensCityFlags?.decorate(card.querySelector(".achievement-icon"), item);
     });
   };
 

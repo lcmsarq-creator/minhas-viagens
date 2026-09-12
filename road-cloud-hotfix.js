@@ -4,6 +4,7 @@
   const APP_VERSION = "0.10.16";
   const CLOUD_PREFIX = "mvroad|";
   const CLOUD_SCHEMA = "road-geometry-polyline5-v2";
+  const LEGACY_CLOUD_SCHEMA = "road-geometry-polyline5-v1";
   const PAGE_SIZE = 500;
   const UPLOAD_BATCH = 12;
   const MB = 1024 * 1024;
@@ -28,6 +29,7 @@
     version: APP_VERSION,
     achievementRoads: 0,
     availableRoads: 0,
+    refreshedRoads: 0,
     pendingRoads: 0,
     failedRoads: 0,
     cloudRoads: 0,
@@ -50,6 +52,8 @@
   const fmtMb = bytes => `${(Number(bytes || 0) / MB).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MB`;
   const fmtKb = bytes => `${(Number(bytes || 0) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} KB`;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const requiredNetworkSchema = () => window.MinhasViagensRoadNetwork?.schema || "";
+  const isCurrentEntry = entry => Boolean(entry?.lines?.length) && (!requiredNetworkSchema() || entry.networkFetchSchema === requiredNetworkSchema());
 
   function cloudId(key) {
     return `${CLOUD_PREFIX}${key}`;
@@ -102,7 +106,7 @@
       key: highwayCacheKey(descriptor),
       descriptor: descriptorPayload(descriptor),
       cacheVersion: Number(entry?.version) || HIGHWAY_CACHE_VERSION,
-      networkFetchSchema: String(entry?.networkFetchSchema || window.MinhasViagensRoadNetwork?.schema || ""),
+      networkFetchSchema: String(entry?.networkFetchSchema || requiredNetworkSchema()),
       sourceUpdatedAt: Number(entry?.updatedAt) || Date.now(),
       sourceToken: sourceToken(entry),
       partial: Boolean(entry?.partial),
@@ -116,19 +120,20 @@
   }
 
   function hydratePayload(payload) {
-    if (!payload || payload.kind !== "road_geometry_cache" || payload.schema !== CLOUD_SCHEMA) return null;
+    if (!payload || payload.kind !== "road_geometry_cache") return null;
+    if (![CLOUD_SCHEMA, LEGACY_CLOUD_SCHEMA].includes(payload.schema)) return null;
     if (Number(payload.cacheVersion) !== HIGHWAY_CACHE_VERSION || !Array.isArray(payload.encodedLines)) return null;
-    const requiredNetworkSchema = window.MinhasViagensRoadNetwork?.schema || "";
-    if (requiredNetworkSchema && payload.networkFetchSchema !== requiredNetworkSchema) return null;
     const precision = Number(payload.precision) || 5;
     const lines = payload.encodedLines
       .map(encoded => compact.decodePolyline(encoded, precision))
       .filter(line => Array.isArray(line) && line.length > 1);
     if (!lines.length) return null;
+    const current = payload.schema === CLOUD_SCHEMA && (!requiredNetworkSchema() || payload.networkFetchSchema === requiredNetworkSchema());
     return {
       key: payload.key,
       version: HIGHWAY_CACHE_VERSION,
-      networkFetchSchema: payload.networkFetchSchema || requiredNetworkSchema,
+      networkFetchSchema: current ? requiredNetworkSchema() : String(payload.networkFetchSchema || ""),
+      needsNetworkRefresh: !current,
       updatedAt: Number(payload.sourceUpdatedAt) || Date.now(),
       ttl: HIGHWAY_CACHE_TTL,
       lines,
@@ -256,7 +261,7 @@
   }
 
   function queueUpload(descriptor, entry) {
-    if (!navigator.onLine || !entry?.lines?.length) return;
+    if (!navigator.onLine || !isCurrentEntry(entry)) return;
     const key = highwayCacheKey(descriptor);
     Promise.resolve(loadCloudIndex()).then(() => {
       const payload = serializeEntry(descriptor, entry);
@@ -344,19 +349,16 @@
     };
   }
 
-  function queueMissingRoad(item, key) {
-    const queue = loadQueue();
-    if (!queue[key]) {
-      queue[key] = {
-        label: item.label,
-        countryCode: item.countryCode || "BR",
-        attempts: 0,
-        nextRetryAt: 0,
-        lastError: "",
-        createdAt: Date.now()
-      };
-      saveQueue(queue);
-    }
+  function ensureQueueItem(queue, item, key) {
+    if (queue[key]) return;
+    queue[key] = {
+      label: item.label,
+      countryCode: item.countryCode || "BR",
+      attempts: 0,
+      nextRetryAt: 0,
+      lastError: "",
+      createdAt: Date.now()
+    };
   }
 
   async function primeAchievements() {
@@ -364,6 +366,7 @@
     const roads = [...getAchievementSnapshot().roads.values()];
     stats.achievementRoads = roads.length;
     let available = 0;
+    let refreshed = 0;
     const validKeys = new Set();
     const queue = loadQueue();
 
@@ -373,15 +376,18 @@
       validKeys.add(key);
       let local = null;
       try { local = await baseCachedHighway?.(descriptor, true); } catch {}
-      if (local) {
+      const remote = hydratePayload(cloudRows.get(key)?.payload);
+
+      if (isCurrentEntry(local)) {
         available += 1;
+        refreshed += 1;
         queueUpload(descriptor, local);
         delete queue[key];
         continue;
       }
-      const remote = hydratePayload(cloudRows.get(key)?.payload);
-      if (remote) {
+      if (isCurrentEntry(remote)) {
         available += 1;
+        refreshed += 1;
         delete queue[key];
         try {
           await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
@@ -389,20 +395,26 @@
         } catch {}
         continue;
       }
-      if (!queue[key]) {
-        queue[key] = {
-          label: item.label,
-          countryCode: item.countryCode || "BR",
-          attempts: 0,
-          nextRetryAt: 0,
-          lastError: "",
-          createdAt: Date.now()
-        };
+      if (local) {
+        available += 1;
+        ensureQueueItem(queue, item, key);
+        continue;
       }
+      if (remote) {
+        available += 1;
+        ensureQueueItem(queue, item, key);
+        try {
+          await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
+          stats.downloadedRoads += 1;
+        } catch {}
+        continue;
+      }
+      ensureQueueItem(queue, item, key);
     }
 
     for (const key of Object.keys(queue)) if (!validKeys.has(key)) delete queue[key];
     stats.availableRoads = available;
+    stats.refreshedRoads = refreshed;
     saveQueue(queue);
     await measureLocalStorage();
     scheduleMissingProcessor(50);
@@ -442,9 +454,9 @@
           const descriptor = overpassRoadDescriptor({ label: item.label, countryCode: item.countryCode || "BR" });
           const local = await baseCachedHighway?.(descriptor, true);
           const remote = hydratePayload(cloudRows.get(key)?.payload);
-          if (local) {
+          if (isCurrentEntry(local)) {
             queueUpload(descriptor, local);
-          } else if (remote) {
+          } else if (isCurrentEntry(remote)) {
             await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
             stats.downloadedRoads += 1;
           } else {
@@ -454,7 +466,8 @@
           const nextQueue = loadQueue();
           delete nextQueue[key];
           saveQueue(nextQueue);
-          stats.availableRoads = Math.min(stats.achievementRoads, stats.availableRoads + 1);
+          stats.refreshedRoads = Math.min(stats.achievementRoads, stats.refreshedRoads + 1);
+          stats.availableRoads = Math.min(stats.achievementRoads, stats.availableRoads + (local || remote ? 0 : 1));
         } catch (error) {
           const nextQueue = loadQueue();
           const current = nextQueue[key] || item;

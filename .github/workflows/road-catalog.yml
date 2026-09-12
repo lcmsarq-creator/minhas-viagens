@@ -1,0 +1,94 @@
+name: Atualizar catálogo de rodovias
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 1 * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/road-catalog.yml"
+      - "scripts/build_road_catalog.py"
+      - "scripts/requirements-road-catalog.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: road-catalog-brazil
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements-road-catalog.txt
+
+      - name: Instalar ferramentas OSM
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes osmium-tool
+          python -m pip install --requirement scripts/requirements-road-catalog.txt
+
+      - name: Baixar dados atuais do Brasil
+        run: |
+          mkdir -p .road-catalog-work
+          curl --fail --location --retry 5 --retry-delay 10 \
+            --output .road-catalog-work/brazil-latest.osm.pbf \
+            https://download.geofabrik.de/south-america/brazil-latest.osm.pbf
+          curl --fail --location --retry 5 --retry-delay 10 \
+            --output .road-catalog-work/brazil.osm.pbf.md5 \
+            https://download.geofabrik.de/south-america/brazil-latest.osm.pbf.md5
+          cd .road-catalog-work
+          md5sum --check brazil.osm.pbf.md5
+
+      - name: Reduzir aos dados rodoviários
+        run: |
+          osmium tags-filter .road-catalog-work/brazil-latest.osm.pbf \
+            r/route=road w/highway \
+            --output .road-catalog-work/brazil-roads.osm.pbf \
+            --overwrite
+
+      - name: Gerar catálogo compacto
+        run: |
+          rm -rf road-catalog/v1
+          SOURCE_DATE="$(date -u +%Y-%m-%d)"
+          python scripts/build_road_catalog.py \
+            --input .road-catalog-work/brazil-roads.osm.pbf \
+            --output road-catalog/v1 \
+            --source-date "$SOURCE_DATE"
+
+      - name: Validar catálogo
+        run: |
+          python -m unittest discover -s tests -p 'test_road_catalog.py'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("road-catalog/v1/manifest.json").read_text())
+          if manifest.get("roadCount", 0) < 100:
+              raise SystemExit("Catálogo incompleto: menos de 100 rodovias")
+          print(f"Catálogo validado: {manifest['roadCount']} rodovias")
+          PY
+
+      - name: Publicar catálogo atualizado
+        run: |
+          git config user.name "minhas-viagens-catalog-bot"
+          git config user.email "catalog-bot@users.noreply.github.com"
+          git add road-catalog/v1
+          if git diff --cached --quiet; then
+            echo "Catálogo já está atualizado."
+          else
+            git commit -m "data: atualizar catálogo brasileiro de rodovias"
+            git push
+          fi

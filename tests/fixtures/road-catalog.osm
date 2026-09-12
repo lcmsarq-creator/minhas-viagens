@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="road-catalog-test">
+  <node id="1" lat="-20.80000" lon="-49.40000" />
+  <node id="2" lat="-20.70000" lon="-49.30000" />
+  <node id="3" lat="-20.60000" lon="-49.20000" />
+  <node id="4" lat="-20.50000" lon="-49.10000" />
+  <way id="101">
+    <nd ref="1" />
+    <nd ref="2" />
+    <tag k="highway" v="primary" />
+  </way>
+  <way id="102">
+    <nd ref="2" />
+    <nd ref="3" />
+    <tag k="highway" v="primary" />
+  </way>
+  <way id="103">
+    <nd ref="3" />
+    <nd ref="4" />
+    <tag k="highway" v="primary" />
+    <tag k="ref" v="SP-270" />
+  </way>
+  <relation id="201">
+    <member type="way" ref="101" role="" />
+    <member type="way" ref="102" role="" />
+    <tag k="type" v="route" />
+    <tag k="route" v="road" />
+    <tag k="network" v="BR:SP" />
+    <tag k="ref" v="425" />
+  </relation>
+</osm>

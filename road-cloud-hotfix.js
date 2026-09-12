@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.17";
+  const APP_VERSION = "0.11.0";
   const CLOUD_PREFIX = "mvroad|";
   const CLOUD_SCHEMA = "road-geometry-polyline5-v3";
   const ENTRY_VALIDATION_SCHEMA = "complete-road-v3";
@@ -63,7 +63,8 @@
 
   function isValidatedEntry(entry) {
     if (!entry?.lines?.length) return false;
-    if (entry.cloudValidationSchema !== ENTRY_VALIDATION_SCHEMA) return false;
+    const catalogValidated = window.MinhasViagensRoadCatalog?.isValidatedEntry?.(entry) === true;
+    if (entry.cloudValidationSchema !== ENTRY_VALIDATION_SCHEMA && !catalogValidated) return false;
     const required = requiredNetworkSchema();
     if (required && entry.networkFetchSchema !== required) return false;
     if (entry.needsNetworkRefresh === true) return false;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=0.10.14" />
+  <link rel="stylesheet" href="style.css?v=0.10.15" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -18,7 +18,7 @@
       <p class="auth-intro">Entre com um link seguro enviado ao seu e-mail para acessar seu mapa pessoal.</p>
       <form id="authForm" novalidate>
         <label for="authEmail">E-mail</label>
-        <input id="authEmail" type="email" autocomplete="off" required placeholder="voce@exemplo.com" />
+        <input id="authEmail" type="email" autocomplete="email" required placeholder="voce@exemplo.com" />
         <button id="authSubmit" class="primary-btn" type="submit">Enviar link de acesso</button>
       </form>
       <p id="authStatus" class="auth-status" role="status"></p>
@@ -31,7 +31,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.10.14</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.10.15</p>
         </div>
       </div>
 
@@ -328,8 +328,8 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="config.js?v=0.10.14"></script>
+  <script src="config.js?v=0.10.15"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.10.14"></script>
+  <script src="auth.js?v=0.10.15"></script>
 </body>
 </html>

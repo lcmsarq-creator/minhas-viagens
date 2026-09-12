@@ -1,14 +1,18 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.16";
+  const APP_VERSION = "0.10.17";
   const CLOUD_PREFIX = "mvroad|";
-  const CLOUD_SCHEMA = "road-geometry-polyline5-v2";
-  const LEGACY_CLOUD_SCHEMA = "road-geometry-polyline5-v1";
+  const CLOUD_SCHEMA = "road-geometry-polyline5-v3";
+  const ACCEPTED_SCHEMAS = new Set([
+    "road-geometry-polyline5-v1",
+    "road-geometry-polyline5-v2",
+    CLOUD_SCHEMA
+  ]);
   const PAGE_SIZE = 500;
-  const UPLOAD_BATCH = 12;
-  const MB = 1024 * 1024;
+  const UPLOAD_BATCH = 10;
   const RETRY_DELAYS = [15000, 60000, 180000, 600000, 1800000];
+  const ROAD_PAUSE_MS = 1200;
 
   const auth = window.MinhasViagensAuth;
   const client = auth?.getClient?.();
@@ -16,27 +20,24 @@
   const compact = window.MinhasViagensGeometryCompact;
   if (!client || !userId || !compact?.encodePolyline || !compact?.decodePolyline) return;
 
-  const QUEUE_KEY = `minhasViagens.roadCloudQueue.${userId}.v2`;
+  const QUEUE_KEY = `minhasViagens.roadCloudQueue.${userId}.v3`;
   const cloudRows = new Map();
   const uploadQueue = new Map();
   let cloudIndexPromise = null;
   let uploadTimer = null;
   let retryTimer = null;
   let flushing = false;
-  let processingMissing = false;
+  let processing = false;
 
   const stats = window.MinhasViagensRoadCloudStats = {
     version: APP_VERSION,
     achievementRoads: 0,
     availableRoads: 0,
-    refreshedRoads: 0,
+    completeRoads: 0,
     pendingRoads: 0,
     failedRoads: 0,
     cloudRoads: 0,
     cloudBytes: 0,
-    localRoadBytes: 0,
-    originUsageBytes: 0,
-    originQuotaBytes: 0,
     uploadedRoads: 0,
     downloadedRoads: 0,
     cloudHits: 0,
@@ -44,19 +45,38 @@
     lastUpdatedAt: null
   };
 
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const byteSize = value => {
     try { return new TextEncoder().encode(JSON.stringify(value)).byteLength; }
     catch { return 0; }
   };
-
-  const fmtMb = bytes => `${(Number(bytes || 0) / MB).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MB`;
-  const fmtKb = bytes => `${(Number(bytes || 0) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} KB`;
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const requiredNetworkSchema = () => window.MinhasViagensRoadNetwork?.schema || "";
-  const isCurrentEntry = entry => Boolean(entry?.lines?.length) && (!requiredNetworkSchema() || entry.networkFetchSchema === requiredNetworkSchema());
 
   function cloudId(key) {
     return `${CLOUD_PREFIX}${key}`;
+  }
+
+  function pointCount(lines) {
+    return (lines || []).reduce((sum, line) => sum + (Array.isArray(line) ? line.length : 0), 0);
+  }
+
+  function isValidatedEntry(entry) {
+    if (!entry?.lines?.length) return false;
+    const required = requiredNetworkSchema();
+    if (required && entry.networkFetchSchema !== required) return false;
+    if (entry.needsNetworkRefresh === true) return false;
+    if (entry.partial === true) return false;
+    return true;
+  }
+
+  function isValidatedPayload(payload) {
+    if (!payload || payload.kind !== "road_geometry_cache") return false;
+    if (payload.schema !== CLOUD_SCHEMA) return false;
+    if (!Array.isArray(payload.encodedLines) || !payload.encodedLines.length) return false;
+    const required = requiredNetworkSchema();
+    if (required && payload.networkFetchSchema !== required) return false;
+    if (payload.partial === true) return false;
+    return true;
   }
 
   function loadQueue() {
@@ -69,21 +89,7 @@
   function saveQueue(queue) {
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch {}
     stats.pendingRoads = Object.keys(queue).length;
-    stats.failedRoads = Object.values(queue).filter(item => Number(item?.attempts) > 0).length;
-  }
-
-  function pointCount(lines) {
-    return (lines || []).reduce((sum, line) => sum + (Array.isArray(line) ? line.length : 0), 0);
-  }
-
-  function sourceToken(entry) {
-    return [
-      Number(entry?.version) || HIGHWAY_CACHE_VERSION,
-      String(entry?.networkFetchSchema || ""),
-      String(entry?.updatedAt || ""),
-      pointCount(entry?.lines || []),
-      Math.round((Number(entry?.totalKm) || 0) * 1000)
-    ].join("|");
+    stats.failedRoads = Object.values(queue).filter(item => Number(item?.attempts || 0) > 0).length;
   }
 
   function descriptorPayload(descriptor) {
@@ -96,48 +102,59 @@
     };
   }
 
-  function serializeEntry(descriptor, entry) {
-    const lines = (entry?.lines || []).filter(line => Array.isArray(line) && line.length > 1);
+  function sourceToken(entry) {
+    return [
+      Number(entry?.version) || HIGHWAY_CACHE_VERSION,
+      String(entry?.networkFetchSchema || ""),
+      String(entry?.updatedAt || ""),
+      Boolean(entry?.partial) ? 1 : 0,
+      pointCount(entry?.lines || []),
+      Math.round((Number(entry?.totalKm) || 0) * 1000)
+    ].join("|");
+  }
+
+  function serializeValidatedEntry(descriptor, entry) {
+    if (!isValidatedEntry(entry)) throw new Error("Geometria ainda não validada como completa");
+    const lines = (entry.lines || []).filter(line => Array.isArray(line) && line.length > 1);
     const precision = 5;
-    const encodedLines = lines.map(line => compact.encodePolyline(line, precision));
     return {
       kind: "road_geometry_cache",
       schema: CLOUD_SCHEMA,
       key: highwayCacheKey(descriptor),
       descriptor: descriptorPayload(descriptor),
-      cacheVersion: Number(entry?.version) || HIGHWAY_CACHE_VERSION,
-      networkFetchSchema: String(entry?.networkFetchSchema || requiredNetworkSchema()),
-      sourceUpdatedAt: Number(entry?.updatedAt) || Date.now(),
+      cacheVersion: Number(entry.version) || HIGHWAY_CACHE_VERSION,
+      networkFetchSchema: String(entry.networkFetchSchema || ""),
+      sourceUpdatedAt: Number(entry.updatedAt) || Date.now(),
       sourceToken: sourceToken(entry),
-      partial: Boolean(entry?.partial),
-      totalKm: Number(entry?.totalKm) || 0,
-      bounds: Array.isArray(entry?.bounds) ? entry.bounds : null,
+      partial: false,
+      totalKm: Number(entry.totalKm) || 0,
+      bounds: Array.isArray(entry.bounds) ? entry.bounds : null,
       precision,
-      compactToleranceM: Number(entry?.compactToleranceM) || 25,
+      compactToleranceM: Number(entry.compactToleranceM) || 25,
       pointCount: pointCount(lines),
-      encodedLines
+      encodedLines: lines.map(line => compact.encodePolyline(line, precision))
     };
   }
 
   function hydratePayload(payload) {
     if (!payload || payload.kind !== "road_geometry_cache") return null;
-    if (![CLOUD_SCHEMA, LEGACY_CLOUD_SCHEMA].includes(payload.schema)) return null;
+    if (!ACCEPTED_SCHEMAS.has(payload.schema)) return null;
     if (Number(payload.cacheVersion) !== HIGHWAY_CACHE_VERSION || !Array.isArray(payload.encodedLines)) return null;
     const precision = Number(payload.precision) || 5;
     const lines = payload.encodedLines
       .map(encoded => compact.decodePolyline(encoded, precision))
       .filter(line => Array.isArray(line) && line.length > 1);
     if (!lines.length) return null;
-    const current = payload.schema === CLOUD_SCHEMA && (!requiredNetworkSchema() || payload.networkFetchSchema === requiredNetworkSchema());
+    const validated = isValidatedPayload(payload);
     return {
       key: payload.key,
       version: HIGHWAY_CACHE_VERSION,
-      networkFetchSchema: current ? requiredNetworkSchema() : String(payload.networkFetchSchema || ""),
-      needsNetworkRefresh: !current,
+      networkFetchSchema: String(payload.networkFetchSchema || ""),
+      needsNetworkRefresh: !validated,
       updatedAt: Number(payload.sourceUpdatedAt) || Date.now(),
       ttl: HIGHWAY_CACHE_TTL,
       lines,
-      partial: Boolean(payload.partial),
+      partial: validated ? false : Boolean(payload.partial),
       totalKm: Number(payload.totalKm) || lines.reduce((sum, line) => sum + lineLengthKm(line), 0),
       bounds: Array.isArray(payload.bounds) ? payload.bounds : null,
       compactToleranceM: Number(payload.compactToleranceM) || 25,
@@ -145,57 +162,11 @@
     };
   }
 
-  function ensureMetricsUi() {
-    if (document.getElementById("roadCloudMetrics")) return;
-    const backupPanel = els?.exportBtn?.closest?.(".panel");
-    if (!backupPanel) return;
-    const title = document.createElement("h3");
-    title.textContent = "Armazenamento";
-    title.style.margin = "16px 0 6px";
-    title.style.fontSize = ".9rem";
-    const cloudLine = document.createElement("p");
-    cloudLine.id = "roadCloudMetrics";
-    cloudLine.className = "micro-hint";
-    cloudLine.textContent = "Rodovias na nuvem: calculando…";
-    const localLine = document.createElement("p");
-    localLine.id = "roadLocalMetrics";
-    localLine.className = "micro-hint";
-    localLine.textContent = "Este dispositivo: calculando…";
-    const trendLine = document.createElement("p");
-    trendLine.id = "roadTrendMetrics";
-    trendLine.className = "micro-hint";
-    trendLine.textContent = "Tendência: calculando…";
-    backupPanel.append(title, cloudLine, localLine, trendLine);
-  }
-
-  function renderMetrics() {
-    ensureMetricsUi();
-    const cloudLine = document.getElementById("roadCloudMetrics");
-    const localLine = document.getElementById("roadLocalMetrics");
-    const trendLine = document.getElementById("roadTrendMetrics");
-    if (cloudLine) cloudLine.textContent = `Rodovias na nuvem: ${stats.cloudRoads} · ${fmtMb(stats.cloudBytes)} de geometria compactada`;
-    if (localLine) {
-      const remaining = Math.max(0, stats.originQuotaBytes - stats.originUsageBytes);
-      localLine.textContent = stats.originQuotaBytes
-        ? `Este dispositivo: ${fmtMb(stats.originUsageBytes)} usados · ${fmtMb(remaining)} disponíveis`
-        : `Cache local de rodovias: ${fmtMb(stats.localRoadBytes)}`;
-    }
-    if (trendLine) {
-      if (stats.cloudRoads > 0) {
-        const avg = stats.cloudBytes / stats.cloudRoads;
-        trendLine.textContent = `Média ${fmtKb(avg)}/rodovia · 100 ≈ ${fmtMb(avg * 100)} · 500 ≈ ${fmtMb(avg * 500)}`;
-      } else {
-        trendLine.textContent = "Tendência: será calculada após a primeira rodovia ser enviada à nuvem.";
-      }
-    }
-  }
-
   function recalcCloudStats() {
     stats.cloudRoads = cloudRows.size;
     stats.cloudBytes = 0;
     for (const row of cloudRows.values()) stats.cloudBytes += byteSize({ trip_id: row.trip_id, payload: row.payload });
     stats.lastUpdatedAt = new Date().toISOString();
-    renderMetrics();
   }
 
   async function loadCloudIndex(force = false) {
@@ -233,53 +204,73 @@
     return cloudIndexPromise;
   }
 
-  async function measureLocalStorage() {
-    try {
-      const db = await openHighwayDb();
-      stats.localRoadBytes = await new Promise((resolve, reject) => {
-        let total = 0;
-        const tx = db.transaction(HIGHWAY_GEOMETRY_STORE, "readonly");
-        const request = tx.objectStore(HIGHWAY_GEOMETRY_STORE).openCursor();
-        request.onsuccess = event => {
-          const cursor = event.target.result;
-          if (!cursor) return;
-          total += byteSize(cursor.value);
-          cursor.continue();
-        };
-        tx.oncomplete = () => { db.close(); resolve(total); };
-        tx.onerror = () => { db.close(); reject(tx.error); };
-        tx.onabort = () => { db.close(); reject(tx.error); };
-      });
-    } catch {}
-    try {
-      const estimate = await navigator.storage?.estimate?.();
-      stats.originUsageBytes = Number(estimate?.usage) || 0;
-      stats.originQuotaBytes = Number(estimate?.quota) || 0;
-    } catch {}
-    renderMetrics();
-    return stats;
+  function ensureQueueItem(queue, item, descriptor, key, priority = false) {
+    const current = queue[key] || {};
+    queue[key] = {
+      label: item?.label || descriptor?.ref || current.label || key,
+      countryCode: item?.countryCode || descriptor?.countryCode || current.countryCode || "BR",
+      attempts: Number(current.attempts || 0),
+      nextRetryAt: Number(current.nextRetryAt || 0),
+      lastError: current.lastError || "",
+      createdAt: Number(current.createdAt || Date.now()),
+      priority: priority || Boolean(current.priority)
+    };
+  }
+
+  function enqueueDescriptor(descriptor, priority = false) {
+    if (!descriptor) return;
+    const key = highwayCacheKey(descriptor);
+    const queue = loadQueue();
+    ensureQueueItem(queue, { label: descriptor.ref, countryCode: descriptor.countryCode }, descriptor, key, priority);
+    if (priority) queue[key].nextRetryAt = 0;
+    saveQueue(queue);
+    scheduleProcessor(priority ? 50 : 400);
+  }
+
+  async function uploadRows(rows) {
+    if (!rows.length) return;
+    const { error } = await client.from("trips").upsert(rows, { onConflict: "user_id,trip_id" });
+    if (error) throw error;
+    for (const row of rows) {
+      const key = String(row.trip_id).slice(CLOUD_PREFIX.length);
+      cloudRows.set(key, { trip_id: row.trip_id, payload: row.payload, client_updated_at: row.client_updated_at });
+      stats.uploadedRoads += 1;
+    }
+    recalcCloudStats();
   }
 
   function queueUpload(descriptor, entry) {
-    if (!navigator.onLine || !isCurrentEntry(entry)) return;
+    if (!navigator.onLine || !isValidatedEntry(entry)) return;
+    let payload;
+    try { payload = serializeValidatedEntry(descriptor, entry); }
+    catch { return; }
     const key = highwayCacheKey(descriptor);
-    Promise.resolve(loadCloudIndex()).then(() => {
-      const payload = serializeEntry(descriptor, entry);
-      const remote = cloudRows.get(key)?.payload;
-      if (remote?.sourceToken === payload.sourceToken && remote?.schema === CLOUD_SCHEMA) return;
-      uploadQueue.set(key, {
-        key,
-        row: {
-          user_id: userId,
-          trip_id: cloudId(key),
-          payload,
-          client_updated_at: new Date().toISOString(),
-          deleted_at: null
-        }
-      });
-      clearTimeout(uploadTimer);
-      uploadTimer = setTimeout(flushUploads, 350);
+    const remote = cloudRows.get(key)?.payload;
+    if (isValidatedPayload(remote) && remote.sourceToken === payload.sourceToken) return;
+    uploadQueue.set(key, {
+      user_id: userId,
+      trip_id: cloudId(key),
+      payload,
+      client_updated_at: new Date().toISOString(),
+      deleted_at: null
     });
+    clearTimeout(uploadTimer);
+    uploadTimer = setTimeout(flushUploads, 300);
+  }
+
+  async function uploadValidatedNow(descriptor, entry) {
+    if (!isValidatedEntry(entry)) throw new Error("Geometria parcial não pode ser publicada como completa");
+    const payload = serializeValidatedEntry(descriptor, entry);
+    const key = highwayCacheKey(descriptor);
+    const row = {
+      user_id: userId,
+      trip_id: cloudId(key),
+      payload,
+      client_updated_at: new Date().toISOString(),
+      deleted_at: null
+    };
+    await uploadRows([row]);
+    return row;
   }
 
   async function flushUploads() {
@@ -287,20 +278,13 @@
     flushing = true;
     try {
       while (uploadQueue.size) {
-        const batch = [...uploadQueue.values()].slice(0, UPLOAD_BATCH);
-        const rows = batch.map(item => item.row);
-        const { error } = await client.from("trips").upsert(rows, { onConflict: "user_id,trip_id" });
-        if (error) throw error;
-        for (const item of batch) {
-          uploadQueue.delete(item.key);
-          cloudRows.set(item.key, { trip_id: item.row.trip_id, payload: item.row.payload, client_updated_at: item.row.client_updated_at });
-          stats.uploadedRoads += 1;
-        }
-        recalcCloudStats();
+        const batchEntries = [...uploadQueue.entries()].slice(0, UPLOAD_BATCH);
+        await uploadRows(batchEntries.map(([, row]) => row));
+        for (const [key] of batchEntries) uploadQueue.delete(key);
         await sleep(80);
       }
     } catch (error) {
-      console.warn("Não foi possível enviar todas as rodovias para a nuvem agora", error);
+      console.warn("Não foi possível enviar todas as rodovias completas para a nuvem agora", error);
     } finally {
       flushing = false;
       if (uploadQueue.size && navigator.onLine) uploadTimer = setTimeout(flushUploads, 1800);
@@ -313,26 +297,29 @@
     const row = cloudRows.get(key);
     if (!row) {
       stats.cloudMisses += 1;
+      enqueueDescriptor(descriptor, true);
       return null;
     }
     const entry = hydratePayload(row.payload);
     if (!entry) {
       stats.cloudMisses += 1;
+      enqueueDescriptor(descriptor, true);
       return null;
     }
     stats.cloudHits += 1;
     try { await highwayDbPut(HIGHWAY_GEOMETRY_STORE, entry); } catch {}
     stats.downloadedRoads += 1;
-    measureLocalStorage();
+    if (!isValidatedEntry(entry)) enqueueDescriptor(descriptor, true);
     return entry;
   }
 
   const baseCachedHighway = typeof cachedHighway === "function" ? cachedHighway : null;
   if (baseCachedHighway) {
-    cachedHighway = async function cachedHighwayCloudAware(descriptor, allowExpired = false) {
+    cachedHighway = async function cachedHighwayCloudV3(descriptor, allowExpired = false) {
       const local = await baseCachedHighway(descriptor, allowExpired);
       if (local) {
-        queueUpload(descriptor, local);
+        if (isValidatedEntry(local)) queueUpload(descriptor, local);
+        else enqueueDescriptor(descriptor, true);
         return local;
       }
       return cloudEntryFor(descriptor);
@@ -341,24 +328,18 @@
 
   const baseCacheHighway = typeof cacheHighway === "function" ? cacheHighway : null;
   if (baseCacheHighway) {
-    cacheHighway = async function cacheHighwayCloudAware(descriptor, lines, partial = false) {
+    cacheHighway = async function cacheHighwayCloudV3(descriptor, lines, partial = false) {
       const entry = await baseCacheHighway(descriptor, lines, partial);
-      queueUpload(descriptor, entry);
-      measureLocalStorage();
+      if (isValidatedEntry(entry)) queueUpload(descriptor, entry);
+      else enqueueDescriptor(descriptor, true);
       return entry;
     };
   }
 
-  function ensureQueueItem(queue, item, key) {
-    if (queue[key]) return;
-    queue[key] = {
-      label: item.label,
-      countryCode: item.countryCode || "BR",
-      attempts: 0,
-      nextRetryAt: 0,
-      lastError: "",
-      createdAt: Date.now()
-    };
+  function priorityForKey(key) {
+    if (key === "BR|SP|425") return 0;
+    if (key === "UY|RU|5") return 1;
+    return 10;
   }
 
   async function primeAchievements() {
@@ -366,7 +347,7 @@
     const roads = [...getAchievementSnapshot().roads.values()];
     stats.achievementRoads = roads.length;
     let available = 0;
-    let refreshed = 0;
+    let complete = 0;
     const validKeys = new Set();
     const queue = loadQueue();
 
@@ -376,48 +357,45 @@
       validKeys.add(key);
       let local = null;
       try { local = await baseCachedHighway?.(descriptor, true); } catch {}
-      const remote = hydratePayload(cloudRows.get(key)?.payload);
+      const remotePayload = cloudRows.get(key)?.payload;
+      const remote = hydratePayload(remotePayload);
 
-      if (isCurrentEntry(local)) {
-        available += 1;
-        refreshed += 1;
+      if (local || remote) available += 1;
+
+      if (isValidatedEntry(local)) {
+        complete += 1;
         queueUpload(descriptor, local);
         delete queue[key];
         continue;
       }
-      if (isCurrentEntry(remote)) {
-        available += 1;
-        refreshed += 1;
+
+      if (isValidatedPayload(remotePayload) && isValidatedEntry(remote)) {
+        complete += 1;
         delete queue[key];
+        if (!local) {
+          try {
+            await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
+            stats.downloadedRoads += 1;
+          } catch {}
+        }
+        continue;
+      }
+
+      if (!local && remote) {
         try {
           await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
           stats.downloadedRoads += 1;
         } catch {}
-        continue;
       }
-      if (local) {
-        available += 1;
-        ensureQueueItem(queue, item, key);
-        continue;
-      }
-      if (remote) {
-        available += 1;
-        ensureQueueItem(queue, item, key);
-        try {
-          await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
-          stats.downloadedRoads += 1;
-        } catch {}
-        continue;
-      }
-      ensureQueueItem(queue, item, key);
+
+      ensureQueueItem(queue, item, descriptor, key, priorityForKey(key) < 10);
     }
 
     for (const key of Object.keys(queue)) if (!validKeys.has(key)) delete queue[key];
     stats.availableRoads = available;
-    stats.refreshedRoads = refreshed;
+    stats.completeRoads = complete;
     saveQueue(queue);
-    await measureLocalStorage();
-    scheduleMissingProcessor(50);
+    scheduleProcessor(80);
     return stats;
   }
 
@@ -425,15 +403,15 @@
     return RETRY_DELAYS[Math.min(RETRY_DELAYS.length - 1, Math.max(0, attempts - 1))];
   }
 
-  function scheduleMissingProcessor(delay = 300) {
+  function scheduleProcessor(delay = 300) {
     clearTimeout(retryTimer);
     if (!navigator.onLine) return;
-    retryTimer = setTimeout(processMissingQueue, delay);
+    retryTimer = setTimeout(processQueue, delay);
   }
 
-  async function processMissingQueue() {
-    if (processingMissing || !navigator.onLine) return;
-    processingMissing = true;
+  async function processQueue() {
+    if (processing || !navigator.onLine) return;
+    processing = true;
     try {
       while (navigator.onLine) {
         const queue = loadQueue();
@@ -442,32 +420,43 @@
         const now = Date.now();
         const due = entries
           .filter(([, item]) => Number(item?.nextRetryAt || 0) <= now)
-          .sort((a, b) => Number(a[1]?.nextRetryAt || 0) - Number(b[1]?.nextRetryAt || 0));
+          .sort((a, b) => {
+            const pa = a[1]?.priority ? priorityForKey(a[0]) : 10;
+            const pb = b[1]?.priority ? priorityForKey(b[0]) : 10;
+            return pa - pb || Number(a[1]?.nextRetryAt || 0) - Number(b[1]?.nextRetryAt || 0);
+          });
+
         if (!due.length) {
           const nextAt = Math.min(...entries.map(([, item]) => Number(item?.nextRetryAt || now + 60000)));
-          scheduleMissingProcessor(Math.max(1000, Math.min(60000, nextAt - now)));
+          scheduleProcessor(Math.max(1000, Math.min(60000, nextAt - now)));
           break;
         }
 
         const [key, item] = due[0];
         try {
           const descriptor = overpassRoadDescriptor({ label: item.label, countryCode: item.countryCode || "BR" });
-          const local = await baseCachedHighway?.(descriptor, true);
-          const remote = hydratePayload(cloudRows.get(key)?.payload);
-          if (isCurrentEntry(local)) {
-            queueUpload(descriptor, local);
-          } else if (isCurrentEntry(remote)) {
-            await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
-            stats.downloadedRoads += 1;
+          let local = null;
+          try { local = await baseCachedHighway?.(descriptor, true); } catch {}
+          const remotePayload = cloudRows.get(key)?.payload;
+          const remote = hydratePayload(remotePayload);
+
+          if (isValidatedEntry(local)) {
+            await uploadValidatedNow(descriptor, local);
+          } else if (isValidatedPayload(remotePayload) && isValidatedEntry(remote)) {
+            try { await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote); } catch {}
           } else {
-            await fetchFullHighway(descriptor, null);
-            await flushUploads();
+            const fresh = await fetchFullHighway(descriptor, null);
+            if (!isValidatedEntry(fresh)) {
+              throw new Error("A consulta retornou apenas parte da rodovia; aguardando nova tentativa");
+            }
+            await uploadValidatedNow(descriptor, fresh);
           }
+
           const nextQueue = loadQueue();
           delete nextQueue[key];
           saveQueue(nextQueue);
-          stats.refreshedRoads = Math.min(stats.achievementRoads, stats.refreshedRoads + 1);
-          stats.availableRoads = Math.min(stats.achievementRoads, stats.availableRoads + (local || remote ? 0 : 1));
+          stats.completeRoads = Math.min(stats.achievementRoads, stats.completeRoads + 1);
+          if (!local && !remote) stats.availableRoads = Math.min(stats.achievementRoads, stats.availableRoads + 1);
         } catch (error) {
           const nextQueue = loadQueue();
           const current = nextQueue[key] || item;
@@ -475,34 +464,32 @@
           current.lastError = String(error?.message || error || "Falha desconhecida").slice(0, 240);
           current.lastAttemptAt = Date.now();
           current.nextRetryAt = Date.now() + retryDelay(current.attempts);
+          current.priority = Boolean(current.priority);
           nextQueue[key] = current;
           saveQueue(nextQueue);
           console.warn(`Rodovia ${current.label} continua pendente; nova tentativa será feita automaticamente.`, error);
         }
-        await sleep(1200);
+        await sleep(ROAD_PAUSE_MS);
       }
     } finally {
-      processingMissing = false;
+      processing = false;
       const queue = loadQueue();
-      if (Object.keys(queue).length && navigator.onLine) scheduleMissingProcessor(1500);
+      if (Object.keys(queue).length && navigator.onLine) scheduleProcessor(1500);
       loadCloudIndex(true);
-      measureLocalStorage();
     }
   }
 
   window.MinhasViagensRoadCloud = {
     prefix: CLOUD_PREFIX,
+    schema: CLOUD_SCHEMA,
     stats,
     loadCloudIndex,
     primeAchievements,
-    measureLocalStorage,
     flushUploads,
-    processMissingQueue,
+    processMissingQueue: processQueue,
     status: () => ({ ...stats, queue: loadQueue() })
   };
 
-  ensureMetricsUi();
-  renderMetrics();
   loadCloudIndex();
   setTimeout(primeAchievements, 700);
   setTimeout(primeAchievements, 3000);
@@ -511,11 +498,11 @@
     loadCloudIndex(true);
     setTimeout(primeAchievements, 250);
     setTimeout(flushUploads, 700);
-    scheduleMissingProcessor(900);
+    scheduleProcessor(900);
   });
 
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
 
-  console.info(`Minhas Viagens ${APP_VERSION}: biblioteca persistente de rodovias com fila de completude e retentativas habilitada.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: nuvem v3 só publica geometrias integralmente validadas; parciais permanecem na fila.`);
 })();

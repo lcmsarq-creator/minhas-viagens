@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=0.11.0" />
+  <link rel="stylesheet" href="style.css?v=0.11.1" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -31,7 +31,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.11.0</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.11.1</p>
         </div>
       </div>
 
@@ -205,20 +205,20 @@
       </div>
 
       <div class="autocomplete-field">
-        <label for="startAddress">Cidade de partida</label>
+        <label for="startAddress">Local de partida</label>
         <div class="search-wrap">
           <input id="startAddress" maxlength="180" placeholder="Ex.: Santa Maria, RS" autocomplete="off" aria-autocomplete="list" aria-controls="startSuggestions" />
           <span id="startStatus" class="search-status"></span>
           <div id="startSuggestions" class="suggestions hidden" role="listbox"></div>
         </div>
-        <small id="startSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+        <small id="startSelected" class="selected-place">Nenhum local selecionado.</small>
       </div>
 
       <div class="stops-section">
         <div class="stops-section-head">
           <div>
             <strong>Paradas intermediárias</strong>
-            <small>Opcional. Adicione as cidades na ordem em que passou por elas.</small>
+            <small>Opcional. Adicione cidades ou locais na ordem em que passou por eles.</small>
           </div>
           <button type="button" id="addStopBtn" class="secondary-btn small">+ Adicionar parada</button>
         </div>
@@ -226,13 +226,13 @@
       </div>
 
       <div class="autocomplete-field">
-        <label for="endAddress">Cidade de chegada</label>
+        <label for="endAddress">Destino final</label>
         <div class="search-wrap">
-          <input id="endAddress" maxlength="180" placeholder="Ex.: Montevidéu" autocomplete="off" aria-autocomplete="list" aria-controls="endSuggestions" />
+          <input id="endAddress" maxlength="180" placeholder="Ex.: Camping Cocão ou Montevidéu" autocomplete="off" aria-autocomplete="list" aria-controls="endSuggestions" />
           <span id="endStatus" class="search-status"></span>
           <div id="endSuggestions" class="suggestions hidden" role="listbox"></div>
         </div>
-        <small id="endSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+        <small id="endSelected" class="selected-place">Nenhum local selecionado.</small>
       </div>
 
       <label>
@@ -257,26 +257,26 @@
       <div class="dialog-head">
         <div>
           <h2>Editar início, fim e paradas</h2>
-          <p>Altere as cidades e salve para recalcular o trajeto. Ajustes manuais anteriores são preservados quando o início e o fim permanecem os mesmos.</p>
+          <p>Altere as cidades ou locais e salve para recalcular o trajeto. Ajustes manuais anteriores são preservados quando o início e o fim permanecem os mesmos.</p>
         </div>
         <button type="button" id="closeEditPlacesBtn" class="icon-btn" aria-label="Fechar">×</button>
       </div>
 
       <div class="autocomplete-field">
-        <label for="editStartAddress">Cidade de partida</label>
+        <label for="editStartAddress">Local de partida</label>
         <div class="search-wrap">
           <input id="editStartAddress" maxlength="180" placeholder="Ex.: São José do Rio Preto, SP" autocomplete="off" aria-autocomplete="list" aria-controls="editStartSuggestions" />
           <span id="editStartStatus" class="search-status"></span>
           <div id="editStartSuggestions" class="suggestions hidden" role="listbox"></div>
         </div>
-        <small id="editStartSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+        <small id="editStartSelected" class="selected-place">Nenhum local selecionado.</small>
       </div>
 
       <div class="stops-section">
         <div class="stops-section-head">
           <div>
             <strong>Paradas intermediárias</strong>
-            <small>Adicione ou remova cidades na ordem em que foram percorridas.</small>
+            <small>Adicione ou remova cidades e locais na ordem em que foram percorridos.</small>
           </div>
           <button type="button" id="editAddStopBtn" class="secondary-btn small">+ Adicionar parada</button>
         </div>
@@ -284,13 +284,13 @@
       </div>
 
       <div class="autocomplete-field">
-        <label for="editEndAddress">Cidade de chegada</label>
+        <label for="editEndAddress">Destino final</label>
         <div class="search-wrap">
-          <input id="editEndAddress" maxlength="180" placeholder="Ex.: Delfinópolis, MG" autocomplete="off" aria-autocomplete="list" aria-controls="editEndSuggestions" />
+          <input id="editEndAddress" maxlength="180" placeholder="Ex.: Camping Cocão ou Delfinópolis" autocomplete="off" aria-autocomplete="list" aria-controls="editEndSuggestions" />
           <span id="editEndStatus" class="search-status"></span>
           <div id="editEndSuggestions" class="suggestions hidden" role="listbox"></div>
         </div>
-        <small id="editEndSelected" class="selected-place">Nenhuma cidade selecionada.</small>
+        <small id="editEndSelected" class="selected-place">Nenhum local selecionado.</small>
       </div>
 
       <div id="editPlacesMessage" class="form-message hidden" role="status"></div>
@@ -328,8 +328,8 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="config.js?v=0.11.0"></script>
+  <script src="config.js?v=0.11.1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.11.0"></script>
+  <script src="auth.js?v=0.11.1"></script>
 </body>
 </html>

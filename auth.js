@@ -56,27 +56,28 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.11.0");
-      await loadScript("storage-pre.js?v=0.11.0");
+      await loadScript("fetch-base.js?v=0.11.1");
+      await loadScript("storage-pre.js?v=0.11.1");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.11.0",
-        "script.js?v=0.11.0",
-        "hotfix.js?v=0.11.0",
-        "road-threshold-hotfix.js?v=0.11.0",
-        "secondary-roads-hotfix.js?v=0.11.0",
-        "ux-hotfix.js?v=0.11.0",
-        "endpoint-hotfix.js?v=0.11.0",
-        "city-search-fast.js?v=0.11.0",
-        "edit-dialog-hotfix.js?v=0.11.0",
-        "route-click-hotfix.js?v=0.11.0",
-        "geometry-compact-hotfix.js?v=0.11.0",
-        "highway-render-hotfix.js?v=0.11.0",
-        "road-network-hotfix.js?v=0.11.0",
-        "road-catalog-hotfix.js?v=0.11.0",
-        "sync.js?v=0.11.0",
-        "road-cloud-hotfix.js?v=0.11.0",
-        "road-sweep-hotfix.js?v=0.11.0"
+        "hotfix-pre.js?v=0.11.1",
+        "script.js?v=0.11.1",
+        "hotfix.js?v=0.11.1",
+        "road-threshold-hotfix.js?v=0.11.1",
+        "secondary-roads-hotfix.js?v=0.11.1",
+        "ux-hotfix.js?v=0.11.1",
+        "endpoint-hotfix.js?v=0.11.1",
+        "city-search-fast.js?v=0.11.1",
+        "place-search-hotfix.js?v=0.11.1",
+        "edit-dialog-hotfix.js?v=0.11.1",
+        "route-click-hotfix.js?v=0.11.1",
+        "geometry-compact-hotfix.js?v=0.11.1",
+        "highway-render-hotfix.js?v=0.11.1",
+        "road-network-hotfix.js?v=0.11.1",
+        "road-catalog-hotfix.js?v=0.11.1",
+        "sync.js?v=0.11.1",
+        "road-cloud-hotfix.js?v=0.11.1",
+        "road-sweep-hotfix.js?v=0.11.1"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

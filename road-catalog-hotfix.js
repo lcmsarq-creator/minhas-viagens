@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.11.0";
+  const APP_VERSION = "0.11.1";
   const MANIFEST_SCHEMA = "road-catalog-manifest-v1";
   const CATALOG_SCHEMA = "road-catalog-polyline5-v1";
   const VALIDATION_SCHEMA = "complete-road-catalog-v1";

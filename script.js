@@ -1672,7 +1672,7 @@ function focusTrip(trip) {
 
 function resetPlaceSelection(kind) {
   state[`${kind}Place`] = null;
-  els[`${kind}Selected`].textContent = "Nenhuma cidade selecionada.";
+  els[`${kind}Selected`].textContent = "Nenhum local selecionado.";
   els[`${kind}Selected`].classList.remove("ok");
   setAirportDisplay(kind, null);
   updateRouteButtons();
@@ -1790,7 +1790,7 @@ function makeAutocomplete(kind) {
         list.innerHTML = "";
 
         if (!results.length) {
-          list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
           list.classList.remove("hidden");
           return;
         }
@@ -1816,11 +1816,11 @@ function makeAutocomplete(kind) {
           });
           list.appendChild(btn);
         });
-        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
         list.classList.remove("hidden");
       } catch (error) {
         if (error.name !== "AbortError") {
-          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar as cidades agora.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar os locais agora.</div>';
           list.classList.remove("hidden");
         }
       } finally {
@@ -1860,7 +1860,7 @@ function addStopField(existingPlace = null) {
         <span class="search-status stop-status"></span>
         <div class="suggestions stop-suggestions hidden" role="listbox"></div>
       </div>
-      <small class="selected-place stop-selected">${existingPlace ? `✓ ${escapeHtml(existingPlace.label || existingPlace.city || "Parada")}` : "Nenhuma cidade selecionada."}</small>
+      <small class="selected-place stop-selected">${existingPlace ? `✓ ${escapeHtml(existingPlace.label || existingPlace.city || "Parada")}` : "Nenhum local selecionado."}</small>
     </div>
     <button type="button" class="remove-stop-btn" title="Remover parada" aria-label="Remover parada">×</button>`;
 
@@ -1880,7 +1880,7 @@ function addStopField(existingPlace = null) {
 
   input.addEventListener("input", () => {
     entry.place = null;
-    selected.textContent = "Nenhuma cidade selecionada.";
+    selected.textContent = "Nenhum local selecionado.";
     selected.classList.remove("ok");
     updateRouteButtons();
     clearTimeout(timer);
@@ -1905,7 +1905,7 @@ function addStopField(existingPlace = null) {
         if (cityResults.length) results = cityResults;
         list.innerHTML = "";
         if (!results.length) {
-          list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
           list.classList.remove("hidden");
           return;
         }
@@ -1929,11 +1929,11 @@ function addStopField(existingPlace = null) {
           });
           list.appendChild(btn);
         });
-        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
         list.classList.remove("hidden");
       } catch (error) {
         if (error.name !== "AbortError") {
-          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar as cidades agora.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar os locais agora.</div>';
           list.classList.remove("hidden");
         }
       } finally {
@@ -1991,7 +1991,7 @@ function makeEditEndpointAutocomplete(kind) {
 
   input.addEventListener("input", () => {
     state[stateKey] = null;
-    selected.textContent = "Nenhuma cidade selecionada.";
+    selected.textContent = "Nenhum local selecionado.";
     selected.classList.remove("ok");
     setEditPlacesMessage("");
     updateEditPlacesButton();
@@ -2017,7 +2017,7 @@ function makeEditEndpointAutocomplete(kind) {
         if (cityResults.length) results = cityResults;
         list.innerHTML = "";
         if (!results.length) {
-          list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
           list.classList.remove("hidden");
           return;
         }
@@ -2042,11 +2042,11 @@ function makeEditEndpointAutocomplete(kind) {
           });
           list.appendChild(btn);
         });
-        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
         list.classList.remove("hidden");
       } catch (error) {
         if (error.name !== "AbortError") {
-          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar as cidades agora.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar os locais agora.</div>';
           list.classList.remove("hidden");
         }
       } finally {
@@ -2093,7 +2093,7 @@ function addEditStopField(existingPlace = null, shouldFocus = true) {
         <span class="search-status stop-status"></span>
         <div class="suggestions stop-suggestions hidden" role="listbox"></div>
       </div>
-      <small class="selected-place stop-selected">${existingPlace ? `✓ ${escapeHtml(existingPlace.label || existingPlace.city || "Parada")}` : "Nenhuma cidade selecionada."}</small>
+      <small class="selected-place stop-selected">${existingPlace ? `✓ ${escapeHtml(existingPlace.label || existingPlace.city || "Parada")}` : "Nenhum local selecionado."}</small>
     </div>
     <div class="edit-stop-actions">
       <button type="button" class="move-stop-up" title="Mover parada para cima" aria-label="Mover parada para cima">↑</button>
@@ -2118,7 +2118,7 @@ function addEditStopField(existingPlace = null, shouldFocus = true) {
   const hide = () => list.classList.add("hidden");
   input.addEventListener("input", () => {
     entry.place = null;
-    selected.textContent = "Nenhuma cidade selecionada.";
+    selected.textContent = "Nenhum local selecionado.";
     selected.classList.remove("ok");
     updateEditPlacesButton();
     clearTimeout(timer);
@@ -2143,7 +2143,7 @@ function addEditStopField(existingPlace = null, shouldFocus = true) {
         if (cityResults.length) results = cityResults;
         list.innerHTML = "";
         if (!results.length) {
-          list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
           list.classList.remove("hidden");
           return;
         }
@@ -2166,11 +2166,11 @@ function addEditStopField(existingPlace = null, shouldFocus = true) {
           });
           list.appendChild(btn);
         });
-        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhuma cidade encontrada.</div>';
+        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
         list.classList.remove("hidden");
       } catch (error) {
         if (error.name !== "AbortError") {
-          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar as cidades agora.</div>';
+          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar os locais agora.</div>';
           list.classList.remove("hidden");
         }
       } finally {
@@ -2234,8 +2234,8 @@ function openEditPlacesDialog(trip) {
   const endLabel = state.editEndPlace?.label || state.editEndPlace?.city || "";
   els.editStartAddress.value = startLabel;
   els.editEndAddress.value = endLabel;
-  els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhuma cidade selecionada.";
-  els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhuma cidade selecionada.";
+  els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhum local selecionado.";
+  els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhum local selecionado.";
   els.editStartSelected.classList.toggle("ok", Boolean(state.editStartPlace));
   els.editEndSelected.classList.toggle("ok", Boolean(state.editEndPlace));
   els.editStartSuggestions.innerHTML = "";
@@ -2247,7 +2247,7 @@ function openEditPlacesDialog(trip) {
   (trip.stopPlaces || []).forEach(place => addEditStopField(place, false));
 
   if (!["carro", "moto"].includes(trip.mode)) {
-    setEditPlacesMessage("Nesta versão, o recálculo automático após editar cidades está disponível para viagens de carro e moto.");
+    setEditPlacesMessage("Nesta versão, o recálculo automático após editar locais está disponível para viagens de carro e moto.");
   } else {
     setEditPlacesMessage("");
   }
@@ -2277,18 +2277,18 @@ async function saveEditedPlaces(event) {
     return;
   }
   if (!state.editStartPlace) {
-    setEditPlacesMessage("Escolha uma cidade válida para a partida.");
+    setEditPlacesMessage("Escolha uma cidade ou local válido para a partida.");
     els.editStartAddress.focus();
     return;
   }
   const incompleteStop = state.editStopPlaces.find(item => !item.place);
   if (incompleteStop) {
-    setEditPlacesMessage("Selecione uma cidade válida para cada parada adicionada, ou remova a parada vazia.");
+    setEditPlacesMessage("Selecione uma cidade ou local válido para cada parada, ou remova a parada vazia.");
     els.editStopsContainer.querySelector(`[data-stop-id="${incompleteStop.id}"] .stop-address`)?.focus();
     return;
   }
   if (!state.editEndPlace) {
-    setEditPlacesMessage("Escolha uma cidade válida para a chegada.");
+    setEditPlacesMessage("Escolha uma cidade ou local válido para a chegada.");
     els.editEndAddress.focus();
     return;
   }
@@ -2323,7 +2323,7 @@ async function saveEditedPlaces(event) {
     focusTrip(trip);
     celebrateConquests(newItems, trip.name);
   } catch (error) {
-    console.error("Falha ao recalcular viagem após editar cidades", error);
+    console.error("Falha ao recalcular viagem após editar locais", error);
     const reason = error?.message ? ` Motivo: ${error.message}` : "";
     setEditPlacesMessage(`Não foi possível recalcular a rota. Nenhuma alteração foi salva.${reason}`);
   } finally {
@@ -2343,8 +2343,8 @@ function openTripDialog() {
   state.startPlace = null;
   state.endPlace = null;
   resetStopsForm();
-  els.startSelected.textContent = "Nenhuma cidade selecionada.";
-  els.endSelected.textContent = "Nenhuma cidade selecionada.";
+  els.startSelected.textContent = "Nenhum local selecionado.";
+  els.endSelected.textContent = "Nenhum local selecionado.";
   els.startSelected.classList.remove("ok");
   els.endSelected.classList.remove("ok");
   els.startSuggestions.classList.add("hidden");
@@ -2366,18 +2366,18 @@ function validateBaseForm() {
     return false;
   }
   if (!state.startPlace) {
-    setFormMessage("Escolha uma cidade na lista de sugestões para a partida.");
+    setFormMessage("Escolha uma cidade ou local na lista de sugestões para a partida.");
     els.startAddress.focus();
     return false;
   }
   const incompleteStop = state.stopPlaces.find(item => !item.place);
   if (incompleteStop) {
-    setFormMessage("Selecione uma cidade válida para cada parada adicionada, ou remova a parada vazia.");
+    setFormMessage("Selecione uma cidade ou local válido para cada parada, ou remova a parada vazia.");
     els.stopsContainer?.querySelector(`[data-stop-id="${incompleteStop.id}"] .stop-address`)?.focus();
     return false;
   }
   if (!state.endPlace) {
-    setFormMessage("Escolha uma cidade na lista de sugestões para a chegada.");
+    setFormMessage("Escolha uma cidade ou local na lista de sugestões para a chegada.");
     els.endAddress.focus();
     return false;
   }

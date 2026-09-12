@@ -365,18 +365,18 @@
       return;
     }
     if (!state.editStartPlace) {
-      setEditPlacesMessage("Escolha uma cidade válida para a partida.");
+      setEditPlacesMessage("Escolha uma cidade ou local válido para a partida.");
       els.editStartAddress.focus();
       return;
     }
     const incompleteStop = state.editStopPlaces.find(item => !item.place);
     if (incompleteStop) {
-      setEditPlacesMessage("Selecione uma cidade válida para cada parada adicionada, ou remova a parada vazia.");
+      setEditPlacesMessage("Selecione uma cidade ou local válido para cada parada, ou remova a parada vazia.");
       els.editStopsContainer.querySelector(`[data-stop-id="${incompleteStop.id}"] .stop-address`)?.focus();
       return;
     }
     if (!state.editEndPlace) {
-      setEditPlacesMessage("Escolha uma cidade válida para a chegada.");
+      setEditPlacesMessage("Escolha uma cidade ou local válido para a chegada.");
       els.editEndAddress.focus();
       return;
     }
@@ -421,7 +421,7 @@
       focusTrip(trip);
       celebrateConquests(newItems, trip.name);
     } catch (error) {
-      console.error("Falha ao recalcular viagem após editar cidades", error);
+      console.error("Falha ao recalcular viagem após editar locais", error);
       const reason = error?.message ? ` Motivo: ${error.message}` : "";
       setEditPlacesMessage(`Não foi possível recalcular a rota. Nenhuma alteração foi salva.${reason}`);
     } finally {

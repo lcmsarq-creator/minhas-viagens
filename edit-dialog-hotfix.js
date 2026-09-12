@@ -55,8 +55,8 @@
       const endLabel = state.editEndPlace?.label || state.editEndPlace?.city || "";
       els.editStartAddress.value = startLabel;
       els.editEndAddress.value = endLabel;
-      els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhuma cidade selecionada.";
-      els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhuma cidade selecionada.";
+      els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhum local selecionado.";
+      els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhum local selecionado.";
       els.editStartSelected.classList.toggle("ok", Boolean(state.editStartPlace));
       els.editEndSelected.classList.toggle("ok", Boolean(state.editEndPlace));
       els.editStartSuggestions.innerHTML = "";
@@ -69,7 +69,7 @@
       (trip.stopPlaces || []).forEach(place => addEditStopField(place, false));
 
       if (!["carro", "moto"].includes(trip.mode)) {
-        setEditPlacesMessage("Nesta versão, o recálculo automático após editar cidades está disponível para viagens de carro e moto.");
+        setEditPlacesMessage("Nesta versão, o recálculo automático após editar locais está disponível para viagens de carro e moto.");
       } else {
         setEditPlacesMessage("");
       }

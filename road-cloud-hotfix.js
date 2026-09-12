@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.11.0";
+  const APP_VERSION = "0.11.1";
   const CLOUD_PREFIX = "mvroad|";
   const CLOUD_SCHEMA = "road-geometry-polyline5-v3";
   const ENTRY_VALIDATION_SCHEMA = "complete-road-v3";

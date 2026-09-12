@@ -57,6 +57,8 @@ const state = {
   airportsPromise: null,
   pointEditor: null,
   achievementTimer: null,
+  achievementView: "cities",
+  achievementStateKey: null,
   activeTripDetailId: null,
   tripLineLayers: new Map(),
   editingPlacesTripId: null,
@@ -104,6 +106,11 @@ const els = {
   achievementsPanel: document.getElementById("achievementsPanel"),
   cityAchievementCount: document.getElementById("cityAchievementCount"),
   roadAchievementCount: document.getElementById("roadAchievementCount"),
+  cityAchievementsTabBtn: document.getElementById("cityAchievementsTabBtn"),
+  roadAchievementsTabBtn: document.getElementById("roadAchievementsTabBtn"),
+  cityAchievementsView: document.getElementById("cityAchievementsView"),
+  roadAchievementsView: document.getElementById("roadAchievementsView"),
+  cityAchievementHeader: document.getElementById("cityAchievementHeader"),
   cityAchievementList: document.getElementById("cityAchievementList"),
   roadAchievementList: document.getElementById("roadAchievementList"),
   tripDialog: document.getElementById("tripDialog"),
@@ -1358,6 +1365,9 @@ function renderAchievements() {
       return;
     }
     items.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true })).forEach(item => {
+      const cityGroup = type === "city" ? window.MinhasViagensAchievements?.groupForCity(item) : null;
+      const citySuffix = cityGroup && !cityGroup.unknown ? ` — ${cityGroup.exterior ? (String(item.countryCode || item.country || "Exterior").toUpperCase()) : cityGroup.uf}` : "";
+      const visibleLabel = type === "city" ? `${item.city || item.label}${citySuffix}` : roadDisplayLabel(item.label);
       const card = document.createElement("button");
       card.type = "button";
       card.className = `achievement-card${type === "road" ? " road-achievement-card" : ""}`;
@@ -1365,7 +1375,7 @@ function renderAchievements() {
       card.innerHTML = `
         <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
         <div>
-          <strong>${escapeHtml(roadDisplayLabel(item.label))}</strong>
+          <strong>${escapeHtml(visibleLabel)}</strong>
           <small>${type === "road" ? "Rodovia conquistada" : `${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}`}</small>
         </div>`;
       card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
@@ -1373,8 +1383,61 @@ function renderAchievements() {
     });
   };
 
-  renderList(els.cityAchievementList, cityItems, "city");
+  const cityGroups = window.MinhasViagensAchievements?.groupCities(cityItems) || [{ key: "ALL", uf: "BR", name: "Cidades", cities: cityItems }];
+  const selectedGroup = cityGroups.find(group => group.key === state.achievementStateKey);
+  if (state.achievementStateKey && !selectedGroup) state.achievementStateKey = null;
+
+  els.cityAchievementHeader.innerHTML = "";
+  if (selectedGroup) {
+    const backButton = document.createElement("button");
+    backButton.type = "button";
+    backButton.className = "achievement-back-btn";
+    backButton.textContent = "← Voltar aos estados";
+    backButton.addEventListener("click", () => {
+      state.achievementStateKey = null;
+      renderAchievements();
+    });
+    els.cityAchievementHeader.appendChild(backButton);
+    const title = document.createElement("div");
+    title.className = "achievement-browser-title";
+    title.innerHTML = `<h2>${escapeHtml(selectedGroup.name)}</h2><span>${selectedGroup.cities.length} ${selectedGroup.cities.length === 1 ? "cidade" : "cidades"}</span>`;
+    els.cityAchievementHeader.appendChild(title);
+    els.cityAchievementList.classList.remove("state-achievement-grid");
+    renderList(els.cityAchievementList, selectedGroup.cities, "city");
+  } else {
+    els.cityAchievementHeader.innerHTML = '<div class="achievement-browser-title"><h2>Estados conquistados</h2></div>';
+    els.cityAchievementList.innerHTML = "";
+    els.cityAchievementList.classList.add("state-achievement-grid");
+    if (!cityGroups.length) {
+      els.cityAchievementList.classList.remove("state-achievement-grid");
+      els.cityAchievementList.innerHTML = '<p class="empty">Nenhuma cidade conquistada ainda.</p>';
+    } else {
+      cityGroups.forEach(group => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "state-achievement-card";
+        card.setAttribute("aria-label", `Abrir cidades conquistadas em ${group.name}`);
+        card.innerHTML = `
+          <span class="state-achievement-icon">${escapeHtml(group.uf)}</span>
+          <strong>${escapeHtml(group.name)}</strong>
+          <small>${group.cities.length} ${group.cities.length === 1 ? "cidade" : "cidades"}</small>`;
+        card.addEventListener("click", () => {
+          state.achievementStateKey = group.key;
+          renderAchievements();
+        });
+        els.cityAchievementList.appendChild(card);
+      });
+    }
+  }
   renderList(els.roadAchievementList, roadItems, "road");
+
+  const citiesActive = state.achievementView !== "roads";
+  els.cityAchievementsTabBtn.classList.toggle("active", citiesActive);
+  els.roadAchievementsTabBtn.classList.toggle("active", !citiesActive);
+  els.cityAchievementsTabBtn.setAttribute("aria-selected", String(citiesActive));
+  els.roadAchievementsTabBtn.setAttribute("aria-selected", String(!citiesActive));
+  els.cityAchievementsView.classList.toggle("hidden", !citiesActive);
+  els.roadAchievementsView.classList.toggle("hidden", citiesActive);
 }
 
 function celebrateConquests(items, tripName) {
@@ -3264,6 +3327,15 @@ els.addStopBtn?.addEventListener("click", () => addStopField());
 els.editAddStopBtn?.addEventListener("click", () => addEditStopField());
 els.tripsTabBtn.addEventListener("click", () => switchSidebarTab("trips"));
 els.achievementsTabBtn.addEventListener("click", () => switchSidebarTab("achievements"));
+els.cityAchievementsTabBtn.addEventListener("click", () => {
+  state.achievementView = "cities";
+  state.achievementStateKey = null;
+  renderAchievements();
+});
+els.roadAchievementsTabBtn.addEventListener("click", () => {
+  state.achievementView = "roads";
+  renderAchievements();
+});
 els.backToTripsBtn.addEventListener("click", showTripList);
 els.closeDialogBtn.addEventListener("click", closeTripDialog);
 els.cancelDialogBtn.addEventListener("click", closeTripDialog);

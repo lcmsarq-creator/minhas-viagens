@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=0.11.1" />
+  <link rel="stylesheet" href="style.css?v=0.11.2" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -31,7 +31,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.11.1</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.11.2</p>
         </div>
       </div>
 
@@ -68,11 +68,15 @@
           <div><strong id="cityAchievementCount">0</strong><span>Cidades</span></div>
           <div><strong id="roadAchievementCount">0</strong><span>Rodovias</span></div>
         </div>
-        <div class="achievement-section">
-          <h2>Cidades conquistadas</h2>
+        <div class="achievement-tabs" role="tablist" aria-label="Tipo de conquista">
+          <button id="cityAchievementsTabBtn" class="achievement-tab active" type="button" role="tab" aria-selected="true" aria-controls="cityAchievementsView">Cidades</button>
+          <button id="roadAchievementsTabBtn" class="achievement-tab" type="button" role="tab" aria-selected="false" aria-controls="roadAchievementsView">Rodovias</button>
+        </div>
+        <div id="cityAchievementsView" class="achievement-section achievement-view" role="tabpanel" aria-labelledby="cityAchievementsTabBtn">
+          <div id="cityAchievementHeader" class="achievement-browser-header"></div>
           <div id="cityAchievementList" class="achievement-list"></div>
         </div>
-        <div class="achievement-section">
+        <div id="roadAchievementsView" class="achievement-section achievement-view hidden" role="tabpanel" aria-labelledby="roadAchievementsTabBtn">
           <h2>Rodovias conquistadas</h2>
           <div id="roadAchievementList" class="achievement-list"></div>
         </div>
@@ -328,8 +332,8 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="config.js?v=0.11.1"></script>
+  <script src="config.js?v=0.11.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.11.1"></script>
+  <script src="auth.js?v=0.11.2"></script>
 </body>
 </html>

@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.12.2";
+  const APP_VERSION = "0.12.3";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -72,7 +72,11 @@
 
   async function ensureLeaflet() {
     if (window.L?.map) return;
-    await loadScript("https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js");
+    try {
+      await loadScript("vendor/leaflet/leaflet.js?v=1.9.4");
+    } catch {
+      await loadScript("https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js");
+    }
     if (!window.L?.map) throw new Error("Biblioteca do mapa indisponível");
   }
 

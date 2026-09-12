@@ -9,12 +9,13 @@ vm.runInContext(fs.readFileSync("achievements.js", "utf8"), context);
 
 const api = context.MinhasViagensAchievements;
 assert.ok(api, "achievement grouping API should be available");
+for (const state of api.states) assert.ok(fs.existsSync(state.flagUrl), `missing flag for ${state.uf}`);
 assert.equal(api.stateFromValue("São Paulo").uf, "SP");
 assert.equal(api.stateFromValue("BR-MG").name, "Minas Gerais");
 assert.equal(api.stateFromValue("State of Rio de Janeiro").uf, "RJ");
 assert.equal(api.stateFromValue("Presidente Venceslau, SP, Brasil").uf, "SP");
 assert.equal(api.stateFromValue("Campo Grande, Mato Grosso do Sul, Brasil").uf, "MS");
-assert.match(api.stateFromValue("São Paulo").flagUrl, /sp-circle\.svg$/);
+assert.equal(api.stateFromValue("São Paulo").flagUrl, "assets/flags/states/sp.svg");
 
 const groups = api.groupCities([
   { city: "Campinas", region: "São Paulo", countryCode: "BR" },
@@ -30,5 +31,7 @@ assert.equal(groups[1].cities.length, 2);
 assert.equal(groups[2].name, "Argentina");
 assert.equal(groups[3].name, "Uruguai");
 assert.equal(groups[3].cities.length, 2);
-assert.equal(groups[3].flagUrl, "https://flagcdn.com/uy.svg");
+assert.equal(groups[3].flagUrl, "assets/flags/countries/uy.svg");
+assert.ok(fs.existsSync(groups[2].flagUrl), "missing Argentina flag");
+assert.ok(fs.existsSync(groups[3].flagUrl), "missing Uruguay flag");
 console.log("achievement grouping tests passed");

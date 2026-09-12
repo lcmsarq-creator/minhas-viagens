@@ -14,7 +14,7 @@
     uf,
     code: uf,
     name,
-    flagUrl: `https://assets.codante.io/codante-apis/bandeiras-do-brasil/${uf.toLowerCase()}-circle.svg`
+    flagUrl: `assets/flags/states/${uf.toLowerCase()}.svg`
   }));
 
   const COUNTRY_NAMES = {
@@ -97,7 +97,9 @@
       uf: code || "INT",
       code: code || "INT",
       name,
-      flagUrl: code ? `https://flagcdn.com/${code.toLowerCase()}.svg` : "",
+      flagUrl: code ? (COUNTRY_NAMES[code]
+        ? `assets/flags/countries/${code.toLowerCase()}.svg`
+        : `https://flagcdn.com/${code.toLowerCase()}.svg`) : "",
       exterior: true
     };
   }

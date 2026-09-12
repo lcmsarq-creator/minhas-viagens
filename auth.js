@@ -56,20 +56,21 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.10.10");
-      await loadScript("storage-pre.js?v=0.10.10");
+      await loadScript("fetch-base.js?v=0.10.11");
+      await loadScript("storage-pre.js?v=0.10.11");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.10.10",
-        "script.js?v=0.10.10",
-        "hotfix.js?v=0.10.10",
-        "road-threshold-hotfix.js?v=0.10.10",
-        "ux-hotfix.js?v=0.10.10",
-        "endpoint-hotfix.js?v=0.10.10",
-        "city-search-fast.js?v=0.10.10",
-        "edit-dialog-hotfix.js?v=0.10.10",
-        "route-click-hotfix.js?v=0.10.10",
-        "sync.js?v=0.10.10"
+        "hotfix-pre.js?v=0.10.11",
+        "script.js?v=0.10.11",
+        "hotfix.js?v=0.10.11",
+        "road-threshold-hotfix.js?v=0.10.11",
+        "secondary-roads-hotfix.js?v=0.10.11",
+        "ux-hotfix.js?v=0.10.11",
+        "endpoint-hotfix.js?v=0.10.11",
+        "city-search-fast.js?v=0.10.11",
+        "edit-dialog-hotfix.js?v=0.10.11",
+        "route-click-hotfix.js?v=0.10.11",
+        "sync.js?v=0.10.11"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

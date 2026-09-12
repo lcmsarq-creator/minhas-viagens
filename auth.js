@@ -56,31 +56,32 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.11.6");
-      await loadScript("storage-pre.js?v=0.11.6");
+      await loadScript("fetch-base.js?v=0.11.7");
+      await loadScript("storage-pre.js?v=0.11.7");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.11.6",
-        "achievements.js?v=0.11.6",
-        "city-flags.js?v=0.11.6",
-        "route-interaction.js?v=0.11.6",
-        "script.js?v=0.11.6",
-        "hotfix.js?v=0.11.6",
-        "road-threshold-hotfix.js?v=0.11.6",
-        "secondary-roads-hotfix.js?v=0.11.6",
-        "ux-hotfix.js?v=0.11.6",
-        "endpoint-hotfix.js?v=0.11.6",
-        "city-search-fast.js?v=0.11.6",
-        "place-search-hotfix.js?v=0.11.6",
-        "edit-dialog-hotfix.js?v=0.11.6",
-        "route-click-hotfix.js?v=0.11.6",
-        "geometry-compact-hotfix.js?v=0.11.6",
-        "highway-render-hotfix.js?v=0.11.6",
-        "road-network-hotfix.js?v=0.11.6",
-        "road-catalog-hotfix.js?v=0.11.6",
-        "sync.js?v=0.11.6",
-        "road-cloud-hotfix.js?v=0.11.6",
-        "road-sweep-hotfix.js?v=0.11.6"
+        "hotfix-pre.js?v=0.11.7",
+        "achievements.js?v=0.11.7",
+        "city-flags.js?v=0.11.7",
+        "route-interaction.js?v=0.11.7",
+        "script.js?v=0.11.7",
+        "hotfix.js?v=0.11.7",
+        "road-threshold-hotfix.js?v=0.11.7",
+        "secondary-roads-hotfix.js?v=0.11.7",
+        "ux-hotfix.js?v=0.11.7",
+        "endpoint-hotfix.js?v=0.11.7",
+        "city-search-fast.js?v=0.11.7",
+        "place-search-hotfix.js?v=0.11.7",
+        "edit-dialog-hotfix.js?v=0.11.7",
+        "route-click-hotfix.js?v=0.11.7",
+        "geometry-compact-hotfix.js?v=0.11.7",
+        "highway-render-hotfix.js?v=0.11.7",
+        "road-network-hotfix.js?v=0.11.7",
+        "road-catalog-hotfix.js?v=0.11.7",
+        "sync.js?v=0.11.7",
+        "road-cloud-hotfix.js?v=0.11.7",
+        "road-sweep-hotfix.js?v=0.11.7",
+        "escape-navigation.js?v=0.11.7"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

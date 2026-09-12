@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.16";
+  const APP_VERSION = "0.10.17";
   const SWEEP_SCHEMA_VERSION = "0.10.12";
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   if (!userId) return;
@@ -133,8 +133,6 @@
     if (status.running || !navigator.onLine) return;
     status.running = true;
     try {
-      // A biblioteca de rodovias cuida do download/upload com retentativas persistentes.
-      // Esta varredura fica responsável somente por reavaliar viagens antigas.
       const earlyQueue = handRoadsToCloudQueue();
       await sweepExistingTrips();
       await earlyQueue;

@@ -18,6 +18,7 @@
     "minhasViagens.v0.6.1", "minhasViagens.v0.6", "minhasViagens.v0.5",
     "minhasViagens.v0.4", "minhasViagens.v0.3", "minhasViagens.v0.2", "minhasViagens.v0.1"
   ];
+  const ROAD_CLOUD_PREFIX = "mvroad|";
 
   function serializeTripForCloud(trip) {
     return JSON.parse(JSON.stringify(trip, (key, value) => EXCLUDED_KEYS.has(key) ? undefined : value));
@@ -219,9 +220,13 @@
     }
 
     async function fetchRemoteTrips() {
-      const { data, error } = await client.from("trips").select("trip_id,payload,client_updated_at,server_updated_at,deleted_at").eq("user_id", userId);
+      const { data, error } = await client
+        .from("trips")
+        .select("trip_id,payload,client_updated_at,server_updated_at,deleted_at")
+        .eq("user_id", userId)
+        .not("trip_id", "like", `${ROAD_CLOUD_PREFIX}%`);
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(row => !String(row.trip_id || "").startsWith(ROAD_CLOUD_PREFIX));
     }
 
     async function syncNow() {

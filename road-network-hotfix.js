@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.16";
-  const NETWORK_SCHEMA = "road-network-additive-v2";
+  const APP_VERSION = "0.10.17";
+  const NETWORK_SCHEMA = "road-network-additive-v3";
   const RAW_MATCH_TOLERANCE_KM = 0.20;
   const ENDPOINT_TOLERANCE_KM = 5;
   const SAME_TRIP_COMPLETION_RATIO = 0.40;

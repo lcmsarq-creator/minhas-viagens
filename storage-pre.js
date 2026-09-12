@@ -16,6 +16,17 @@
   let memoryValue = null;
   let db = null;
   let writeChain = Promise.resolve();
+  const STORAGE_TIMEOUT_MS = Number(window.MINHAS_VIAGENS_STORAGE_TIMEOUT_MS) || 6000;
+
+  function withTimeout(promise, label) {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} excedeu ${STORAGE_TIMEOUT_MS / 1000}s`)), STORAGE_TIMEOUT_MS);
+      })
+    ]).finally(() => clearTimeout(timer));
+  }
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -29,6 +40,7 @@
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("IndexedDB bloqueado por outra aba"));
     });
   }
 
@@ -107,21 +119,22 @@
   window.MinhasViagensStorageReady = (async () => {
     cleanupReconstructibleLocalCaches();
     try {
-      db = await openDb();
+      db = await withTimeout(openDb(), "Abertura do IndexedDB");
       const localValue = originalGetItem.call(localStorage, STORAGE_KEY);
-      const indexedValue = await idbGet(STORAGE_KEY);
+      const indexedValue = await withTimeout(idbGet(STORAGE_KEY), "Leitura do cache de viagens");
 
       // Durante a transição, a cópia existente no localStorage tem prioridade.
       // Depois da primeira gravação confirmada ela é removida, liberando a cota.
       if (localValue != null) {
         memoryValue = localValue;
-        await idbPut(STORAGE_KEY, localValue);
+        await withTimeout(idbPut(STORAGE_KEY, localValue), "Migração do cache de viagens");
         originalRemoveItem.call(localStorage, STORAGE_KEY);
       } else {
         memoryValue = indexedValue;
       }
     } catch (error) {
       console.error("IndexedDB principal indisponível; usando armazenamento local quando possível", error);
+      try { db?.close(); } catch {}
       db = null;
       memoryValue = originalGetItem.call(localStorage, STORAGE_KEY);
 

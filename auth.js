@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.12.1";
+  const APP_VERSION = "0.12.2";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -70,10 +70,17 @@
     });
   }
 
+  async function ensureLeaflet() {
+    if (window.L?.map) return;
+    await loadScript("https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js");
+    if (!window.L?.map) throw new Error("Biblioteca do mapa indisponível");
+  }
+
   async function loadAppScripts() {
     if (appLoaded) return;
     appLoaded = true;
     try {
+      await ensureLeaflet();
       await loadScript(`fetch-base.js?v=${APP_VERSION}`);
       await loadScript(`storage-pre.js?v=${APP_VERSION}`);
       await window.MinhasViagensStorageReady;

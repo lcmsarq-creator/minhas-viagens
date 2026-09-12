@@ -63,6 +63,7 @@
         "script.js?v=0.10.0",
         "hotfix.js?v=0.10.0",
         "ux-hotfix.js?v=0.10.0",
+        "endpoint-hotfix.js?v=0.10.1",
         "sync.js?v=0.10.0"
       ];
       for (const src of sources) await loadScript(src);

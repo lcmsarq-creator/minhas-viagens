@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.14";
+  const APP_VERSION = "0.10.16";
   const SWEEP_SCHEMA_VERSION = "0.10.12";
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   if (!userId) return;
@@ -9,8 +9,6 @@
   const SWEEP_KEY = `minhasViagens.roadSweep.${userId}.v${SWEEP_SCHEMA_VERSION}`;
   const MAX_ROUTE_SAMPLES = 22;
   const TRIP_PAUSE_MS = 700;
-  const ROAD_PAUSE_MS = 900;
-  const warmedRoadKeys = new Set();
 
   const status = window.MinhasViagensRoadSweep = {
     version: APP_VERSION,
@@ -42,9 +40,7 @@
   function sampledRoutePoints(trip) {
     const line = tripLatLngs(trip);
     if (!Array.isArray(line) || line.length < 2) return [];
-    if (line.length <= MAX_ROUTE_SAMPLES) {
-      return line.map(([lat, lng]) => ({ lat, lng }));
-    }
+    if (line.length <= MAX_ROUTE_SAMPLES) return line.map(([lat, lng]) => ({ lat, lng }));
     const points = [];
     const last = line.length - 1;
     for (let i = 0; i < MAX_ROUTE_SAMPLES; i++) {
@@ -72,7 +68,6 @@
     const nextLabels = extractRoadLabelsFromRoute(route, trip);
     const nextRoads = extractHighwaysFromRoute(route, trip);
     const nextSegments = extractRoadSegmentsFromRoute(route, trip);
-
     const changed = !sameRoadList(trip.conquests?.roads || [], nextRoads);
     trip.roadLabels = nextLabels;
     trip.conquests.roads = nextRoads;
@@ -81,7 +76,6 @@
     for (const [road, lines] of Object.entries(nextSegments || {})) {
       try { await window.__mvPutTripRoadSegments?.(trip.id, road, lines); } catch {}
     }
-
     if (changed) trip.updatedAt = new Date().toISOString();
     return changed;
   }
@@ -116,35 +110,22 @@
     sweepState.completed = eligible.every(trip => Boolean(sweepState.tripDone?.[trip.id]));
     sweepState.completedAt = sweepState.completed ? Date.now() : null;
     saveSweepState(sweepState);
-
     if (anyChanged) {
       saveTrips();
       renderTrips();
     }
   }
 
-  async function warmAchievementRoads() {
-    const roads = [...getAchievementSnapshot().roads.values()];
-    status.roadsTotal = roads.length;
-
-    for (const item of roads) {
-      const descriptor = overpassRoadDescriptor(item);
-      const key = highwayCacheKey(descriptor);
-      if (warmedRoadKeys.has(key)) continue;
-      try {
-        let entry = await cachedHighway(descriptor, true);
-        if (!entry) {
-          entry = await fetchFullHighway(descriptor, null);
-          await sleep(ROAD_PAUSE_MS);
-        }
-        if (entry) {
-          warmedRoadKeys.add(key);
-          status.roadsCached += 1;
-        }
-      } catch (error) {
-        status.failedRoads += 1;
-        console.warn(`Geometria de ${item.label} não pôde ser pré-carregada agora`, error);
-      }
+  async function handRoadsToCloudQueue() {
+    const cloud = window.MinhasViagensRoadCloud;
+    if (!cloud?.primeAchievements) return;
+    try {
+      const result = await cloud.primeAchievements();
+      status.roadsTotal = Number(result?.achievementRoads) || 0;
+      status.roadsCached = Number(result?.availableRoads) || 0;
+      status.failedRoads = Number(result?.failedRoads) || 0;
+    } catch (error) {
+      console.warn("A fila persistente de rodovias será retomada depois", error);
     }
   }
 
@@ -152,12 +133,12 @@
     if (status.running || !navigator.onLine) return;
     status.running = true;
     try {
-      // Começa a aquecer as rodovias já conhecidas imediatamente, em paralelo
-      // à varredura histórica. Depois da varredura, aquece apenas as novas.
-      const earlyWarm = warmAchievementRoads();
+      // A biblioteca de rodovias cuida do download/upload com retentativas persistentes.
+      // Esta varredura fica responsável somente por reavaliar viagens antigas.
+      const earlyQueue = handRoadsToCloudQueue();
       await sweepExistingTrips();
-      await earlyWarm;
-      await warmAchievementRoads();
+      await earlyQueue;
+      await handRoadsToCloudQueue();
       status.completed = status.failedTrips === 0 && status.failedRoads === 0;
     } finally {
       status.running = false;
@@ -170,5 +151,5 @@
   setTimeout(run, 1200);
   window.addEventListener("online", () => setTimeout(run, 800));
 
-  console.info(`Minhas Viagens ${APP_VERSION}: varredura histórica e pré-cache antecipado de rodovias conquistadas habilitados.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: varredura histórica ligada à fila persistente de rodovias.`);
 })();

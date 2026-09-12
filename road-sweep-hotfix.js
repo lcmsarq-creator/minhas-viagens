@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.13";
+  const APP_VERSION = "0.10.14";
   const SWEEP_SCHEMA_VERSION = "0.10.12";
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   if (!userId) return;
@@ -10,6 +10,7 @@
   const MAX_ROUTE_SAMPLES = 22;
   const TRIP_PAUSE_MS = 700;
   const ROAD_PAUSE_MS = 900;
+  const warmedRoadKeys = new Set();
 
   const status = window.MinhasViagensRoadSweep = {
     version: APP_VERSION,
@@ -127,14 +128,19 @@
     status.roadsTotal = roads.length;
 
     for (const item of roads) {
+      const descriptor = overpassRoadDescriptor(item);
+      const key = highwayCacheKey(descriptor);
+      if (warmedRoadKeys.has(key)) continue;
       try {
-        const descriptor = overpassRoadDescriptor(item);
         let entry = await cachedHighway(descriptor, true);
         if (!entry) {
           entry = await fetchFullHighway(descriptor, null);
           await sleep(ROAD_PAUSE_MS);
         }
-        if (entry) status.roadsCached += 1;
+        if (entry) {
+          warmedRoadKeys.add(key);
+          status.roadsCached += 1;
+        }
       } catch (error) {
         status.failedRoads += 1;
         console.warn(`Geometria de ${item.label} não pôde ser pré-carregada agora`, error);
@@ -146,7 +152,11 @@
     if (status.running || !navigator.onLine) return;
     status.running = true;
     try {
+      // Começa a aquecer as rodovias já conhecidas imediatamente, em paralelo
+      // à varredura histórica. Depois da varredura, aquece apenas as novas.
+      const earlyWarm = warmAchievementRoads();
       await sweepExistingTrips();
+      await earlyWarm;
       await warmAchievementRoads();
       status.completed = status.failedTrips === 0 && status.failedRoads === 0;
     } finally {
@@ -157,8 +167,8 @@
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
 
-  setTimeout(run, 2200);
-  window.addEventListener("online", () => setTimeout(run, 1200));
+  setTimeout(run, 1200);
+  window.addEventListener("online", () => setTimeout(run, 800));
 
-  console.info(`Minhas Viagens ${APP_VERSION}: varredura histórica e pré-cache de rodovias conquistadas habilitados.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: varredura histórica e pré-cache antecipado de rodovias conquistadas habilitados.`);
 })();

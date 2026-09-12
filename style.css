@@ -66,11 +66,11 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .button-row > * { flex: 1; text-align: center; }
 .file-btn { display: grid; place-items: center; cursor: pointer; }
 
-.achievement-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.achievement-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .achievement-summary > div { border: 1px solid #ead9ad; background: var(--gold-soft); border-radius: 12px; padding: 12px; display: grid; gap: 2px; }
 .achievement-summary strong { font-size: 1.35rem; color: #7f5411; }
 .achievement-summary span { font-size: .74rem; color: #8d6a31; font-weight: 700; }
-.achievement-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; background: #eef1ef; border-radius: 11px; }
+.achievement-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 4px; background: #eef1ef; border-radius: 11px; }
 .achievement-tab { min-height: 38px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 800; }
 .achievement-tab.active { background: white; color: var(--text); box-shadow: 0 1px 4px rgba(20,30,25,.08); }
 .achievement-section { margin-top: 16px; }
@@ -211,6 +211,25 @@ textarea { resize: vertical; }
 .road-shield-fallback { display: inline-grid; place-items: center; min-width: 40px; min-height: 27px; padding: 3px 6px; border: 2px solid #222; border-radius: 5px; background: white; color: #111; font-size: 10px; font-weight: 850; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .road-map-shield-wrap { width: 44px; height: 50px; pointer-events: none; }
 
+/* v0.12 — rotas icônicas e graduações de rodovias */
+.road-medal-gold .road-emblem-svg > path:first-of-type { fill: #d6a21f !important; stroke: #805a00 !important; }
+.road-medal-gold .road-emblem-svg > path:nth-of-type(2) { stroke: #fff8df !important; }
+.road-medal-silver .road-emblem-svg > path:first-of-type { fill: #d9dde0 !important; stroke: #646b70 !important; }
+.road-medal-silver .road-emblem-svg > path:nth-of-type(2) { stroke: #f9fbfc !important; }
+.road-medal-gold .road-shield-fallback { border-color: #805a00; background: #d6a21f; color: #201800; }
+.road-medal-silver .road-shield-fallback { border-color: #646b70; background: #d9dde0; color: #202426; }
+.road-achievement-card.road-medal-gold { border-color: #d6a21f; background: #fff9e8; }
+.road-achievement-card.road-medal-silver { border-color: #aeb5ba; background: #f5f7f8; }
+.iconic-route-card { align-items: flex-start; }
+.iconic-route-icon { margin-top: 2px; background: #eef1ef; color: #8a918c; }
+.iconic-route-card.discovered .iconic-route-icon { background: #fff1bd; color: #a57100; box-shadow: inset 0 0 0 1px #e2bd52; }
+.iconic-route-card.completed { border-color: #d6a21f; background: #fff9e8; }
+.iconic-route-card.completed .iconic-route-icon { background: #d6a21f; color: #fff; box-shadow: 0 0 0 2px #fff4c9, 0 2px 7px rgba(128,90,0,.25); }
+.iconic-route-copy { flex: 1; }
+.iconic-progress-label { display: block; margin-top: 6px; color: #6b6044; font-size: .7rem; font-weight: 750; }
+.iconic-progress-track { display: block; height: 7px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #daddda; }
+.iconic-progress-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: #d6a21f; transition: width .25s ease; }
+
 @media (prefers-reduced-motion: reduce) {
   .achievement-toast, .achievement-burst, .achievement-toast::before, .achievement-toast::after { animation: none; }
 }
@@ -228,6 +247,12 @@ textarea { resize: vertical; }
   .route-chooser-actions { flex-direction: column; }
   .draw-banner { top: 10px; }
   .highway-banner { top: 10px; right: 10px; width: calc(100% - 20px); align-items: stretch; flex-direction: column; }
+}
+
+@media (max-width: 430px) {
+  .achievement-summary { grid-template-columns: 1fr 1fr; }
+  .achievement-summary > div:last-child { grid-column: 1 / -1; }
+  .achievement-tab { font-size: .72rem; }
 }
 
 /* v0.6 */

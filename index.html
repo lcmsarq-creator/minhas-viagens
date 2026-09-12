@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=0.11.7" />
+  <link rel="stylesheet" href="style.css?v=0.12.0" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -31,7 +31,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.11.8</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.12.0</p>
         </div>
       </div>
 
@@ -67,10 +67,12 @@
         <div class="achievement-summary">
           <div><strong id="cityAchievementCount">0</strong><span>Cidades</span></div>
           <div><strong id="roadAchievementCount">0</strong><span>Rodovias</span></div>
+          <div><strong id="iconicAchievementCount">0</strong><span>Rotas icônicas</span></div>
         </div>
         <div class="achievement-tabs" role="tablist" aria-label="Tipo de conquista">
           <button id="cityAchievementsTabBtn" class="achievement-tab active" type="button" role="tab" aria-selected="true" aria-controls="cityAchievementsView">Cidades</button>
           <button id="roadAchievementsTabBtn" class="achievement-tab" type="button" role="tab" aria-selected="false" aria-controls="roadAchievementsView">Rodovias</button>
+          <button id="iconicAchievementsTabBtn" class="achievement-tab" type="button" role="tab" aria-selected="false" aria-controls="iconicAchievementsView">Icônicas</button>
         </div>
         <div id="cityAchievementsView" class="achievement-section achievement-view" role="tabpanel" aria-labelledby="cityAchievementsTabBtn">
           <div id="cityAchievementHeader" class="achievement-browser-header"></div>
@@ -79,6 +81,10 @@
         <div id="roadAchievementsView" class="achievement-section achievement-view hidden" role="tabpanel" aria-labelledby="roadAchievementsTabBtn">
           <h2>Rodovias conquistadas</h2>
           <div id="roadAchievementList" class="achievement-list"></div>
+        </div>
+        <div id="iconicAchievementsView" class="achievement-section achievement-view hidden" role="tabpanel" aria-labelledby="iconicAchievementsTabBtn">
+          <h2>Rotas icônicas</h2>
+          <div id="iconicAchievementList" class="achievement-list"><p class="empty">Calculando rotas icônicas…</p></div>
         </div>
       </section>
 
@@ -332,8 +338,8 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="config.js?v=0.11.8"></script>
+  <script src="config.js?v=0.12.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.11.8"></script>
+  <script src="auth.js?v=0.12.0"></script>
 </body>
 </html>

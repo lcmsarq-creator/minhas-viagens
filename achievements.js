@@ -9,7 +9,36 @@
     ["PE", "Pernambuco"], ["PI", "Piauí"], ["RJ", "Rio de Janeiro"], ["RN", "Rio Grande do Norte"],
     ["RS", "Rio Grande do Sul"], ["RO", "Rondônia"], ["RR", "Roraima"], ["SC", "Santa Catarina"],
     ["SP", "São Paulo"], ["SE", "Sergipe"], ["TO", "Tocantins"]
-  ].map(([uf, name]) => ({ key: `BR-${uf}`, uf, name }));
+  ].map(([uf, name]) => ({
+    key: `BR-${uf}`,
+    uf,
+    code: uf,
+    name,
+    flagUrl: `https://assets.codante.io/codante-apis/bandeiras-do-brasil/${uf.toLowerCase()}-circle.svg`
+  }));
+
+  const COUNTRY_NAMES = {
+    AR: "Argentina", BO: "Bolívia", BR: "Brasil", CL: "Chile", CO: "Colômbia",
+    GF: "Guiana Francesa", GY: "Guiana", PE: "Peru", PY: "Paraguai", SR: "Suriname",
+    UY: "Uruguai", VE: "Venezuela", US: "Estados Unidos", CA: "Canadá", MX: "México",
+    PT: "Portugal", ES: "Espanha", FR: "França", GB: "Reino Unido", IE: "Irlanda",
+    DE: "Alemanha", IT: "Itália", NL: "Países Baixos", BE: "Bélgica", CH: "Suíça"
+  };
+  const ISO3_TO_ISO2 = {
+    ARG: "AR", BOL: "BO", BRA: "BR", CHL: "CL", COL: "CO", GUF: "GF", GUY: "GY",
+    PER: "PE", PRY: "PY", SUR: "SR", URY: "UY", VEN: "VE", USA: "US", CAN: "CA",
+    MEX: "MX", PRT: "PT", ESP: "ES", FRA: "FR", GBR: "GB", IRL: "IE", DEU: "DE",
+    ITA: "IT", NLD: "NL", BEL: "BE", CHE: "CH"
+  };
+  const COUNTRY_NAME_TO_CODE = new Map(Object.entries(COUNTRY_NAMES).flatMap(([code, name]) => {
+    const aliases = [[normalizeText(name), code]];
+    if (code === "UY") aliases.push(["uruguay", code]);
+    if (code === "PY") aliases.push(["paraguay", code]);
+    if (code === "GB") aliases.push(["united kingdom", code], ["gra bretanha", code]);
+    if (code === "US") aliases.push(["united states", code], ["estados unidos da america", code]);
+    if (code === "NL") aliases.push(["netherlands", code], ["holanda", code]);
+    return aliases;
+  }));
 
   const BY_UF = new Map(BRAZIL_STATES.map(state => [state.uf, state]));
   const BY_NAME = new Map(BRAZIL_STATES.map(state => [normalizeText(state.name), state]));
@@ -51,10 +80,32 @@
     return Boolean(country && country !== "brasil" && country !== "brazil");
   }
 
+  function countryCodeForCity(city) {
+    const rawCode = String(city?.countryCode || "").trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(rawCode)) return rawCode;
+    if (ISO3_TO_ISO2[rawCode]) return ISO3_TO_ISO2[rawCode];
+    return COUNTRY_NAME_TO_CODE.get(normalizeText(city?.country)) || "";
+  }
+
+  function countryForCity(city) {
+    const code = countryCodeForCity(city);
+    const suppliedName = String(city?.country || "").trim();
+    const name = COUNTRY_NAMES[code] || suppliedName || code || "País não identificado";
+    const fallbackKey = normalizeText(name).replace(/\s+/g, "-") || "desconhecido";
+    return {
+      key: `COUNTRY-${code || fallbackKey}`,
+      uf: code || "INT",
+      code: code || "INT",
+      name,
+      flagUrl: code ? `https://flagcdn.com/${code.toLowerCase()}.svg` : "",
+      exterior: true
+    };
+  }
+
   function groupForCity(city) {
-    if (isForeignCity(city)) return { key: "EXTERIOR", uf: "INT", name: "Exterior", exterior: true };
+    if (isForeignCity(city)) return countryForCity(city);
     return stateFromValue(city?.region) || stateFromValue(city?.label) || {
-      key: "BR-OUTROS", uf: "BR", name: "Estado não identificado", unknown: true
+      key: "BR-OUTROS", uf: "BR", code: "BR", name: "Estado não identificado", unknown: true
     };
   }
 
@@ -75,5 +126,5 @@
     });
   }
 
-  root.MinhasViagensAchievements = { states: BRAZIL_STATES, stateFromValue, groupForCity, groupCities };
+  root.MinhasViagensAchievements = { states: BRAZIL_STATES, stateFromValue, countryForCity, groupForCity, groupCities };
 })(typeof window !== "undefined" ? window : globalThis);

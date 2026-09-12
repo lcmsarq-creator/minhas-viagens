@@ -1366,7 +1366,7 @@ function renderAchievements() {
     }
     items.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true })).forEach(item => {
       const cityGroup = type === "city" ? window.MinhasViagensAchievements?.groupForCity(item) : null;
-      const citySuffix = cityGroup && !cityGroup.unknown ? ` — ${cityGroup.exterior ? (String(item.countryCode || item.country || "Exterior").toUpperCase()) : cityGroup.uf}` : "";
+      const citySuffix = cityGroup && !cityGroup.unknown ? ` — ${cityGroup.code || cityGroup.uf}` : "";
       const visibleLabel = type === "city" ? `${item.city || item.label}${citySuffix}` : roadDisplayLabel(item.label);
       const card = document.createElement("button");
       card.type = "button";
@@ -1392,7 +1392,7 @@ function renderAchievements() {
     const backButton = document.createElement("button");
     backButton.type = "button";
     backButton.className = "achievement-back-btn";
-    backButton.textContent = "← Voltar aos estados";
+    backButton.textContent = "← Voltar aos estados e países";
     backButton.addEventListener("click", () => {
       state.achievementStateKey = null;
       renderAchievements();
@@ -1405,7 +1405,7 @@ function renderAchievements() {
     els.cityAchievementList.classList.remove("state-achievement-grid");
     renderList(els.cityAchievementList, selectedGroup.cities, "city");
   } else {
-    els.cityAchievementHeader.innerHTML = '<div class="achievement-browser-title"><h2>Estados conquistados</h2></div>';
+    els.cityAchievementHeader.innerHTML = '<div class="achievement-browser-title"><h2>Estados e países conquistados</h2></div>';
     els.cityAchievementList.innerHTML = "";
     els.cityAchievementList.classList.add("state-achievement-grid");
     if (!cityGroups.length) {
@@ -1417,10 +1417,18 @@ function renderAchievements() {
         card.type = "button";
         card.className = "state-achievement-card";
         card.setAttribute("aria-label", `Abrir cidades conquistadas em ${group.name}`);
+        const flagMarkup = group.flagUrl
+          ? `<img src="${escapeHtml(group.flagUrl)}" alt="Bandeira de ${escapeHtml(group.name)}" loading="lazy"><span class="state-achievement-icon-fallback hidden">${escapeHtml(group.code || group.uf)}</span>`
+          : `<span class="state-achievement-icon-fallback">${escapeHtml(group.code || group.uf)}</span>`;
         card.innerHTML = `
-          <span class="state-achievement-icon">${escapeHtml(group.uf)}</span>
+          <span class="state-achievement-icon">${flagMarkup}</span>
           <strong>${escapeHtml(group.name)}</strong>
           <small>${group.cities.length} ${group.cities.length === 1 ? "cidade" : "cidades"}</small>`;
+        const flag = card.querySelector(".state-achievement-icon img");
+        flag?.addEventListener("error", () => {
+          flag.classList.add("hidden");
+          card.querySelector(".state-achievement-icon-fallback")?.classList.remove("hidden");
+        });
         card.addEventListener("click", () => {
           state.achievementStateKey = group.key;
           renderAchievements();

@@ -12,6 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
+  const APP_VERSION = "0.12.1";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -42,12 +43,29 @@
     setStatus(message, type);
   }
 
-  function loadScript(src) {
+  function displayCurrentVersion() {
+    const brandCopy = document.querySelector(".brand p");
+    if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
+  }
+
+  function loadScript(src, attempt = 0) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = src;
-      script.onload = resolve;
-      script.onerror = reject;
+      script.async = false;
+      script.onload = () => {
+        displayCurrentVersion();
+        resolve();
+      };
+      script.onerror = () => {
+        script.remove();
+        if (attempt < 1) {
+          const separator = src.includes("?") ? "&" : "?";
+          loadScript(`${src}${separator}retry=${Date.now()}`, attempt + 1).then(resolve, reject);
+          return;
+        }
+        reject(new Error(`Falha ao carregar ${src}`));
+      };
       document.body.appendChild(script);
     });
   }
@@ -56,37 +74,20 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.12.0");
-      await loadScript("storage-pre.js?v=0.12.0");
+      await loadScript(`fetch-base.js?v=${APP_VERSION}`);
+      await loadScript(`storage-pre.js?v=${APP_VERSION}`);
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.12.0",
-        "achievements.js?v=0.12.0",
-        "city-flags.js?v=0.12.0",
-        "route-interaction.js?v=0.12.0",
-        "script.js?v=0.12.0",
-        "hotfix.js?v=0.12.0",
-        "road-threshold-hotfix.js?v=0.12.0",
-        "secondary-roads-hotfix.js?v=0.12.0",
-        "ux-hotfix.js?v=0.12.0",
-        "endpoint-hotfix.js?v=0.12.0",
-        "city-search-fast.js?v=0.12.0",
-        "place-search-hotfix.js?v=0.12.0",
-        "edit-dialog-hotfix.js?v=0.12.0",
-        "route-click-hotfix.js?v=0.12.0",
-        "geometry-compact-hotfix.js?v=0.12.0",
-        "highway-render-hotfix.js?v=0.12.0",
-        "road-progress-core.js?v=0.12.0",
-        "road-network-hotfix.js?v=0.12.0",
-        "road-catalog-hotfix.js?v=0.12.0",
-        "sync.js?v=0.12.0",
-        "road-cloud-hotfix.js?v=0.12.0",
-        "road-sweep-hotfix.js?v=0.12.0",
-        "escape-navigation.js?v=0.12.0",
-        "iconic-routes-core.js?v=0.12.0",
-        "iconic-routes.js?v=0.12.0"
+        "hotfix-pre.js", "achievements.js", "city-flags.js", "route-interaction.js",
+        "script.js", "hotfix.js", "road-threshold-hotfix.js", "secondary-roads-hotfix.js",
+        "ux-hotfix.js", "endpoint-hotfix.js", "city-search-fast.js", "place-search-hotfix.js",
+        "edit-dialog-hotfix.js", "route-click-hotfix.js", "geometry-compact-hotfix.js",
+        "highway-render-hotfix.js", "road-progress-core.js", "road-network-hotfix.js",
+        "road-catalog-hotfix.js", "sync.js", "road-cloud-hotfix.js", "road-sweep-hotfix.js",
+        "escape-navigation.js", "iconic-routes-core.js", "iconic-routes.js"
       ];
-      for (const src of sources) await loadScript(src);
+      for (const src of sources) await loadScript(`${src}?v=${APP_VERSION}`);
+      displayCurrentVersion();
     } catch (error) {
       console.error("Falha ao carregar o aplicativo", error);
       showLogin("Não foi possível carregar o aplicativo. Atualize a página e tente novamente.", "error");

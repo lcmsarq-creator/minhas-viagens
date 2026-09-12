@@ -236,6 +236,7 @@
   // Pré-carrega a base brasileira enquanto o usuário navega pelo app.
   brazilPromise.then(() => {
     const brand = document.querySelector(".brand p");
-    if (brand) brand.textContent = brand.textContent.replace(/v\d+\.\d+\.\d+/, `v${VERSION}`);
+    const displayedVersion = window.MINHAS_VIAGENS_APP_VERSION || VERSION;
+    if (brand) brand.textContent = brand.textContent.replace(/v\d+\.\d+\.\d+/, `v${displayedVersion}`);
   });
 })();

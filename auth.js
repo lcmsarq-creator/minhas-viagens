@@ -65,6 +65,7 @@
         "ux-hotfix.js?v=0.10.0",
         "endpoint-hotfix.js?v=0.10.1",
         "search-ui-hotfix.js?v=0.10.2",
+        "edit-dialog-hotfix.js?v=0.10.3",
         "sync.js?v=0.10.0"
       ];
       for (const src of sources) await loadScript(src);

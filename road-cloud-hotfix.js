@@ -1,12 +1,13 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.15";
+  const APP_VERSION = "0.10.16";
   const CLOUD_PREFIX = "mvroad|";
-  const CLOUD_SCHEMA = "road-geometry-polyline5-v1";
+  const CLOUD_SCHEMA = "road-geometry-polyline5-v2";
   const PAGE_SIZE = 500;
   const UPLOAD_BATCH = 12;
   const MB = 1024 * 1024;
+  const RETRY_DELAYS = [15000, 60000, 180000, 600000, 1800000];
 
   const auth = window.MinhasViagensAuth;
   const client = auth?.getClient?.();
@@ -14,14 +15,21 @@
   const compact = window.MinhasViagensGeometryCompact;
   if (!client || !userId || !compact?.encodePolyline || !compact?.decodePolyline) return;
 
+  const QUEUE_KEY = `minhasViagens.roadCloudQueue.${userId}.v2`;
   const cloudRows = new Map();
   const uploadQueue = new Map();
   let cloudIndexPromise = null;
   let uploadTimer = null;
+  let retryTimer = null;
   let flushing = false;
+  let processingMissing = false;
 
   const stats = window.MinhasViagensRoadCloudStats = {
     version: APP_VERSION,
+    achievementRoads: 0,
+    availableRoads: 0,
+    pendingRoads: 0,
+    failedRoads: 0,
     cloudRoads: 0,
     cloudBytes: 0,
     localRoadBytes: 0,
@@ -41,9 +49,23 @@
 
   const fmtMb = bytes => `${(Number(bytes || 0) / MB).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MB`;
   const fmtKb = bytes => `${(Number(bytes || 0) / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} KB`;
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function cloudId(key) {
     return `${CLOUD_PREFIX}${key}`;
+  }
+
+  function loadQueue() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(QUEUE_KEY) || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch { return {}; }
+  }
+
+  function saveQueue(queue) {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch {}
+    stats.pendingRoads = Object.keys(queue).length;
+    stats.failedRoads = Object.values(queue).filter(item => Number(item?.attempts) > 0).length;
   }
 
   function pointCount(lines) {
@@ -53,6 +75,7 @@
   function sourceToken(entry) {
     return [
       Number(entry?.version) || HIGHWAY_CACHE_VERSION,
+      String(entry?.networkFetchSchema || ""),
       String(entry?.updatedAt || ""),
       pointCount(entry?.lines || []),
       Math.round((Number(entry?.totalKm) || 0) * 1000)
@@ -79,6 +102,7 @@
       key: highwayCacheKey(descriptor),
       descriptor: descriptorPayload(descriptor),
       cacheVersion: Number(entry?.version) || HIGHWAY_CACHE_VERSION,
+      networkFetchSchema: String(entry?.networkFetchSchema || window.MinhasViagensRoadNetwork?.schema || ""),
       sourceUpdatedAt: Number(entry?.updatedAt) || Date.now(),
       sourceToken: sourceToken(entry),
       partial: Boolean(entry?.partial),
@@ -94,6 +118,8 @@
   function hydratePayload(payload) {
     if (!payload || payload.kind !== "road_geometry_cache" || payload.schema !== CLOUD_SCHEMA) return null;
     if (Number(payload.cacheVersion) !== HIGHWAY_CACHE_VERSION || !Array.isArray(payload.encodedLines)) return null;
+    const requiredNetworkSchema = window.MinhasViagensRoadNetwork?.schema || "";
+    if (requiredNetworkSchema && payload.networkFetchSchema !== requiredNetworkSchema) return null;
     const precision = Number(payload.precision) || 5;
     const lines = payload.encodedLines
       .map(encoded => compact.decodePolyline(encoded, precision))
@@ -102,6 +128,7 @@
     return {
       key: payload.key,
       version: HIGHWAY_CACHE_VERSION,
+      networkFetchSchema: payload.networkFetchSchema || requiredNetworkSchema,
       updatedAt: Number(payload.sourceUpdatedAt) || Date.now(),
       ttl: HIGHWAY_CACHE_TTL,
       lines,
@@ -265,7 +292,7 @@
           stats.uploadedRoads += 1;
         }
         recalcCloudStats();
-        await new Promise(resolve => setTimeout(resolve, 80));
+        await sleep(80);
       }
     } catch (error) {
       console.warn("Não foi possível enviar todas as rodovias para a nuvem agora", error);
@@ -317,28 +344,137 @@
     };
   }
 
+  function queueMissingRoad(item, key) {
+    const queue = loadQueue();
+    if (!queue[key]) {
+      queue[key] = {
+        label: item.label,
+        countryCode: item.countryCode || "BR",
+        attempts: 0,
+        nextRetryAt: 0,
+        lastError: "",
+        createdAt: Date.now()
+      };
+      saveQueue(queue);
+    }
+  }
+
   async function primeAchievements() {
     await loadCloudIndex();
     const roads = [...getAchievementSnapshot().roads.values()];
+    stats.achievementRoads = roads.length;
+    let available = 0;
+    const validKeys = new Set();
+    const queue = loadQueue();
+
     for (const item of roads) {
       const descriptor = overpassRoadDescriptor(item);
       const key = highwayCacheKey(descriptor);
+      validKeys.add(key);
       let local = null;
       try { local = await baseCachedHighway?.(descriptor, true); } catch {}
       if (local) {
+        available += 1;
         queueUpload(descriptor, local);
+        delete queue[key];
         continue;
       }
-      const row = cloudRows.get(key);
-      const remote = hydratePayload(row?.payload);
-      if (!remote) continue;
-      try {
-        await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
-        stats.downloadedRoads += 1;
-      } catch {}
+      const remote = hydratePayload(cloudRows.get(key)?.payload);
+      if (remote) {
+        available += 1;
+        delete queue[key];
+        try {
+          await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
+          stats.downloadedRoads += 1;
+        } catch {}
+        continue;
+      }
+      if (!queue[key]) {
+        queue[key] = {
+          label: item.label,
+          countryCode: item.countryCode || "BR",
+          attempts: 0,
+          nextRetryAt: 0,
+          lastError: "",
+          createdAt: Date.now()
+        };
+      }
     }
+
+    for (const key of Object.keys(queue)) if (!validKeys.has(key)) delete queue[key];
+    stats.availableRoads = available;
+    saveQueue(queue);
     await measureLocalStorage();
+    scheduleMissingProcessor(50);
     return stats;
+  }
+
+  function retryDelay(attempts) {
+    return RETRY_DELAYS[Math.min(RETRY_DELAYS.length - 1, Math.max(0, attempts - 1))];
+  }
+
+  function scheduleMissingProcessor(delay = 300) {
+    clearTimeout(retryTimer);
+    if (!navigator.onLine) return;
+    retryTimer = setTimeout(processMissingQueue, delay);
+  }
+
+  async function processMissingQueue() {
+    if (processingMissing || !navigator.onLine) return;
+    processingMissing = true;
+    try {
+      while (navigator.onLine) {
+        const queue = loadQueue();
+        const entries = Object.entries(queue);
+        if (!entries.length) break;
+        const now = Date.now();
+        const due = entries
+          .filter(([, item]) => Number(item?.nextRetryAt || 0) <= now)
+          .sort((a, b) => Number(a[1]?.nextRetryAt || 0) - Number(b[1]?.nextRetryAt || 0));
+        if (!due.length) {
+          const nextAt = Math.min(...entries.map(([, item]) => Number(item?.nextRetryAt || now + 60000)));
+          scheduleMissingProcessor(Math.max(1000, Math.min(60000, nextAt - now)));
+          break;
+        }
+
+        const [key, item] = due[0];
+        try {
+          const descriptor = overpassRoadDescriptor({ label: item.label, countryCode: item.countryCode || "BR" });
+          const local = await baseCachedHighway?.(descriptor, true);
+          const remote = hydratePayload(cloudRows.get(key)?.payload);
+          if (local) {
+            queueUpload(descriptor, local);
+          } else if (remote) {
+            await highwayDbPut(HIGHWAY_GEOMETRY_STORE, remote);
+            stats.downloadedRoads += 1;
+          } else {
+            await fetchFullHighway(descriptor, null);
+            await flushUploads();
+          }
+          const nextQueue = loadQueue();
+          delete nextQueue[key];
+          saveQueue(nextQueue);
+          stats.availableRoads = Math.min(stats.achievementRoads, stats.availableRoads + 1);
+        } catch (error) {
+          const nextQueue = loadQueue();
+          const current = nextQueue[key] || item;
+          current.attempts = Number(current.attempts || 0) + 1;
+          current.lastError = String(error?.message || error || "Falha desconhecida").slice(0, 240);
+          current.lastAttemptAt = Date.now();
+          current.nextRetryAt = Date.now() + retryDelay(current.attempts);
+          nextQueue[key] = current;
+          saveQueue(nextQueue);
+          console.warn(`Rodovia ${current.label} continua pendente; nova tentativa será feita automaticamente.`, error);
+        }
+        await sleep(1200);
+      }
+    } finally {
+      processingMissing = false;
+      const queue = loadQueue();
+      if (Object.keys(queue).length && navigator.onLine) scheduleMissingProcessor(1500);
+      loadCloudIndex(true);
+      measureLocalStorage();
+    }
   }
 
   window.MinhasViagensRoadCloud = {
@@ -347,22 +483,26 @@
     loadCloudIndex,
     primeAchievements,
     measureLocalStorage,
-    flushUploads
+    flushUploads,
+    processMissingQueue,
+    status: () => ({ ...stats, queue: loadQueue() })
   };
 
   ensureMetricsUi();
   renderMetrics();
   loadCloudIndex();
-  setTimeout(primeAchievements, 900);
-  setTimeout(primeAchievements, 2600);
+  setTimeout(primeAchievements, 700);
+  setTimeout(primeAchievements, 3000);
+  setInterval(() => primeAchievements().catch(() => {}), 120000);
   window.addEventListener("online", () => {
     loadCloudIndex(true);
-    setTimeout(primeAchievements, 300);
+    setTimeout(primeAchievements, 250);
     setTimeout(flushUploads, 700);
+    scheduleMissingProcessor(900);
   });
 
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
 
-  console.info(`Minhas Viagens ${APP_VERSION}: biblioteca de rodovias na nuvem habilitada.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: biblioteca persistente de rodovias com fila de completude e retentativas habilitada.`);
 })();

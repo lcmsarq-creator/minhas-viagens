@@ -56,23 +56,24 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.10.13");
-      await loadScript("storage-pre.js?v=0.10.13");
+      await loadScript("fetch-base.js?v=0.10.14");
+      await loadScript("storage-pre.js?v=0.10.14");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.10.13",
-        "script.js?v=0.10.13",
-        "hotfix.js?v=0.10.13",
-        "road-threshold-hotfix.js?v=0.10.13",
-        "secondary-roads-hotfix.js?v=0.10.13",
-        "ux-hotfix.js?v=0.10.13",
-        "endpoint-hotfix.js?v=0.10.13",
-        "city-search-fast.js?v=0.10.13",
-        "edit-dialog-hotfix.js?v=0.10.13",
-        "route-click-hotfix.js?v=0.10.13",
-        "geometry-compact-hotfix.js?v=0.10.13",
-        "sync.js?v=0.10.13",
-        "road-sweep-hotfix.js?v=0.10.13"
+        "hotfix-pre.js?v=0.10.14",
+        "script.js?v=0.10.14",
+        "hotfix.js?v=0.10.14",
+        "road-threshold-hotfix.js?v=0.10.14",
+        "secondary-roads-hotfix.js?v=0.10.14",
+        "ux-hotfix.js?v=0.10.14",
+        "endpoint-hotfix.js?v=0.10.14",
+        "city-search-fast.js?v=0.10.14",
+        "edit-dialog-hotfix.js?v=0.10.14",
+        "route-click-hotfix.js?v=0.10.14",
+        "geometry-compact-hotfix.js?v=0.10.14",
+        "highway-render-hotfix.js?v=0.10.14",
+        "sync.js?v=0.10.14",
+        "road-sweep-hotfix.js?v=0.10.14"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

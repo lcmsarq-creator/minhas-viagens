@@ -1,80 +1,115 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.7";
-  const dialog = document.getElementById("editPlacesDialog");
-  if (!dialog) return;
+  const APP_VERSION = "0.10.8";
+  const editDialog = document.getElementById("editPlacesDialog");
+  const tripDialog = document.getElementById("tripDialog");
 
-  // Abre o editor como painel NÃO modal. Assim ele não cria backdrop nem bloqueia
-  // o restante da interface: a área do mapa que fica visível continua aceitando
-  // pan, zoom, duplo clique e os controles do Leaflet normalmente.
-  openEditPlacesDialog = function openEditPlacesDialogModeless(trip) {
-    if (!trip || state.drawing || state.editingTripId || !els.routeChooser.classList.contains("hidden")) return;
-
-    state.editingPlacesTripId = trip.id;
-    state.editStartPlace = trip.startPlace ? { ...trip.startPlace } : editPlaceFallback(trip, "start");
-    state.editEndPlace = trip.endPlace ? { ...trip.endPlace } : editPlaceFallback(trip, "end");
-    state.editStopPlaces = [];
-    els.editStopsContainer.innerHTML = "";
-
-    const startLabel = state.editStartPlace?.label || state.editStartPlace?.city || "";
-    const endLabel = state.editEndPlace?.label || state.editEndPlace?.city || "";
-    els.editStartAddress.value = startLabel;
-    els.editEndAddress.value = endLabel;
-    els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhuma cidade selecionada.";
-    els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhuma cidade selecionada.";
-    els.editStartSelected.classList.toggle("ok", Boolean(state.editStartPlace));
-    els.editEndSelected.classList.toggle("ok", Boolean(state.editEndPlace));
-    els.editStartSuggestions.innerHTML = "";
-    els.editEndSuggestions.innerHTML = "";
-    els.editStartSuggestions.classList.add("hidden");
-    els.editEndSuggestions.classList.add("hidden");
-    els.editStartStatus.textContent = "";
-    els.editEndStatus.textContent = "";
-
-    (trip.stopPlaces || []).forEach(place => addEditStopField(place, false));
-
-    if (!["carro", "moto"].includes(trip.mode)) {
-      setEditPlacesMessage("Nesta versão, o recálculo automático após editar cidades está disponível para viagens de carro e moto.");
-    } else {
-      setEditPlacesMessage("");
-    }
-    updateEditPlacesButton();
-
-    // Não usamos showModal(), show() nem top layer do navegador. O atributo open
-    // transforma este <dialog> em um painel comum, fixo e modeless.
+  function openPanel(dialog) {
+    if (!dialog) return;
     dialog.setAttribute("open", "");
-    dialog.classList.add("mv-city-editor-open");
-    requestAnimationFrame(() => els.editStartAddress?.focus({ preventScroll: true }));
-  };
+    dialog.classList.add("mv-map-panel-open");
+    const form = dialog.querySelector("form");
+    if (form) form.scrollTop = 0;
+  }
 
-  const originalClose = closeEditPlacesDialog;
-  closeEditPlacesDialog = function closeEditPlacesDialogModeless() {
-    dialog.classList.remove("mv-city-editor-open");
-    dialog.removeAttribute("open");
-    // Replica a limpeza do fluxo original sem depender de dialog.close().
-    state.editingPlacesTripId = null;
-    state.editStartPlace = null;
-    state.editEndPlace = null;
-    state.editStopPlaces = [];
-    els.editStopsContainer.innerHTML = "";
-    setEditPlacesMessage("");
-  };
+  function clearPanelClass(dialog) {
+    if (!dialog) return;
+    dialog.classList.remove("mv-map-panel-open");
+  }
 
-  // Os listeners de fechar/cancelar foram registrados antes deste hotfix e podem
-  // manter referência à função antiga. Garantimos o fechamento modeless no capture.
-  [els.closeEditPlacesBtn, els.cancelEditPlacesBtn].forEach(button => {
-    button?.addEventListener("click", () => {
-      if (dialog.hasAttribute("open")) {
-        dialog.classList.remove("mv-city-editor-open");
-        dialog.removeAttribute("open");
+  function installModelessOpen(dialog) {
+    if (!dialog) return;
+    const showPanel = () => openPanel(dialog);
+    ["showModal", "show"].forEach(method => {
+      try {
+        Object.defineProperty(dialog, method, {
+          configurable: true,
+          writable: true,
+          value: showPanel
+        });
+      } catch {
+        try { dialog[method] = showPanel; } catch {}
       }
-    }, true);
+    });
+    dialog.addEventListener("close", () => clearPanelClass(dialog));
+  }
+
+  // A janela de Nova viagem usa o mesmo painel não modal do editor de cidades.
+  // O código principal continua chamando showModal(), mas aqui esse método abre
+  // apenas um painel comum, sem backdrop e sem bloquear o mapa ao fundo.
+  installModelessOpen(tripDialog);
+
+  if (editDialog) {
+    // Mantém o fluxo de edição já existente, abrindo-o no mesmo padrão visual.
+    openEditPlacesDialog = function openEditPlacesDialogModeless(trip) {
+      if (!trip || state.drawing || state.editingTripId || !els.routeChooser.classList.contains("hidden")) return;
+
+      state.editingPlacesTripId = trip.id;
+      state.editStartPlace = trip.startPlace ? { ...trip.startPlace } : editPlaceFallback(trip, "start");
+      state.editEndPlace = trip.endPlace ? { ...trip.endPlace } : editPlaceFallback(trip, "end");
+      state.editStopPlaces = [];
+      els.editStopsContainer.innerHTML = "";
+
+      const startLabel = state.editStartPlace?.label || state.editStartPlace?.city || "";
+      const endLabel = state.editEndPlace?.label || state.editEndPlace?.city || "";
+      els.editStartAddress.value = startLabel;
+      els.editEndAddress.value = endLabel;
+      els.editStartSelected.textContent = state.editStartPlace ? `✓ ${startLabel}` : "Nenhuma cidade selecionada.";
+      els.editEndSelected.textContent = state.editEndPlace ? `✓ ${endLabel}` : "Nenhuma cidade selecionada.";
+      els.editStartSelected.classList.toggle("ok", Boolean(state.editStartPlace));
+      els.editEndSelected.classList.toggle("ok", Boolean(state.editEndPlace));
+      els.editStartSuggestions.innerHTML = "";
+      els.editEndSuggestions.innerHTML = "";
+      els.editStartSuggestions.classList.add("hidden");
+      els.editEndSuggestions.classList.add("hidden");
+      els.editStartStatus.textContent = "";
+      els.editEndStatus.textContent = "";
+
+      (trip.stopPlaces || []).forEach(place => addEditStopField(place, false));
+
+      if (!["carro", "moto"].includes(trip.mode)) {
+        setEditPlacesMessage("Nesta versão, o recálculo automático após editar cidades está disponível para viagens de carro e moto.");
+      } else {
+        setEditPlacesMessage("");
+      }
+      updateEditPlacesButton();
+
+      openPanel(editDialog);
+      requestAnimationFrame(() => els.editStartAddress?.focus({ preventScroll: true }));
+    };
+
+    closeEditPlacesDialog = function closeEditPlacesDialogModeless() {
+      clearPanelClass(editDialog);
+      editDialog.removeAttribute("open");
+      state.editingPlacesTripId = null;
+      state.editStartPlace = null;
+      state.editEndPlace = null;
+      state.editStopPlaces = [];
+      els.editStopsContainer.innerHTML = "";
+      setEditPlacesMessage("");
+    };
+
+    // Os listeners originais podem guardar referência à função antiga. Garantimos
+    // que os botões sempre fechem o painel visualmente no capture.
+    [els.closeEditPlacesBtn, els.cancelEditPlacesBtn].forEach(button => {
+      button?.addEventListener("click", () => {
+        clearPanelClass(editDialog);
+        editDialog.removeAttribute("open");
+      }, true);
+    });
+  }
+
+  // A classe visual da Nova viagem é removida mesmo quando o fechamento acontece
+  // pelo fluxo original do aplicativo.
+  [document.getElementById("closeDialogBtn"), document.getElementById("cancelDialogBtn")].forEach(button => {
+    button?.addEventListener("click", () => clearPanelClass(tripDialog), true);
   });
 
   const style = document.createElement("style");
   style.textContent = `
-    #editPlacesDialog.mv-city-editor-open[open] {
+    #tripDialog.mv-map-panel-open[open],
+    #editPlacesDialog.mv-map-panel-open[open] {
       display: block !important;
       position: fixed !important;
       top: 22px !important;
@@ -97,49 +132,46 @@
       resize: none !important;
     }
 
+    #tripDialog::backdrop,
     #editPlacesDialog::backdrop {
       display: none !important;
       background: transparent !important;
       pointer-events: none !important;
     }
 
-    #editPlacesDialog.mv-city-editor-open > #editPlacesForm {
+    #tripDialog.mv-map-panel-open > #tripForm,
+    #editPlacesDialog.mv-map-panel-open > #editPlacesForm {
       height: 100% !important;
       max-height: none !important;
       min-height: 0;
       padding: 18px;
-      display: flex !important;
-      flex-direction: column;
-      overflow: hidden !important;
+      display: block !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
     }
 
-    #editPlacesDialog.mv-city-editor-open .dialog-head {
-      flex: 0 0 auto;
-      margin-bottom: 12px;
+    #tripDialog.mv-map-panel-open .dialog-head,
+    #editPlacesDialog.mv-map-panel-open .dialog-head {
+      margin-bottom: 14px;
       cursor: default !important;
       user-select: text !important;
     }
 
-    #editPlacesDialog.mv-city-editor-open .autocomplete-field,
-    #editPlacesDialog.mv-city-editor-open .dialog-actions,
-    #editPlacesDialog.mv-city-editor-open .form-message {
-      flex: 0 0 auto;
+    #tripDialog.mv-map-panel-open .stops-section,
+    #editPlacesDialog.mv-map-panel-open .stops-section {
+      min-height: 150px !important;
+      max-height: none !important;
+      height: auto !important;
+      margin-bottom: 12px;
+      overflow: visible !important;
     }
 
-    #editPlacesDialog.mv-city-editor-open .stops-section {
-      display: flex !important;
-      flex-direction: column;
-      flex: 1 1 auto !important;
-      min-height: 170px !important;
-      max-height: none !important;
-      overflow: hidden !important;
-      margin-bottom: 10px;
-    }
-
-    #editPlacesDialog.mv-city-editor-open .stops-container {
-      flex: 1 1 auto;
-      min-height: 105px !important;
-      max-height: none !important;
+    #tripDialog.mv-map-panel-open .stops-container,
+    #editPlacesDialog.mv-map-panel-open .stops-container {
+      min-height: 95px !important;
+      max-height: 230px !important;
       height: auto !important;
       overflow-y: auto !important;
       overflow-x: hidden !important;
@@ -148,18 +180,19 @@
       padding-right: 5px;
     }
 
-    #editPlacesDialog.mv-city-editor-open .dialog-actions {
-      margin-top: 8px;
+    #tripDialog.mv-map-panel-open .dialog-actions,
+    #editPlacesDialog.mv-map-panel-open .dialog-actions {
+      margin-top: 10px;
       padding-top: 8px;
       background: #fff;
     }
 
-    /* Remove totalmente os elementos e comportamentos das versões arrastáveis. */
     #editPlacesDialog .mv-dialog-resize-handle { display: none !important; }
     body.mv-dragging-edit-dialog { user-select: auto !important; }
 
     @media (max-width: 820px) {
-      #editPlacesDialog.mv-city-editor-open[open] {
+      #tripDialog.mv-map-panel-open[open],
+      #editPlacesDialog.mv-map-panel-open[open] {
         top: 12px !important;
         right: 12px !important;
         bottom: 12px !important;

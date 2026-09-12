@@ -56,30 +56,31 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
-      await loadScript("fetch-base.js?v=0.11.5");
-      await loadScript("storage-pre.js?v=0.11.5");
+      await loadScript("fetch-base.js?v=0.11.6");
+      await loadScript("storage-pre.js?v=0.11.6");
       await window.MinhasViagensStorageReady;
       const sources = [
-        "hotfix-pre.js?v=0.11.5",
-        "achievements.js?v=0.11.5",
-        "city-flags.js?v=0.11.5",
-        "script.js?v=0.11.5",
-        "hotfix.js?v=0.11.5",
-        "road-threshold-hotfix.js?v=0.11.5",
-        "secondary-roads-hotfix.js?v=0.11.5",
-        "ux-hotfix.js?v=0.11.5",
-        "endpoint-hotfix.js?v=0.11.5",
-        "city-search-fast.js?v=0.11.5",
-        "place-search-hotfix.js?v=0.11.5",
-        "edit-dialog-hotfix.js?v=0.11.5",
-        "route-click-hotfix.js?v=0.11.5",
-        "geometry-compact-hotfix.js?v=0.11.5",
-        "highway-render-hotfix.js?v=0.11.5",
-        "road-network-hotfix.js?v=0.11.5",
-        "road-catalog-hotfix.js?v=0.11.5",
-        "sync.js?v=0.11.5",
-        "road-cloud-hotfix.js?v=0.11.5",
-        "road-sweep-hotfix.js?v=0.11.5"
+        "hotfix-pre.js?v=0.11.6",
+        "achievements.js?v=0.11.6",
+        "city-flags.js?v=0.11.6",
+        "route-interaction.js?v=0.11.6",
+        "script.js?v=0.11.6",
+        "hotfix.js?v=0.11.6",
+        "road-threshold-hotfix.js?v=0.11.6",
+        "secondary-roads-hotfix.js?v=0.11.6",
+        "ux-hotfix.js?v=0.11.6",
+        "endpoint-hotfix.js?v=0.11.6",
+        "city-search-fast.js?v=0.11.6",
+        "place-search-hotfix.js?v=0.11.6",
+        "edit-dialog-hotfix.js?v=0.11.6",
+        "route-click-hotfix.js?v=0.11.6",
+        "geometry-compact-hotfix.js?v=0.11.6",
+        "highway-render-hotfix.js?v=0.11.6",
+        "road-network-hotfix.js?v=0.11.6",
+        "road-catalog-hotfix.js?v=0.11.6",
+        "sync.js?v=0.11.6",
+        "road-cloud-hotfix.js?v=0.11.6",
+        "road-sweep-hotfix.js?v=0.11.6"
       ];
       for (const src of sources) await loadScript(src);
     } catch (error) {

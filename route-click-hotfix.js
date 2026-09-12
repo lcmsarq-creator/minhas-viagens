@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.10";
+  const APP_VERSION = "0.11.6";
   const baseRenderTrips = typeof renderTrips === "function" ? renderTrips : null;
 
   function routeInteractionAvailable() {
@@ -23,9 +23,11 @@
 
     for (const [tripId, line] of state.tripLineLayers || []) {
       if (!line) continue;
-      try { line.off("click"); } catch {}
-      try { line.unbindPopup(); } catch {}
-      line.on("click", () => openTripFromRoute(tripId));
+      for (const target of [line, line._routeHitLine].filter(Boolean)) {
+        try { target.off("click"); } catch {}
+        try { target.unbindPopup(); } catch {}
+        target.on("click", () => openTripFromRoute(tripId));
+      }
     }
   }
 

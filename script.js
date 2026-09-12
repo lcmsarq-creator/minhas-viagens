@@ -12,6 +12,7 @@ const AIRPORTS_CSV_URLS = [
   "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
 ];
 const DEFAULT_ROUTE_COLOR = "#2f6d50";
+const ROUTE_INTERACTION = window.MinhasViagensRouteInteraction;
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -1658,13 +1659,16 @@ function renderTrips() {
     els.tripList.appendChild(card);
 
     if (trip.visible !== false && latlngs.length >= 2 && state.editingTripId !== trip.id) {
+      const routeIsInteractive = !hasFocusedTrip || isFocused;
+      const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("trip-route-hit", 24, routeIsInteractive));
       const line = L.polyline(latlngs, {
         color: routeColor,
         weight: hasFocusedTrip ? (isFocused ? 7 : 3) : 5,
         opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9,
         dashArray: trip.mode === "aviao" ? "12 10" : null,
-        interactive: !hasFocusedTrip || isFocused
+        interactive: routeIsInteractive
       });
+      line._routeHitLine = hitLine;
       line.bindPopup(`
         <div class="popup-title">${escapeHtml(trip.name || "Viagem")}</div>
         <div class="popup-meta">${formatDate(trip.date)} · ${modeLabel(trip.mode)}</div>
@@ -1672,14 +1676,20 @@ function renderTrips() {
         <div class="popup-detail"><b>Chegada:</b> ${escapeHtml(endAddress)}</div>
         ${Number.isFinite(trip.distance) ? `<div class="popup-detail"><b>Distância:</b> ${formatDistance(trip.distance)}</div>` : ""}
         <div class="popup-detail"><b>Dica:</b> clique na rota para adicionar um ponto com foto ou vídeo.</div>`);
-      line.on("click", event => {
+      const handleRouteClick = event => {
         if ((!hasFocusedTrip || isFocused) && !state.drawing && !state.editingTripId && els.routeChooser.classList.contains("hidden")) {
           openRoutePointDialog(trip, event.latlng);
         }
-      });
+      };
+      line.on("click", handleRouteClick);
+      hitLine.on("click", handleRouteClick);
+      tripLayers.addLayer(hitLine);
       tripLayers.addLayer(line);
       state.tripLineLayers.set(trip.id, line);
-      if (isFocused && hasFocusedTrip) line.bringToFront();
+      if (isFocused && hasFocusedTrip) {
+        hitLine.bringToFront();
+        line.bringToFront();
+      }
 
       const endpointOpacity = hasFocusedTrip && !isFocused ? .25 : 1;
       tripLayers.addLayer(L.circleMarker(latlngs[0], {
@@ -2669,11 +2679,14 @@ function renderRouteAlternatives() {
     els.routeOptions.appendChild(btn);
 
     const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("route-option-hit", 24)).addTo(previewGroup);
     const line = L.polyline(latlngs, {
       color: selected ? (state.pendingTrip?.color || DEFAULT_ROUTE_COLOR) : "#7a827d",
       weight: selected ? 7 : 4,
       opacity: selected ? .95 : .55
     }).addTo(previewGroup);
+    line._routeHitLine = hitLine;
+    hitLine.on("click", () => selectRoute(index));
     line.on("click", () => selectRoute(index));
     state.previewLayers[index] = line;
   });
@@ -3059,8 +3072,8 @@ function createEditLayers(trip) {
   editGroup.clearLayers();
   const latlngs = tripLatLngs(trip);
   const color = trip.color || DEFAULT_ROUTE_COLOR;
-  state.editVisibleLine = L.polyline(latlngs, { color, weight: 6, opacity: .95 }).addTo(editGroup);
-  state.editHitLine = L.polyline(latlngs, { color: "#000", weight: 24, opacity: 0, interactive: true, className: "edit-route-hit" }).addTo(editGroup);
+  state.editVisibleLine = L.polyline(latlngs, { color, weight: 6, opacity: .95, interactive: false }).addTo(editGroup);
+  state.editHitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("edit-route-hit", 28)).addTo(editGroup);
   state.editHitLine.on("mousedown", event => startEditDrag(trip, event));
   const endpoints = getTripEndpoints(trip);
   if (endpoints.start) L.circleMarker([endpoints.start.lat, endpoints.start.lng], { radius: 6, weight: 2, color, fillColor: "#fff", fillOpacity: 1 }).addTo(editGroup);

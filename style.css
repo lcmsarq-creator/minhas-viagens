@@ -146,7 +146,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 @keyframes sparkle { from { transform: scale(.8) rotate(0); opacity: .5; } to { transform: scale(1.4) rotate(30deg); opacity: 1; } }
 
 .route-poi-marker { width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; background: #2f6d50; box-shadow: 0 2px 9px rgba(0,0,0,.3); }
+.trip-route-hit, .route-option-hit { cursor: pointer; }
 .edit-route-hit { cursor: grab; }
+.edit-route-hit:active { cursor: grabbing; }
 
  dialog { width: min(670px, calc(100% - 28px)); border: 0; border-radius: 16px; padding: 0; box-shadow: var(--shadow); overflow: visible; }
 dialog::backdrop { background: rgba(15,24,19,.45); }

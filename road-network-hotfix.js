@@ -54,9 +54,10 @@
   fetchFullHighway = async function fetchFullHighwayAdditive(descriptor, signal, onStatus = () => {}) {
     const collected = [];
     const succeeded = new Set();
+    // A busca por relações já inclui a relação principal quando o ref coincide. A consulta
+    // separada "primary" era redundante e triplicava o custo da atualização em massa.
     const kinds = [
-      ["primary", "Buscando relação principal…"],
-      ["relations", "Buscando relações parciais…"],
+      ["relations", "Buscando relações da rodovia…"],
       ["ways", "Buscando todos os trechos por referência…"]
     ];
 
@@ -76,9 +77,9 @@
     const lines = dedupeLines(collected);
     if (!lines.length) throw new Error("Não foi possível localizar a rodovia completa no OpenStreetMap");
     onStatus("Consolidando todos os trechos encontrados…");
-    // A consulta de ways é a rede de segurança mais ampla. Se ela falhou, mantemos
-    // a geometria encontrada, mas sinalizamos que ainda pode haver trechos ausentes.
-    return cacheHighway(descriptor, lines, !succeeded.has("ways"));
+    // Relations trazem trechos cujo ref some em travessias urbanas; ways traz todos os
+    // fragmentos explicitamente referenciados. Os dois conjuntos são sempre somados.
+    return cacheHighway(descriptor, lines, !succeeded.has("ways") || !succeeded.has("relations"));
   };
 
   function bearing(a, b) {
@@ -237,8 +238,6 @@
     return result;
   };
 
-  // Remove apenas o progresso antigo; geometrias antigas são invalidadas sob demanda
-  // pelo marcador NETWORK_SCHEMA e serão substituídas pela busca aditiva.
   (async () => {
     try {
       const db = await openHighwayDb();

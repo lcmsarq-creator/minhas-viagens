@@ -4,6 +4,7 @@
   const APP_VERSION = "0.10.17";
   const CLOUD_PREFIX = "mvroad|";
   const CLOUD_SCHEMA = "road-geometry-polyline5-v3";
+  const ENTRY_VALIDATION_SCHEMA = "complete-road-v3";
   const ACCEPTED_SCHEMAS = new Set([
     "road-geometry-polyline5-v1",
     "road-geometry-polyline5-v2",
@@ -62,6 +63,7 @@
 
   function isValidatedEntry(entry) {
     if (!entry?.lines?.length) return false;
+    if (entry.cloudValidationSchema !== ENTRY_VALIDATION_SCHEMA) return false;
     const required = requiredNetworkSchema();
     if (required && entry.networkFetchSchema !== required) return false;
     if (entry.needsNetworkRefresh === true) return false;
@@ -72,6 +74,7 @@
   function isValidatedPayload(payload) {
     if (!payload || payload.kind !== "road_geometry_cache") return false;
     if (payload.schema !== CLOUD_SCHEMA) return false;
+    if (payload.validationSchema !== ENTRY_VALIDATION_SCHEMA) return false;
     if (!Array.isArray(payload.encodedLines) || !payload.encodedLines.length) return false;
     const required = requiredNetworkSchema();
     if (required && payload.networkFetchSchema !== required) return false;
@@ -120,6 +123,7 @@
     return {
       kind: "road_geometry_cache",
       schema: CLOUD_SCHEMA,
+      validationSchema: ENTRY_VALIDATION_SCHEMA,
       key: highwayCacheKey(descriptor),
       descriptor: descriptorPayload(descriptor),
       cacheVersion: Number(entry.version) || HIGHWAY_CACHE_VERSION,
@@ -149,6 +153,7 @@
     return {
       key: payload.key,
       version: HIGHWAY_CACHE_VERSION,
+      cloudValidationSchema: validated ? ENTRY_VALIDATION_SCHEMA : "",
       networkFetchSchema: String(payload.networkFetchSchema || ""),
       needsNetworkRefresh: !validated,
       updatedAt: Number(payload.sourceUpdatedAt) || Date.now(),
@@ -330,6 +335,14 @@
   if (baseCacheHighway) {
     cacheHighway = async function cacheHighwayCloudV3(descriptor, lines, partial = false) {
       const entry = await baseCacheHighway(descriptor, lines, partial);
+      const required = requiredNetworkSchema();
+      const fetchedCompletely = Boolean(entry?.lines?.length) &&
+        (!required || entry.networkFetchSchema === required) &&
+        entry.needsNetworkRefresh !== true && entry.partial !== true;
+      if (fetchedCompletely) {
+        entry.cloudValidationSchema = ENTRY_VALIDATION_SCHEMA;
+        try { await highwayDbPut(HIGHWAY_GEOMETRY_STORE, entry); } catch {}
+      }
       if (isValidatedEntry(entry)) queueUpload(descriptor, entry);
       else enqueueDescriptor(descriptor, true);
       return entry;

@@ -42,19 +42,34 @@
     setStatus(message, type);
   }
 
-  function loadAppScripts() {
-    if (appLoaded) return;
-    appLoaded = true;
-    const sources = ["hotfix-pre.js?v=0.9.1", "script.js?v=0.9.1", "hotfix.js?v=0.9.1", "sync.js?v=0.9.1"];
-    sources.reduce((promise, src) => promise.then(() => new Promise((resolve, reject) => {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = src;
       script.onload = resolve;
       script.onerror = reject;
       document.body.appendChild(script);
-    })), Promise.resolve()).catch(() => {
-      showLogin("Não foi possível carregar o aplicativo. Atualize a página e tente novamente.", "error");
     });
+  }
+
+  async function loadAppScripts() {
+    if (appLoaded) return;
+    appLoaded = true;
+    try {
+      await loadScript("storage-pre.js?v=0.10.0");
+      await window.MinhasViagensStorageReady;
+      const sources = [
+        "hotfix-pre.js?v=0.10.0",
+        "script.js?v=0.10.0",
+        "hotfix.js?v=0.10.0",
+        "ux-hotfix.js?v=0.10.0",
+        "sync.js?v=0.10.0"
+      ];
+      for (const src of sources) await loadScript(src);
+    } catch (error) {
+      console.error("Falha ao carregar o aplicativo", error);
+      showLogin("Não foi possível carregar o aplicativo. Atualize a página e tente novamente.", "error");
+    }
   }
 
   function showApp(session) {

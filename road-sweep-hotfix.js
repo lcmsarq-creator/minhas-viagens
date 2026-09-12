@@ -1,11 +1,12 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.10.12";
+  const APP_VERSION = "0.10.13";
+  const SWEEP_SCHEMA_VERSION = "0.10.12";
   const userId = window.MinhasViagensAuth?.getUser()?.id;
   if (!userId) return;
 
-  const SWEEP_KEY = `minhasViagens.roadSweep.${userId}.v0.10.12`;
+  const SWEEP_KEY = `minhasViagens.roadSweep.${userId}.v${SWEEP_SCHEMA_VERSION}`;
   const MAX_ROUTE_SAMPLES = 22;
   const TRIP_PAUSE_MS = 700;
   const ROAD_PAUSE_MS = 900;

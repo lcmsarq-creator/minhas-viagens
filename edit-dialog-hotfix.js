@@ -6,18 +6,12 @@
 
   const header = dialog.querySelector(".dialog-head");
   const closeButton = document.getElementById("closeEditPlacesBtn");
-  const APP_VERSION = "0.10.3";
-
-  // O editor de cidades precisa coexistir com o mapa. Transformamos apenas este
-  // dialog em não modal para permitir pan/zoom no Leaflet enquanto ele estiver aberto.
-  dialog.showModal = function showAsModeless() {
-    if (!this.open) this.show();
-    ensurePosition();
-  };
+  const APP_VERSION = "0.10.5";
+  const nativeShow = window.HTMLDialogElement?.prototype?.show;
 
   function defaultRect() {
-    const width = Math.min(620, Math.max(460, window.innerWidth - 48));
-    const height = Math.min(600, Math.max(420, window.innerHeight - 72));
+    const width = Math.min(590, Math.max(440, window.innerWidth - 56));
+    const height = Math.min(590, Math.max(420, window.innerHeight - 80));
     return {
       width,
       height,
@@ -45,10 +39,10 @@
     const rect = dialog.getBoundingClientRect();
     const maxWidth = Math.max(360, window.innerWidth - 24);
     const maxHeight = Math.max(320, window.innerHeight - 24);
-    const width = Math.min(rect.width, maxWidth);
-    const height = Math.min(rect.height, maxHeight);
-    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
-    const top = Math.min(Math.max(12, rect.top), Math.max(12, window.innerHeight - height - 12));
+    const width = Math.min(rect.width || defaultRect().width, maxWidth);
+    const height = Math.min(rect.height || defaultRect().height, maxHeight);
+    const left = Math.min(Math.max(12, rect.left || 12), Math.max(12, window.innerWidth - width - 12));
+    const top = Math.min(Math.max(12, rect.top || 12), Math.max(12, window.innerHeight - height - 12));
     Object.assign(dialog.style, {
       width: `${width}px`,
       height: `${height}px`,
@@ -56,6 +50,44 @@
       top: `${top}px`
     });
   }
+
+  function showModeless() {
+    if (!dialog.open) {
+      if (typeof nativeShow === "function") nativeShow.call(dialog);
+      else dialog.setAttribute("open", "");
+    }
+    ensurePosition();
+    requestAnimationFrame(() => {
+      ensurePosition();
+      dialog.focus?.({ preventScroll: true });
+    });
+  }
+
+  // O código principal chama showModal(). Para permitir pan/zoom no mapa, este
+  // painel específico é aberto como dialog modeless. defineProperty evita diferenças
+  // entre navegadores ao sobrescrever o método nativo no elemento.
+  try {
+    Object.defineProperty(dialog, "showModal", {
+      configurable: true,
+      writable: true,
+      value: showModeless
+    });
+  } catch (error) {
+    console.warn("Não foi possível substituir showModal diretamente", error);
+    try { dialog.showModal = showModeless; } catch {}
+  }
+
+  // Segurança adicional: se o fluxo principal preencher o editor mas a abertura
+  // falhar por alguma particularidade do navegador, abrimos no quadro seguinte.
+  document.addEventListener("click", event => {
+    const button = event.target.closest?.(".edit-places-btn");
+    if (!button || button.disabled) return;
+    requestAnimationFrame(() => {
+      if (!dialog.open && typeof state !== "undefined" && state.editingPlacesTripId) {
+        showModeless();
+      }
+    });
+  }, true);
 
   let drag = null;
   header?.addEventListener("pointerdown", event => {
@@ -97,6 +129,8 @@
   header?.addEventListener("pointerup", endDrag);
   header?.addEventListener("pointercancel", endDrag);
 
+  const oldHandle = dialog.querySelector(".mv-dialog-resize-handle");
+  oldHandle?.remove();
   const resizeHandle = document.createElement("div");
   resizeHandle.className = "mv-dialog-resize-handle";
   resizeHandle.setAttribute("role", "separator");
@@ -122,9 +156,9 @@
   resizeHandle.addEventListener("pointermove", event => {
     if (!resize || event.pointerId !== resize.pointerId) return;
     const rect = dialog.getBoundingClientRect();
-    const maxWidth = Math.max(420, window.innerWidth - rect.left - 10);
+    const maxWidth = Math.max(400, window.innerWidth - rect.left - 10);
     const maxHeight = Math.max(360, window.innerHeight - rect.top - 10);
-    const width = Math.min(maxWidth, Math.max(460, resize.width + event.clientX - resize.startX));
+    const width = Math.min(maxWidth, Math.max(440, resize.width + event.clientX - resize.startX));
     const height = Math.min(maxHeight, Math.max(420, resize.height + event.clientY - resize.startY));
     dialog.style.width = `${width}px`;
     dialog.style.height = `${height}px`;
@@ -138,8 +172,8 @@
   resizeHandle.addEventListener("pointerup", endResize);
   resizeHandle.addEventListener("pointercancel", endResize);
 
-  // Evita que interações sobre o painel escapem para o mapa; fora do painel o mapa
-  // continua totalmente navegável porque o dialog não é modal.
+  // Eventos dentro do painel não devem mover o mapa; fora do painel o mapa permanece
+  // totalmente navegável porque o dialog não entra no top layer modal.
   ["mousedown", "pointerdown", "wheel", "dblclick", "touchstart"].forEach(type => {
     dialog.addEventListener(type, event => event.stopPropagation());
   });
@@ -154,9 +188,9 @@
       position: fixed !important;
       inset: auto !important;
       margin: 0 !important;
-      width: 620px;
-      height: 600px;
-      min-width: 460px;
+      width: 590px;
+      height: 590px;
+      min-width: 440px;
       min-height: 420px;
       max-width: calc(100vw - 24px);
       max-height: calc(100vh - 24px);

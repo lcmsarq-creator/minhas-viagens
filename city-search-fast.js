@@ -133,7 +133,7 @@
       ranked.push({ city, score });
     }
     ranked.sort((a,b) => a.score - b.score || a.city.name.localeCompare(b.city.name, "pt-BR"));
-    return ranked.slice(0, limit).map(({city}) => ({
+    return ranked.slice(0, limit).map(({city, score}) => ({
       id: city.id,
       name: city.name,
       latitude: city.latitude,
@@ -142,7 +142,8 @@
       country: city.country,
       country_code: city.country_code,
       feature_code: "PPLA",
-      _mvStateCode: city.stateCode
+      _mvStateCode: city.stateCode,
+      _mvScore: score
     }));
   }
 
@@ -185,11 +186,13 @@
   async function search(query, signal) {
     if (!brazilReady) await brazilPromise;
     const local = brazilResults(query, 8);
+    const q = normalize(query);
 
-    // Se já temos uma lista brasileira forte e cheia, devolvemos sem rede.
-    // Isso deixa buscas como "rio preto", "guaratingueta" e "venceslau" praticamente instantâneas.
-    const strongest = local.filter(item => remoteScore(item, query) <= 7);
-    if (strongest.length >= 8) return local;
+    // Município brasileiro exato: não esperamos nenhuma chamada externa.
+    // Também evitamos rede quando já há muitas correspondências brasileiras fortes.
+    if (local.some(item => normalize(item.name) === q) || local.filter(item => item._mvScore <= 7).length >= 6) {
+      return local;
+    }
 
     let remote = [];
     try { remote = await remoteResults(query, signal); }

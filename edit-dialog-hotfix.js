@@ -6,8 +6,7 @@
 
   const header = dialog.querySelector(".dialog-head");
   const closeButton = document.getElementById("closeEditPlacesBtn");
-  const APP_VERSION = "0.10.5";
-  const nativeShow = window.HTMLDialogElement?.prototype?.show;
+  const APP_VERSION = "0.10.6";
 
   function defaultRect() {
     const width = Math.min(590, Math.max(440, window.innerWidth - 56));
@@ -37,12 +36,13 @@
 
   function clampToViewport() {
     const rect = dialog.getBoundingClientRect();
+    const fallback = defaultRect();
     const maxWidth = Math.max(360, window.innerWidth - 24);
     const maxHeight = Math.max(320, window.innerHeight - 24);
-    const width = Math.min(rect.width || defaultRect().width, maxWidth);
-    const height = Math.min(rect.height || defaultRect().height, maxHeight);
-    const left = Math.min(Math.max(12, rect.left || 12), Math.max(12, window.innerWidth - width - 12));
-    const top = Math.min(Math.max(12, rect.top || 12), Math.max(12, window.innerHeight - height - 12));
+    const width = Math.min(rect.width || fallback.width, maxWidth);
+    const height = Math.min(rect.height || fallback.height, maxHeight);
+    const left = Math.min(Math.max(12, Number.isFinite(rect.left) ? rect.left : fallback.left), Math.max(12, window.innerWidth - width - 12));
+    const top = Math.min(Math.max(12, Number.isFinite(rect.top) ? rect.top : fallback.top), Math.max(12, window.innerHeight - height - 12));
     Object.assign(dialog.style, {
       width: `${width}px`,
       height: `${height}px`,
@@ -52,42 +52,75 @@
   }
 
   function showModeless() {
-    if (!dialog.open) {
-      if (typeof nativeShow === "function") nativeShow.call(dialog);
-      else dialog.setAttribute("open", "");
-    }
+    // Não usamos HTMLDialogElement.show()/showModal(). O atributo open é suficiente
+    // para um dialog modeless e evita diferenças de implementação/top-layer entre
+    // navegadores. Assim o mapa continua recebendo pan e zoom fora do painel.
+    dialog.setAttribute("open", "");
+    dialog.classList.add("mv-edit-panel-open");
     ensurePosition();
     requestAnimationFrame(() => {
       ensurePosition();
-      dialog.focus?.({ preventScroll: true });
+      try { dialog.querySelector("input, button")?.focus({ preventScroll: true }); } catch {}
     });
   }
 
-  // O código principal chama showModal(). Para permitir pan/zoom no mapa, este
-  // painel específico é aberto como dialog modeless. defineProperty evita diferenças
-  // entre navegadores ao sobrescrever o método nativo no elemento.
+  function hideModeless() {
+    dialog.removeAttribute("open");
+    dialog.classList.remove("mv-edit-panel-open");
+    document.body.classList.remove("mv-dragging-edit-dialog");
+  }
+
+  // Compatibilidade com o código principal, que chama showModal() e close().
+  // Mantemos tudo como painel modeless para que o mapa permaneça interativo.
   try {
     Object.defineProperty(dialog, "showModal", {
       configurable: true,
       writable: true,
       value: showModeless
     });
-  } catch (error) {
-    console.warn("Não foi possível substituir showModal diretamente", error);
+  } catch {
     try { dialog.showModal = showModeless; } catch {}
   }
 
-  // Segurança adicional: se o fluxo principal preencher o editor mas a abertura
-  // falhar por alguma particularidade do navegador, abrimos no quadro seguinte.
+  const nativeClose = window.HTMLDialogElement?.prototype?.close;
+  try {
+    Object.defineProperty(dialog, "close", {
+      configurable: true,
+      writable: true,
+      value: function closeModeless() {
+        hideModeless();
+        // Não chamamos o close nativo porque o painel não foi colocado no top layer.
+        // O atributo open é a fonte de verdade para o estado deste editor.
+      }
+    });
+  } catch {
+    // Mesmo se não for possível substituir close(), o atributo open ainda é removido
+    // pelos botões abaixo e o close nativo continua como fallback.
+  }
+
+  // Abre de forma independente do fluxo principal. O listener é capturado antes do
+  // handler criado em script.js e a abertura não depende de state nem do método nativo.
   document.addEventListener("click", event => {
     const button = event.target.closest?.(".edit-places-btn");
     if (!button || button.disabled) return;
-    requestAnimationFrame(() => {
-      if (!dialog.open && typeof state !== "undefined" && state.editingPlacesTripId) {
-        showModeless();
-      }
-    });
+    showModeless();
+    // O fluxo principal, executado em seguida, preenche os campos da viagem.
+    // Reforçamos a visibilidade depois dele caso algum código tente reabrir o dialog.
+    requestAnimationFrame(showModeless);
   }, true);
+
+  // Escape fecha somente o painel e não bloqueia o mapa.
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && dialog.hasAttribute("open")) {
+      event.preventDefault();
+      try {
+        if (typeof closeEditPlacesDialog === "function") closeEditPlacesDialog();
+        else hideModeless();
+      } catch {
+        hideModeless();
+      }
+    }
+  });
 
   let drag = null;
   header?.addEventListener("pointerdown", event => {
@@ -129,8 +162,7 @@
   header?.addEventListener("pointerup", endDrag);
   header?.addEventListener("pointercancel", endDrag);
 
-  const oldHandle = dialog.querySelector(".mv-dialog-resize-handle");
-  oldHandle?.remove();
+  dialog.querySelector(".mv-dialog-resize-handle")?.remove();
   const resizeHandle = document.createElement("div");
   resizeHandle.className = "mv-dialog-resize-handle";
   resizeHandle.setAttribute("role", "separator");
@@ -172,19 +204,21 @@
   resizeHandle.addEventListener("pointerup", endResize);
   resizeHandle.addEventListener("pointercancel", endResize);
 
-  // Eventos dentro do painel não devem mover o mapa; fora do painel o mapa permanece
-  // totalmente navegável porque o dialog não entra no top layer modal.
+  // Dentro do painel os eventos não devem vazar para o mapa. Fora dele, o Leaflet
+  // segue totalmente navegável porque não existe backdrop/top-layer modal.
   ["mousedown", "pointerdown", "wheel", "dblclick", "touchstart"].forEach(type => {
     dialog.addEventListener(type, event => event.stopPropagation());
   });
 
   window.addEventListener("resize", () => {
-    if (dialog.open) clampToViewport();
+    if (dialog.hasAttribute("open")) clampToViewport();
   });
 
   const style = document.createElement("style");
   style.textContent = `
+    #editPlacesDialog:not([open]) { display: none !important; }
     #editPlacesDialog[open] {
+      display: block !important;
       position: fixed !important;
       inset: auto !important;
       margin: 0 !important;
@@ -195,11 +229,14 @@
       max-width: calc(100vw - 24px);
       max-height: calc(100vh - 24px);
       overflow: hidden !important;
-      z-index: 1250;
+      z-index: 2147483000 !important;
       border: 1px solid rgba(31, 40, 35, .18);
+      border-radius: 16px;
+      background: #fff;
+      color: #1f2823;
       box-shadow: 0 18px 50px rgba(16, 24, 20, .24);
     }
-    #editPlacesDialog::backdrop { display: none !important; background: transparent !important; }
+    #editPlacesDialog::backdrop { display: none !important; background: transparent !important; pointer-events: none !important; }
     #editPlacesDialog > #editPlacesForm {
       height: 100% !important;
       max-height: none !important;
@@ -272,9 +309,8 @@
   `;
   document.head.appendChild(style);
 
-  closeButton?.addEventListener("click", () => {
-    document.body.classList.remove("mv-dragging-edit-dialog");
-  });
+  closeButton?.addEventListener("click", hideModeless);
+  document.getElementById("cancelEditPlacesBtn")?.addEventListener("click", hideModeless);
 
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);

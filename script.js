@@ -118,6 +118,9 @@ const els = {
   cityAchievementList: document.getElementById("cityAchievementList"),
   roadAchievementList: document.getElementById("roadAchievementList"),
   iconicAchievementList: document.getElementById("iconicAchievementList"),
+  iconicOtherList: document.getElementById("iconicOtherList"),
+  iconicMineTabBtn: document.getElementById("iconicMineTabBtn"),
+  iconicOtherTabBtn: document.getElementById("iconicOtherTabBtn"),
   tripDialog: document.getElementById("tripDialog"),
   tripForm: document.getElementById("tripForm"),
   tripName: document.getElementById("tripName"),
@@ -1191,24 +1194,28 @@ function fitHighwayBounds() {
 }
 
 async function drawFullHighway(entry, item, descriptor) {
+  const palette = window.MinhasViagensIconicRoutes?.roadPalette?.(item.label, item.medal) ||
+    { base: "#c77b00", progress: "#168447", banner: "#d09a2a" };
   const group = L.featureGroup();
   for (const line of entry.lines) {
     L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: 9, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
-    L.polyline(line, { pane: "fullHighwayMain", color: "#c77b00", weight: 5, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
+    L.polyline(line, { pane: "fullHighwayMain", color: palette.base, weight: 5, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
   }
   state.highwayLayer = group.addTo(map);
   state.highwayBounds = group.getBounds();
   setTripsSecondary(true);
   fitHighwayBounds();
   els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
+  els.highwayBanner.style.borderColor = palette.banner;
   els.highwayBannerStatus.textContent = entry.partial ? "Geometria parcial encontrada" : "Rodovia carregada";
   const progress = await highwayProgress(descriptor, entry);
   if (state.highwayKey !== highwayCacheKey(descriptor)) return;
-  state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: "#168447", weight: 7, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
+  state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: palette.progress, weight: 7, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
   els.highwayProgress.classList.remove("hidden");
   els.highwayProgressPercent.textContent = `${Math.round(progress.percent)}% concluída`;
   els.highwayProgressDistance.textContent = `${progress.traveledKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km de ${progress.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km percorridos`;
   els.highwayProgressBar.style.width = `${progress.percent}%`;
+  els.highwayProgressBar.style.background = palette.progress;
   els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
 }
 
@@ -1384,7 +1391,15 @@ function renderAchievements() {
           <strong>${escapeHtml(visibleLabel)}</strong>
           <small>${type === "road" ? "Rodovia conquistada" : `${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}`}</small>
         </div>`;
-      card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
+      card.addEventListener("click", () => {
+        if (type === "city") {
+          focusCityAchievement(item);
+          return;
+        }
+        const medal = card.dataset.roadMedal ||
+          (card.classList.contains("road-medal-gold") ? "gold" : card.classList.contains("road-medal-silver") ? "silver" : "");
+        showFullHighway({ ...item, medal });
+      });
       container.appendChild(card);
       if (type === "city") window.MinhasViagensCityFlags?.decorate(card.querySelector(".achievement-icon"), item);
     });

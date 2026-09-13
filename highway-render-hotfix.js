@@ -63,6 +63,8 @@
     drawFullHighway = async function drawFullHighwayFast(entry, item, descriptor) {
       const lines = (entry?.lines || []).filter(line => Array.isArray(line) && line.length > 1);
       if (!lines.length) return baseDrawFullHighway(entry, item, descriptor);
+      const palette = window.MinhasViagensIconicRoutes?.roadPalette?.(item.label, item.medal) ||
+        { base: "#c77b00", progress: "#168447", banner: "#d09a2a" };
 
       const outline = L.polyline(lines, {
         renderer: outlineRenderer,
@@ -76,7 +78,7 @@
       const main = L.polyline(lines, {
         renderer: mainRenderer,
         pane: "fullHighwayMain",
-        color: "#c77b00",
+        color: palette.base,
         weight: 5,
         opacity: .9,
         interactive: false,
@@ -88,6 +90,7 @@
       setTripsSecondary(true);
       fitHighwayBounds();
       els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
+      els.highwayBanner.style.borderColor = palette.banner;
       els.highwayBannerStatus.textContent = entry.partial
         ? "Geometria parcial encontrada · calculando progresso…"
         : "Rodovia carregada · calculando progresso…";
@@ -106,7 +109,7 @@
         ? L.polyline(traveled, {
             renderer: progressRenderer,
             pane: "fullHighwayMain",
-            color: "#168447",
+            color: palette.progress,
             weight: 7,
             opacity: 1,
             interactive: false,
@@ -119,6 +122,7 @@
       els.highwayProgressPercent.textContent = `${Math.round(progress.percent)}% concluída`;
       els.highwayProgressDistance.textContent = `${progress.traveledKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km de ${progress.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km percorridos`;
       els.highwayProgressBar.style.width = `${progress.percent}%`;
+      els.highwayProgressBar.style.background = palette.progress;
       els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
     };
   }

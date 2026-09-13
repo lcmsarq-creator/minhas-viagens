@@ -12,6 +12,13 @@
     if (isEditingText(event.target) || document.querySelector("dialog[open]")) return;
     if (state.drawing || state.editingTripId || !els.routeChooser.classList.contains("hidden")) return;
 
+    if (state.iconicPreviewLayer?.getLayers?.().length) {
+      event.preventDefault();
+      event.stopPropagation();
+      window.MinhasViagensIconicRoutes?.clearPreview?.();
+      return;
+    }
+
     if (state.tripRoadLayer) {
       event.preventDefault();
       event.stopPropagation();

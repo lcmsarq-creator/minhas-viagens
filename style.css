@@ -226,9 +226,19 @@ textarea { resize: vertical; }
 .iconic-route-card.completed { border-color: #d6a21f; background: #fff9e8; }
 .iconic-route-card.completed .iconic-route-icon { background: #d6a21f; color: #fff; box-shadow: 0 0 0 2px #fff4c9, 0 2px 7px rgba(128,90,0,.25); }
 .iconic-route-copy { flex: 1; }
+.iconic-list-tabs { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 5px; margin-bottom: 9px; padding: 4px; border-radius: 10px; background: #eef1ef; }
+.iconic-list-tab { min-height: 34px; padding: 5px 7px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: .7rem; font-weight: 800; line-height: 1.15; }
+.iconic-list-tab.active { background: white; color: var(--text); box-shadow: 0 1px 4px rgba(20,30,25,.08); }
+.iconic-route-card.active { border-color: #59675f; box-shadow: 0 0 0 2px rgba(55,116,84,.14); }
+.iconic-route-card.silver-completed { border-color: #9aa1a6; background: #f4f6f7; }
+.iconic-route-card.silver-completed .iconic-route-icon { background: #aeb5ba; color: white; box-shadow: 0 0 0 2px #eef1f3, 0 2px 7px rgba(63,69,73,.2); }
+.iconic-source-label { display: inline-block; margin-top: 4px; padding: 2px 5px; border-radius: 999px; background: #eef1ef; color: #68716b; font-size: .62rem; font-weight: 800; }
+.iconic-route-note { display: block; margin-top: 6px; color: var(--muted); font-size: .65rem; line-height: 1.35; }
 .iconic-progress-label { display: block; margin-top: 6px; color: #6b6044; font-size: .7rem; font-weight: 750; }
 .iconic-progress-track { display: block; height: 7px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #daddda; }
 .iconic-progress-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: #d6a21f; transition: width .25s ease; }
+.iconic-progress-label.silver-label { color: #666e73; }
+.iconic-progress-track.silver-track i { background: #9aa1a6; }
 
 @media (prefers-reduced-motion: reduce) {
   .achievement-toast, .achievement-burst, .achievement-toast::before, .achievement-toast::after { animation: none; }

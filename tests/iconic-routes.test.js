@@ -4,6 +4,38 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const core = require("../iconic-routes-core.js");
+const catalog = require("../iconic-routes-catalog.js");
+
+test("o catálogo expõe as 27 rotas pedidas em 30 recortes", () => {
+  assert.equal(catalog.familyCount, 27);
+  assert.equal(catalog.routeCount, 30);
+  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 30);
+  assert.equal(catalog.routes.filter(route => route.family === "Estrada Real").length, 4);
+});
+
+test("cada recorte tem uma geometria estática válida", () => {
+  for (const route of catalog.routes) {
+    const file = path.join(__dirname, "..", route.geometryPath);
+    assert.ok(fs.existsSync(file), `${route.id} deve possuir geometria`);
+    const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(payload.id, route.id);
+    assert.equal(payload.precision, 5);
+    assert.ok(payload.totalKm > 1, `${route.id} deve possuir extensão coerente`);
+    assert.ok(payload.encodedLines.length > 0, `${route.id} deve possuir linhas`);
+    assert.ok(Array.isArray(payload.bounds) && payload.bounds.length === 2);
+  }
+});
+
+test("os quatro caminhos da Estrada Real preservam base oficial e alternativa rodoviária", () => {
+  for (const route of catalog.routes.filter(item => item.family === "Estrada Real")) {
+    const payload = JSON.parse(fs.readFileSync(path.join(__dirname, "..", route.geometryPath), "utf8"));
+    assert.equal(route.officialAndAlternative, true);
+    assert.equal(payload.sourceType, "official-gpx");
+    assert.ok(payload.encodedLines.length > 0);
+    assert.ok(payload.alternateEncodedLines.length > 0);
+    assert.ok(payload.alternateTotalKm > 1);
+  }
+});
 
 test("o teste da Graciosa aponta para a geometria integral da PR-410", () => {
   const file = path.join(__dirname, "..", "road-catalog", "v1", "br", "pr", "410.json");
@@ -41,4 +73,10 @@ test("estadual e secundária recebem prata em 90%", () => {
 test("conquista icônica dá ouro ao emblema e prevalece sobre a prata", () => {
   assert.equal(core.roadMedal("PR-410", 12, true), "gold");
   assert.equal(core.roadMedal("PR-410", 100, true), "gold");
+});
+
+test("a entrada BR-319 não é rotulada incorretamente como Transamazônica", () => {
+  const route = catalog.routes.find(item => item.id === "br-319-manaus-porto-velho");
+  assert.equal(route.name, "BR-319 — Manaus–Porto Velho");
+  assert.match(route.note, /BR-230/);
 });

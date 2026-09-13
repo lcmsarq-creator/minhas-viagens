@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.12.5";
+  const APP_VERSION = "0.13.0";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -117,7 +117,7 @@
         "edit-dialog-hotfix.js", "route-click-hotfix.js", "geometry-compact-hotfix.js",
         "highway-render-hotfix.js", "road-progress-core.js", "road-network-hotfix.js",
         "road-catalog-hotfix.js", "sync.js", "road-cloud-hotfix.js", "road-sweep-hotfix.js",
-        "escape-navigation.js", "iconic-routes-core.js", "iconic-routes.js"
+        "escape-navigation.js", "iconic-routes-core.js", "iconic-routes-catalog.js", "iconic-routes.js"
       ];
       for (const src of sources) {
         await loadScript(`${src}?v=${APP_VERSION}`);

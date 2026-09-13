@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.12.41";
+  const APP_VERSION = "0.12.5";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -58,12 +58,25 @@
       const script = document.createElement("script");
       script.src = src;
       script.async = false;
+      let runtimeError = null;
+      const expectedPath = new URL(script.src, location.href).pathname;
+      const captureRuntimeError = event => {
+        if (!event.filename || new URL(event.filename, location.href).pathname !== expectedPath) return;
+        runtimeError = event.error || new Error(event.message || `Erro ao executar ${src}`);
+      };
+      window.addEventListener("error", captureRuntimeError);
       script.onload = () => {
+        window.removeEventListener("error", captureRuntimeError);
+        if (runtimeError) {
+          reject(runtimeError);
+          return;
+        }
         markStartup("script-loaded", src);
         displayCurrentVersion();
         resolve();
       };
       script.onerror = () => {
+        window.removeEventListener("error", captureRuntimeError);
         script.remove();
         if (attempt < 1) {
           const separator = src.includes("?") ? "&" : "?";
@@ -106,7 +119,12 @@
         "road-catalog-hotfix.js", "sync.js", "road-cloud-hotfix.js", "road-sweep-hotfix.js",
         "escape-navigation.js", "iconic-routes-core.js", "iconic-routes.js"
       ];
-      for (const src of sources) await loadScript(`${src}?v=${APP_VERSION}`);
+      for (const src of sources) {
+        await loadScript(`${src}?v=${APP_VERSION}`);
+        if (src === "script.js" && (!window.MinhasViagensApp || !document.querySelector(".leaflet-map-pane"))) {
+          throw new Error("O núcleo do mapa não concluiu a inicialização");
+        }
+      }
       markStartup("ready");
       displayCurrentVersion();
     } catch (error) {
@@ -114,18 +132,6 @@
       console.error("Falha ao carregar o aplicativo", error);
       showLogin("Não foi possível carregar o aplicativo. Atualize a página e tente novamente.", "error");
     }
-  }
-
-  function smokeClient() {
-    const result = Promise.resolve({ data: [], error: null });
-    let chain;
-    chain = new Proxy({}, {
-      get(_target, property) {
-        if (property === "then") return result.then.bind(result);
-        return () => chain;
-      }
-    });
-    return { from: () => chain, auth: { signOut: async () => ({ error: null }) } };
   }
 
   function showApp(session) {
@@ -148,12 +154,6 @@
   }
 
   async function initialize() {
-    if (new URLSearchParams(location.search).get("startup-smoke") === "0124") {
-      client = smokeClient();
-      currentSession = { user: { id: "startup-smoke", email: "teste@local" } };
-      showApp(currentSession);
-      return;
-    }
     const callbackError = authErrorFromUrl();
     if (!configured()) {
       emailInput.disabled = true;

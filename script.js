@@ -13,6 +13,7 @@ const AIRPORTS_CSV_URLS = [
 ];
 const DEFAULT_ROUTE_COLOR = "#2f6d50";
 const ROUTE_INTERACTION = window.MinhasViagensRouteInteraction;
+const ROUTE_STYLE = window.MinhasViagensRouteStyleLab;
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -73,6 +74,8 @@ const state = {
   highwaySelection: 0,
   highwayBounds: null,
   highwayProgressLayer: null,
+  highwayStyleLabel: "",
+  highwayStyleMedal: "",
   tripRoadLayer: null,
   tripRoadKey: "",
   highwayQueue: [],
@@ -125,8 +128,6 @@ const els = {
   tripName: document.getElementById("tripName"),
   tripDate: document.getElementById("tripDate"),
   tripMode: document.getElementById("tripMode"),
-  tripColor: document.getElementById("tripColor"),
-  newTripColorWheel: document.getElementById("newTripColorWheel"),
   startAddress: document.getElementById("startAddress"),
   endAddress: document.getElementById("endAddress"),
   startSuggestions: document.getElementById("startSuggestions"),
@@ -218,186 +219,9 @@ function shortText(text, max = 82) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function currentRouteStyle(kind = "common") {
+  return ROUTE_STYLE?.style?.(kind) || { color: DEFAULT_ROUTE_COLOR, width: 5 };
 }
-
-function hexToRgb(hex) {
-  const clean = String(hex || "").replace("#", "").trim();
-  if (!/^[0-9a-f]{6}$/i.test(clean)) return { r: 47, g: 109, b: 80 };
-  return {
-    r: parseInt(clean.slice(0, 2), 16),
-    g: parseInt(clean.slice(2, 4), 16),
-    b: parseInt(clean.slice(4, 6), 16)
-  };
-}
-
-function rgbToHex({ r, g, b }) {
-  const part = value => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0");
-  return `#${part(r)}${part(g)}${part(b)}`;
-}
-
-function rgbToHsv({ r, g, b }) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const d = max - min;
-  let h = 0;
-  if (d) {
-    if (max === r) h = ((g - b) / d) % 6;
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60;
-    if (h < 0) h += 360;
-  }
-  return { h, s: max ? d / max : 0, v: max };
-}
-
-function hsvToRgb(h, s, v) {
-  h = ((h % 360) + 360) % 360;
-  s = clamp(s, 0, 1);
-  v = clamp(v, 0, 1);
-  const c = v * s;
-  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = v - c;
-  let rp = 0, gp = 0, bp = 0;
-  if (h < 60) [rp, gp, bp] = [c, x, 0];
-  else if (h < 120) [rp, gp, bp] = [x, c, 0];
-  else if (h < 180) [rp, gp, bp] = [0, c, x];
-  else if (h < 240) [rp, gp, bp] = [0, x, c];
-  else if (h < 300) [rp, gp, bp] = [x, 0, c];
-  else [rp, gp, bp] = [c, 0, x];
-  return { r: (rp + m) * 255, g: (gp + m) * 255, b: (bp + m) * 255 };
-}
-
-function drawColorWheel(canvas, selectedHex) {
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d", { willReadFrequently: false });
-  const w = canvas.width, h = canvas.height;
-  const cx = w / 2, cy = h / 2;
-  const radius = Math.min(w, h) / 2 - 2;
-  const image = ctx.createImageData(w, h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const dx = x + .5 - cx, dy = y + .5 - cy;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const index = (y * w + x) * 4;
-      if (distance > radius) {
-        image.data[index + 3] = 0;
-        continue;
-      }
-      const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-      const saturation = clamp(distance / radius, 0, 1);
-      const rgb = hsvToRgb(hue, saturation, .96);
-      image.data[index] = Math.round(rgb.r);
-      image.data[index + 1] = Math.round(rgb.g);
-      image.data[index + 2] = Math.round(rgb.b);
-      image.data[index + 3] = 255;
-    }
-  }
-  ctx.clearRect(0, 0, w, h);
-  ctx.putImageData(image, 0, 0);
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius + .5, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(20,30,25,.28)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  const hsv = rgbToHsv(hexToRgb(selectedHex));
-  const angle = hsv.h * Math.PI / 180;
-  const markerRadius = radius * clamp(hsv.s, 0, 1);
-  const mx = cx + Math.cos(angle) * markerRadius;
-  const my = cy + Math.sin(angle) * markerRadius;
-  ctx.beginPath();
-  ctx.arc(mx, my, Math.max(3.5, radius * .09), 0, Math.PI * 2);
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(mx, my, Math.max(4.8, radius * .12), 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(0,0,0,.7)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
-}
-
-function setupColorWheel(canvas, initialColor, onInput, onCommit) {
-  let color = initialColor || DEFAULT_ROUTE_COLOR;
-  let dragging = false;
-  const colorFromPointer = event => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / Math.max(1, rect.width);
-    const scaleY = canvas.height / Math.max(1, rect.height);
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    let dx = (event.clientX - rect.left) * scaleX - cx;
-    let dy = (event.clientY - rect.top) * scaleY - cy;
-    const radius = Math.min(canvas.width, canvas.height) / 2 - 2;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance > radius && distance > 0) {
-      const factor = radius / distance;
-      dx *= factor;
-      dy *= factor;
-    }
-    const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-    const saturation = clamp(Math.sqrt(dx * dx + dy * dy) / radius, 0, 1);
-    color = rgbToHex(hsvToRgb(hue, saturation, .96));
-    drawColorWheel(canvas, color);
-    canvas.setAttribute("aria-valuetext", color.toUpperCase());
-    onInput?.(color);
-  };
-
-  const start = event => {
-    event.preventDefault();
-    dragging = true;
-    canvas.classList.add("dragging");
-    try { canvas.setPointerCapture(event.pointerId); } catch {}
-    colorFromPointer(event);
-  };
-  const move = event => {
-    if (!dragging) return;
-    event.preventDefault();
-    colorFromPointer(event);
-  };
-  const finish = event => {
-    if (!dragging) return;
-    if (event?.clientX != null) colorFromPointer(event);
-    dragging = false;
-    canvas.classList.remove("dragging");
-    try { canvas.releasePointerCapture(event.pointerId); } catch {}
-    onCommit?.(color);
-  };
-  canvas.addEventListener("pointerdown", start);
-  canvas.addEventListener("pointermove", move);
-  canvas.addEventListener("pointerup", finish);
-  canvas.addEventListener("pointercancel", finish);
-  canvas.addEventListener("keydown", event => {
-    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-    event.preventDefault();
-    const hsv = rgbToHsv(hexToRgb(color));
-    if (event.key === "ArrowLeft") hsv.h -= 5;
-    if (event.key === "ArrowRight") hsv.h += 5;
-    if (event.key === "ArrowUp") hsv.s = clamp(hsv.s + .05, 0, 1);
-    if (event.key === "ArrowDown") hsv.s = clamp(hsv.s - .05, 0, 1);
-    color = rgbToHex(hsvToRgb(hsv.h, hsv.s, .96));
-    drawColorWheel(canvas, color);
-    canvas.setAttribute("aria-valuetext", color.toUpperCase());
-    onInput?.(color);
-    onCommit?.(color);
-  });
-  drawColorWheel(canvas, color);
-  canvas.setAttribute("aria-valuetext", color.toUpperCase());
-  return {
-    setColor(nextColor) {
-      color = nextColor || DEFAULT_ROUTE_COLOR;
-      drawColorWheel(canvas, color);
-      canvas.setAttribute("aria-valuetext", color.toUpperCase());
-    },
-    getColor() { return color; }
-  };
-}
-
-let newTripColorWheelController = null;
 
 function formatDate(dateStr) {
   if (!dateStr) return "Sem data";
@@ -530,7 +354,6 @@ function ensureTripSchema(trip) {
   if (!Array.isArray(trip.stopPlaces)) trip.stopPlaces = [];
   if (!Array.isArray(trip.roadLabels)) trip.roadLabels = [];
   if (!trip.roadSegments || typeof trip.roadSegments !== "object") trip.roadSegments = {};
-  if (!trip.color) trip.color = DEFAULT_ROUTE_COLOR;
   if (!Array.isArray(trip.flightAirports)) trip.flightAirports = [];
   if (!trip.createdAt) trip.createdAt = new Date().toISOString();
   if (!trip.conquests || typeof trip.conquests !== "object") trip.conquests = {};
@@ -1188,17 +1011,43 @@ function setTripsSecondary(secondary) {
   state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .22 : .9 }));
 }
 
+function refreshRouteStyles() {
+  const commonStyle = currentRouteStyle("common");
+  const hasFocusedTrip = Boolean(state.activeTripDetailId);
+  state.tripLineLayers.forEach((line, tripId) => {
+    const isFocused = !hasFocusedTrip || state.activeTripDetailId === tripId;
+    line.setStyle({
+      color: commonStyle.color,
+      weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width
+    });
+  });
+  els.tripList?.querySelectorAll(".trip-toggle").forEach(toggle => { toggle.style.accentColor = commonStyle.color; });
+  state.previewLayers.forEach((line, index) => line?.setStyle?.({
+    color: index === state.selectedRouteIndex ? commonStyle.color : "#7a827d",
+    weight: index === state.selectedRouteIndex ? commonStyle.width + 2 : Math.max(2, commonStyle.width - 1)
+  }));
+  state.draftLine?.setStyle?.({ color: commonStyle.color, weight: commonStyle.width });
+  state.editVisibleLine?.setStyle?.({ color: commonStyle.color, weight: commonStyle.width + 1 });
+  state.editHitLine?.setStyle?.({ weight: Math.max(28, commonStyle.width + 18) });
+  document.querySelectorAll(".route-adjust-marker").forEach(marker => marker.style.setProperty("--route-color", commonStyle.color));
+  state.tripRoadLayer?.eachLayer?.(layer => layer.setStyle?.({ color: commonStyle.color, weight: commonStyle.width }));
+}
+
 function fitHighwayBounds() {
   if (state.highwayBounds?.isValid()) map.fitBounds(state.highwayBounds, { padding: [28, 28], maxZoom: 10 });
 }
 
 async function drawFullHighway(entry, item, descriptor) {
+  const commonStyle = currentRouteStyle("common");
   const palette = window.MinhasViagensIconicRoutes?.roadPalette?.(item.label, item.medal) ||
-    { base: "#c77b00", progress: "#168447", banner: "#d09a2a" };
+    { medal: "", base: commonStyle.color, progress: commonStyle.color, banner: commonStyle.color, width: commonStyle.width };
+  const routeWidth = Number(palette.width) || commonStyle.width;
+  state.highwayStyleLabel = item.label || "";
+  state.highwayStyleMedal = palette.medal || "";
   const group = L.featureGroup();
   for (const line of entry.lines) {
-    L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: 9, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
-    L.polyline(line, { pane: "fullHighwayMain", color: palette.base, weight: 5, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
+    L.polyline(line, { pane: "fullHighwayOutline", color: "#fff", weight: routeWidth + 2, opacity: .9, interactive: false, smoothFactor: 1.5 }).addTo(group);
+    L.polyline(line, { pane: "fullHighwayMain", color: palette.base, weight: Math.max(1, routeWidth - 2), opacity: .58, interactive: false, smoothFactor: 1.5 }).addTo(group);
   }
   state.highwayLayer = group.addTo(map);
   state.highwayBounds = group.getBounds();
@@ -1209,7 +1058,7 @@ async function drawFullHighway(entry, item, descriptor) {
   els.highwayBannerStatus.textContent = entry.partial ? "Geometria parcial encontrada" : "Rodovia carregada";
   const progress = await highwayProgress(descriptor, entry);
   if (state.highwayKey !== highwayCacheKey(descriptor)) return;
-  state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: palette.progress, weight: 7, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
+  state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: palette.progress, weight: routeWidth, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
   els.highwayProgress.classList.remove("hidden");
   els.highwayProgressPercent.textContent = `${Math.round(progress.percent)}% concluída`;
   els.highwayProgressDistance.textContent = `${progress.traveledKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km de ${progress.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km percorridos`;
@@ -1224,6 +1073,7 @@ function closeFullHighway(restoreFocus = false) {
   if (state.highwayLayer) map.removeLayer(state.highwayLayer);
   if (state.highwayProgressLayer) map.removeLayer(state.highwayProgressLayer);
   state.highwayLayer = null; state.highwayProgressLayer = null;
+  state.highwayStyleLabel = ""; state.highwayStyleMedal = "";
   setTripsSecondary(false);
   els.highwayBanner.classList.add("hidden"); els.highwayBanner.classList.remove("is-error"); els.highwayProgress.classList.add("hidden");
   if (restoreFocus) {
@@ -1284,7 +1134,8 @@ async function showTripRoadSegment(trip, label, button) {
     alert("O trecho desta rodovia ainda não pôde ser reconstruído para esta viagem antiga.");
     return;
   }
-  state.tripRoadLayer = L.featureGroup(segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: "#ef8d00", weight: 8, opacity: 1, interactive: false }))).addTo(map);
+  const commonStyle = currentRouteStyle("common");
+  state.tripRoadLayer = L.featureGroup(segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: commonStyle.color, weight: commonStyle.width, opacity: 1, interactive: false }))).addTo(map);
   state.tripRoadKey = key;
   setTripsSecondary(true);
   button?.classList.add("active");
@@ -1551,7 +1402,6 @@ function renderTripDetail() {
   const startAddress = trip.startPlace?.label || trip.startAddress || "Partida não informada";
   const endAddress = trip.endPlace?.label || trip.endAddress || "Chegada não informada";
   const distance = Number.isFinite(trip.distance) ? formatDistance(trip.distance) : `${latlngs.length} pontos`;
-  const routeColor = trip.color || DEFAULT_ROUTE_COLOR;
   const stopList = (trip.stopPlaces || []).map(place => place.label || place.city).filter(Boolean);
   const roads = trip.conquests?.roads || [];
   els.tripDetailContent.innerHTML = `
@@ -1583,9 +1433,6 @@ function renderTripDetail() {
         <button type="button" class="edit-places-btn" ${!["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Editar cidades</button>
         <button type="button" class="edit-route-btn" ${latlngs.length < 2 || !["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Ajustar rota</button>
         <button type="button" class="refresh-roads-btn" ${latlngs.length < 2 || !["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Atualizar rodovias</button>
-        <div class="trip-detail-color-wheel-wrap" title="Arraste pelo globo para mudar a cor da rota">
-          <canvas class="trip-color-wheel color-wheel" width="68" height="68" tabindex="0" role="slider" aria-label="Cor da rota ${escapeHtml(trip.name || "Viagem")}"></canvas>
-        </div>
         <button type="button" class="delete-btn">Excluir</button>
       </div>
     </article>`;
@@ -1625,17 +1472,6 @@ function renderTripDetail() {
   els.tripDetailContent.querySelector(".edit-route-btn")?.addEventListener("click", () => beginRouteEdit(trip));
   els.tripDetailContent.querySelector(".refresh-roads-btn")?.addEventListener("click", () => refreshTripRoads(trip));
   els.tripDetailContent.querySelectorAll(".detail-road-list [data-road]").forEach(button => button.addEventListener("click", () => showTripRoadSegment(trip, button.dataset.road, button)));
-  const detailColorWheel = els.tripDetailContent.querySelector(".trip-color-wheel");
-  if (detailColorWheel) {
-    setupColorWheel(detailColorWheel, routeColor, color => {
-      trip.color = color;
-      const line = state.tripLineLayers.get(trip.id);
-      if (line) line.setStyle({ color });
-    }, color => {
-      trip.color = color;
-      saveTrips();
-    });
-  }
   els.tripDetailContent.querySelector(".delete-btn")?.addEventListener("click", () => deleteTrip(trip));
 }
 
@@ -1662,7 +1498,8 @@ function renderTrips() {
     const latlngs = tripLatLngs(trip);
     const startAddress = trip.startPlace?.label || trip.startAddress || "Partida não informada";
     const endAddress = trip.endPlace?.label || trip.endAddress || "Chegada não informada";
-    const routeColor = trip.color || DEFAULT_ROUTE_COLOR;
+    const commonStyle = currentRouteStyle("common");
+    const routeColor = commonStyle.color;
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === trip.id;
 
     const card = document.createElement("article");
@@ -1688,7 +1525,7 @@ function renderTrips() {
       const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("trip-route-hit", 24, routeIsInteractive));
       const line = L.polyline(latlngs, {
         color: routeColor,
-        weight: hasFocusedTrip ? (isFocused ? 7 : 3) : 5,
+        weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width,
         opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9,
         dashArray: trip.mode === "aviao" ? "12 10" : null,
         interactive: routeIsInteractive
@@ -2447,8 +2284,6 @@ function openTripDialog() {
   window.MinhasViagensIconicRoutes?.clearPreview?.();
   els.tripForm.reset();
   els.tripDate.value = "";
-  els.tripColor.value = DEFAULT_ROUTE_COLOR;
-  newTripColorWheelController?.setColor(DEFAULT_ROUTE_COLOR);
   els.manualFromDialogBtn.classList.remove("hidden");
   els.suggestRoutesBtn.textContent = "Sugerir rotas";
   state.startPlace = null;
@@ -2502,7 +2337,6 @@ function capturePendingTrip() {
     name: els.tripName.value.trim(),
     date: els.tripDate.value,
     mode: els.tripMode.value,
-    color: els.tripColor.value || DEFAULT_ROUTE_COLOR,
     startPlace: { ...state.startPlace },
     stopPlaces: pendingStops(),
     endPlace: { ...state.endPlace },
@@ -2697,6 +2531,7 @@ function renderRouteAlternatives() {
 
   state.routeAlternatives.forEach((route, index) => {
     const selected = index === state.selectedRouteIndex;
+    const commonStyle = currentRouteStyle("common");
     const label = index === 0 ? "Rota recomendada" : `Alternativa ${index + 1}`;
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2713,8 +2548,8 @@ function renderRouteAlternatives() {
     const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("route-option-hit", 24)).addTo(previewGroup);
     const line = L.polyline(latlngs, {
-      color: selected ? (state.pendingTrip?.color || DEFAULT_ROUTE_COLOR) : "#7a827d",
-      weight: selected ? 7 : 4,
+      color: selected ? commonStyle.color : "#7a827d",
+      weight: selected ? commonStyle.width + 2 : Math.max(2, commonStyle.width - 1),
       opacity: selected ? .95 : .55
     }).addTo(previewGroup);
     line._routeHitLine = hitLine;
@@ -2817,8 +2652,9 @@ function beginManualDrawing(trip) {
     fixed: true
   }));
   state.draftMarkers = [];
+  const commonStyle = currentRouteStyle("common");
   state.draftLine = L.polyline(state.draftPoints.map(p => [p.lat, p.lng]), {
-    color: "#111827", weight: 5, dashArray: "10 8", opacity: .8
+    color: commonStyle.color, weight: commonStyle.width, dashArray: "10 8", opacity: .8
   }).addTo(map);
 
   state.draftPoints.forEach((point, index) => {
@@ -3110,8 +2946,9 @@ function beginRouteEdit(trip) {
 function createEditLayers(trip) {
   editGroup.clearLayers();
   const latlngs = tripLatLngs(trip);
-  const color = trip.color || DEFAULT_ROUTE_COLOR;
-  state.editVisibleLine = L.polyline(latlngs, { color, weight: 6, opacity: .95, interactive: false }).addTo(editGroup);
+  const commonStyle = currentRouteStyle("common");
+  const color = commonStyle.color;
+  state.editVisibleLine = L.polyline(latlngs, { color, weight: commonStyle.width + 1, opacity: .95, interactive: false }).addTo(editGroup);
   state.editHitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("edit-route-hit", 28)).addTo(editGroup);
   state.editHitLine.on("mousedown", event => startEditDrag(trip, event));
   const endpoints = getTripEndpoints(trip);
@@ -3494,15 +3331,10 @@ map.getContainer().addEventListener("pointerup", finishEditPointer, true);
 map.getContainer().addEventListener("pointercancel", cancelEditPointer, true);
 window.addEventListener("resize", () => map.invalidateSize());
 
-newTripColorWheelController = setupColorWheel(els.newTripColorWheel, els.tripColor.value || DEFAULT_ROUTE_COLOR, color => {
-  els.tripColor.value = color;
-}, color => {
-  els.tripColor.value = color;
-});
-
 loadTrips();
 saveTrips();
 renderTrips();
+ROUTE_STYLE?.subscribe?.(refreshRouteStyles);
 window.MinhasViagensApp = {
   getTrips: () => state.trips,
   replaceTrips: trips => {
@@ -3512,6 +3344,7 @@ window.MinhasViagensApp = {
   },
   saveLocal: () => saveTrips(),
   render: () => renderTrips(),
+  refreshRouteStyles,
   storageKey: STORAGE_KEY
 };
 queueRoadsForPreload([...getAchievementSnapshot().roads.values()].map(item => item.label));

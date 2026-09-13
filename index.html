@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
-  <link rel="stylesheet" href="style.css?v=0.13.1" />
+  <link rel="stylesheet" href="style.css?v=0.13.2" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -31,7 +31,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.13.1</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.13.2</p>
         </div>
       </div>
 
@@ -197,7 +197,7 @@
         <input id="tripName" required maxlength="80" placeholder="Ex.: Paraná 2026" />
       </label>
 
-      <div class="form-grid form-grid-three">
+      <div class="form-grid">
         <label>
           Data inicial <span class="optional-label">(opcional)</span>
           <input id="tripDate" type="date" />
@@ -211,11 +211,6 @@
             <option value="a-pe">A pé</option>
             <option value="outro">Outro</option>
           </select>
-        </label>
-        <label class="color-wheel-field">
-          Cor da rota
-          <input id="tripColor" type="hidden" value="#2f6d50" />
-          <canvas id="newTripColorWheel" class="color-wheel" width="76" height="76" tabindex="0" role="slider" aria-label="Escolher cor da rota arrastando pelo globo de cores"></canvas>
         </label>
       </div>
 
@@ -343,9 +338,9 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.13.1";</script>
-  <script src="config.js?v=0.13.1"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.13.2";</script>
+  <script src="config.js?v=0.13.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.13.1"></script>
+  <script src="auth.js?v=0.13.2"></script>
 </body>
 </html>

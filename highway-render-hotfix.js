@@ -63,14 +63,18 @@
     drawFullHighway = async function drawFullHighwayFast(entry, item, descriptor) {
       const lines = (entry?.lines || []).filter(line => Array.isArray(line) && line.length > 1);
       if (!lines.length) return baseDrawFullHighway(entry, item, descriptor);
+      const commonStyle = currentRouteStyle("common");
       const palette = window.MinhasViagensIconicRoutes?.roadPalette?.(item.label, item.medal) ||
-        { base: "#c77b00", progress: "#168447", banner: "#d09a2a" };
+        { medal: "", base: commonStyle.color, progress: commonStyle.color, banner: commonStyle.color, width: commonStyle.width };
+      const routeWidth = Number(palette.width) || commonStyle.width;
+      state.highwayStyleLabel = item.label || "";
+      state.highwayStyleMedal = palette.medal || "";
 
       const outline = L.polyline(lines, {
         renderer: outlineRenderer,
         pane: "fullHighwayOutline",
         color: "#fff",
-        weight: 9,
+        weight: routeWidth + 2,
         opacity: .9,
         interactive: false,
         smoothFactor: 1.5
@@ -79,8 +83,8 @@
         renderer: mainRenderer,
         pane: "fullHighwayMain",
         color: palette.base,
-        weight: 5,
-        opacity: .9,
+        weight: Math.max(1, routeWidth - 2),
+        opacity: .58,
         interactive: false,
         smoothFactor: 1.5
       });
@@ -110,7 +114,7 @@
             renderer: progressRenderer,
             pane: "fullHighwayMain",
             color: palette.progress,
-            weight: 7,
+            weight: routeWidth,
             opacity: 1,
             interactive: false,
             smoothFactor: 1.2
@@ -126,6 +130,22 @@
       els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
     };
   }
+
+  window.MinhasViagensRouteStyleLab?.subscribe?.(() => {
+    if (!state.highwayLayer) return;
+    const commonStyle = currentRouteStyle("common");
+    const palette = window.MinhasViagensIconicRoutes?.roadPalette?.(state.highwayStyleLabel, state.highwayStyleMedal) ||
+      { base: commonStyle.color, progress: commonStyle.color, banner: commonStyle.color, width: commonStyle.width };
+    const routeWidth = Number(palette.width) || commonStyle.width;
+    state.highwayLayer.eachLayer?.(layer => {
+      if (!layer?.setStyle) return;
+      if (layer.options?.pane === "fullHighwayOutline") layer.setStyle({ color: "#fff", weight: routeWidth + 2 });
+      else layer.setStyle({ color: palette.base, weight: Math.max(1, routeWidth - 2), opacity: .58 });
+    });
+    state.highwayProgressLayer?.setStyle?.({ color: palette.progress, weight: routeWidth });
+    els.highwayBanner.style.borderColor = palette.banner;
+    els.highwayProgressBar.style.background = palette.progress;
+  });
 
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);

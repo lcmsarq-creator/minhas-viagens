@@ -197,8 +197,9 @@
       return;
     }
 
+    const commonStyle = currentRouteStyle("common");
     state.tripRoadLayer = L.featureGroup(segments.map(line => L.polyline(line, {
-      pane: "fullHighwayMain", color: "#ef8d00", weight: 8, opacity: 1, interactive: false
+      pane: "fullHighwayMain", color: commonStyle.color, weight: commonStyle.width, opacity: 1, interactive: false
     }))).addTo(map);
     state.tripRoadKey = key;
     setTripsSecondary(true);

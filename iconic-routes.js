@@ -1,12 +1,14 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.1";
-  const GOLD = "#d6a21f";
-  const GOLD_DARK = "#8c6200";
-  const SILVER = "#aeb5ba";
-  const SILVER_DARK = "#687177";
-  const PREVIEW = "#626b65";
+  const APP_VERSION = "0.13.2";
+  const STYLE_LAB = window.MinhasViagensRouteStyleLab;
+  const FALLBACK_STYLES = {
+    common: { color: "#2f6d50", width: 5 },
+    gold: { color: "#d6a21f", width: 6 },
+    silver: { color: "#aeb5ba", width: 5 }
+  };
+  const routeStyle = kind => STYLE_LAB?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
   const core = window.MinhasViagensIconicCore;
   const catalog = window.MinhasViagensIconicCatalog;
   const progressEngine = window.MinhasViagensRoadProgress;
@@ -23,6 +25,7 @@
   let achievementGeneration = 0;
   let medalGeneration = 0;
   let selectedRouteId = "";
+  let selectedRouteResult = null;
   let iconicListView = "mine";
 
   if (!map.getPane("iconicRoutePreview")) map.createPane("iconicRoutePreview");
@@ -165,10 +168,11 @@
     L.polyline(line, { interactive: false, smoothFactor: 1.1, ...options }).addTo(layer);
   }
 
-  function paintTraveled(layer, segments, color, weight = 6) {
+  function paintTraveled(layer, segments, kind) {
+    const routePaint = routeStyle(kind);
     for (const line of segments || []) {
-      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: weight + 4, opacity: .94 });
-      addStyledLine(layer, line, { pane: "iconicRouteMain", color, weight, opacity: 1 });
+      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: routePaint.width + 4, opacity: .94 });
+      addStyledLine(layer, line, { pane: "iconicRouteMain", color: routePaint.color, weight: routePaint.width, opacity: 1 });
     }
   }
 
@@ -181,8 +185,8 @@
       const result = await progressFor(route, trips).catch(() => null);
       if (generation !== mapRenderGeneration) return;
       if (!result) continue;
-      paintTraveled(state.iconicRouteLayer, result.alternateCoverage?.segments, SILVER, 5);
-      paintTraveled(state.iconicRouteLayer, result.coverage?.segments, GOLD, 6);
+      paintTraveled(state.iconicRouteLayer, result.alternateCoverage?.segments, "silver");
+      paintTraveled(state.iconicRouteLayer, result.coverage?.segments, "gold");
       await new Promise(resolve => requestAnimationFrame(resolve));
     }
   }
@@ -196,9 +200,26 @@
 
   function clearPreview() {
     selectedRouteId = "";
+    selectedRouteResult = null;
     state.iconicPreviewLayer?.clearLayers();
     document.querySelectorAll(".iconic-route-card.active").forEach(card => card.classList.remove("active"));
     if (!state.highwayLayer && !state.tripRoadLayer) setTripsSecondary(false);
+  }
+
+  function paintRoutePreview(result) {
+    state.iconicPreviewLayer?.clearLayers();
+    const commonStyle = routeStyle("common");
+    const silverStyle = routeStyle("silver");
+    for (const line of result.geometry.lines) {
+      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: commonStyle.width + 4, opacity: .88 });
+      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: commonStyle.color, weight: commonStyle.width, opacity: .55 });
+    }
+    for (const line of result.geometry.alternateLines) {
+      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: silverStyle.width + 4, opacity: .82 });
+      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: silverStyle.color, weight: silverStyle.width, opacity: .65, dashArray: "7 7" });
+    }
+    paintTraveled(state.iconicPreviewLayer, result.alternateCoverage?.segments, "silver");
+    paintTraveled(state.iconicPreviewLayer, result.coverage?.segments, "gold");
   }
 
   function focusRoute(result, card) {
@@ -208,19 +229,10 @@
     closeTripRoadHighlight();
     clearPreview();
     selectedRouteId = result.route.id;
+    selectedRouteResult = result;
     card?.classList.add("active");
     setTripsSecondary(true);
-
-    for (const line of result.geometry.lines) {
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: 8, opacity: .88 });
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: PREVIEW, weight: 4, opacity: .83 });
-    }
-    for (const line of result.geometry.alternateLines) {
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: 7, opacity: .82 });
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: SILVER_DARK, weight: 3, opacity: .82, dashArray: "7 7" });
-    }
-    paintTraveled(state.iconicPreviewLayer, result.alternateCoverage?.segments, SILVER, 6);
-    paintTraveled(state.iconicPreviewLayer, result.coverage?.segments, GOLD, 7);
+    paintRoutePreview(result);
     map.fitBounds(L.latLngBounds(points).pad(.08), { maxZoom: 13 });
   }
 
@@ -390,9 +402,9 @@
 
   function roadPalette(label, requestedMedal = "") {
     const medal = requestedMedal || roadMedalFor(label);
-    if (medal === "gold") return { medal, base: GOLD, progress: GOLD_DARK, banner: GOLD };
-    if (medal === "silver") return { medal, base: "#c7ccd0", progress: SILVER_DARK, banner: SILVER_DARK };
-    return { medal: "", base: "#c77b00", progress: "#168447", banner: "#d09a2a" };
+    const kind = medal === "gold" || medal === "silver" ? medal : "common";
+    const value = routeStyle(kind);
+    return { medal: medal || "", base: value.color, progress: value.color, banner: value.color, width: value.width };
   }
 
   const baseRenderTripDetail = typeof renderTripDetail === "function" ? renderTripDetail : null;
@@ -415,6 +427,10 @@
 
   els.iconicMineTabBtn?.addEventListener("click", () => setIconicListView("mine"));
   els.iconicOtherTabBtn?.addEventListener("click", () => setIconicListView("others"));
+  STYLE_LAB?.subscribe?.(() => {
+    scheduleMapRender();
+    if (selectedRouteResult) paintRoutePreview(selectedRouteResult);
+  });
 
   window.MinhasViagensIconicRoutes = {
     version: APP_VERSION,

@@ -39,3 +39,37 @@ test("área ampliada está ligada às viagens, alternativas e edição", () => {
   assert.match(appSource, /editVisibleLine[^\n]+interactive: false/);
   assert.match(clickPatchSource, /line\._routeHitLine/);
 });
+
+test("painéis puramente visuais nunca bloqueiam os eventos do mapa", () => {
+  const interaction = loadRouteInteraction();
+  const panes = new Map();
+  const map = {
+    getPane(name) { return panes.get(name) || null; },
+    createPane(name) {
+      const pane = { style: {} };
+      panes.set(name, pane);
+      return pane;
+    }
+  };
+
+  const pane = interaction.configurePassivePane(map, "fullHighwayMain", 626);
+  assert.equal(pane.style.zIndex, "626");
+  assert.equal(pane.style.pointerEvents, "none");
+  assert.equal(map.getPane("fullHighwayMain"), pane);
+});
+
+test("distância até a rota usa o segmento mais próximo em pixels", () => {
+  const interaction = loadRouteInteraction();
+  const line = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+
+  assert.equal(interaction.nearestPolylineDistance({ x: 4, y: 3 }, line), 3);
+  assert.equal(interaction.nearestPolylineDistance({ x: 13, y: 7 }, line), 3);
+  assert.equal(interaction.EDIT_HIT_TOLERANCE_PX, 18);
+});
+
+test("editor possui captura nativa do ponteiro como proteção contra camadas sobrepostas", () => {
+  const appSource = fs.readFileSync("script.js", "utf8");
+  assert.match(appSource, /configurePassivePane\(map, "fullHighwayMain", 626\)/);
+  assert.match(appSource, /addEventListener\("pointerdown", startEditPointer, true\)/);
+  assert.match(appSource, /selectedLayer\?\._routeHitLine\?\.bringToFront/);
+});

@@ -52,6 +52,7 @@ const state = {
   editDragStart: null,
   editDragLast: null,
   editDragProgress: 0,
+  editPointerId: null,
   editBusy: false,
   editSnapshot: null,
   airports: null,
@@ -91,10 +92,8 @@ const tripLayers = L.layerGroup().addTo(map);
 const pointLayers = L.layerGroup().addTo(map);
 const previewGroup = L.layerGroup().addTo(map);
 const editGroup = L.layerGroup().addTo(map);
-map.createPane("fullHighwayOutline");
-map.getPane("fullHighwayOutline").style.zIndex = 625;
-map.createPane("fullHighwayMain");
-map.getPane("fullHighwayMain").style.zIndex = 626;
+ROUTE_INTERACTION.configurePassivePane(map, "fullHighwayOutline", 625);
+ROUTE_INTERACTION.configurePassivePane(map, "fullHighwayMain", 626);
 
 const els = {
   newTripBtn: document.getElementById("newTripBtn"),
@@ -2443,6 +2442,9 @@ async function saveEditedPlaces(event) {
 
 function openTripDialog() {
   if (state.drawing || state.editingTripId || !els.routeChooser.classList.contains("hidden")) return;
+  closeFullHighway();
+  closeTripRoadHighlight();
+  window.MinhasViagensIconicRoutes?.clearPreview?.();
   els.tripForm.reset();
   els.tripDate.value = "";
   els.tripColor.value = DEFAULT_ROUTE_COLOR;
@@ -2672,6 +2674,9 @@ function routeViaText(route) {
 }
 
 function showRouteChooser() {
+  closeFullHighway();
+  closeTripRoadHighlight();
+  window.MinhasViagensIconicRoutes?.clearPreview?.();
   els.routeChooserTitle.textContent = "Escolha a rota percorrida";
   els.manualRouteBtn.classList.remove("hidden");
   els.saveSelectedRouteBtn.textContent = "Salvar rota escolhida";
@@ -2717,6 +2722,10 @@ function renderRouteAlternatives() {
     line.on("click", () => selectRoute(index));
     state.previewLayers[index] = line;
   });
+
+  const selectedLayer = state.previewLayers[state.selectedRouteIndex];
+  selectedLayer?._routeHitLine?.bringToFront?.();
+  selectedLayer?.bringToFront?.();
 
   const start = state.pendingTrip.startPlace;
   const end = state.pendingTrip.endPlace;
@@ -3078,6 +3087,9 @@ function beginRouteEdit(trip) {
   if (state.drawing || state.editingTripId || !["carro", "moto"].includes(trip.mode)) return;
   const latlngs = tripLatLngs(trip);
   if (latlngs.length < 2) return;
+  closeFullHighway();
+  closeTripRoadHighlight();
+  window.MinhasViagensIconicRoutes?.clearPreview?.();
   state.editingTripId = trip.id;
   state.editSnapshot = JSON.parse(JSON.stringify({
     routeGeometry: trip.routeGeometry || null,
@@ -3152,6 +3164,60 @@ function startEditDrag(trip, event) {
   }
   const snapped = nearestLatLngOnRoute(trip, event.latlng);
   state.editGuideLine = L.polyline([[snapped.lat, snapped.lng], [snapped.lat, snapped.lng]], { color: "#111827", weight: 4, dashArray: "7 7", opacity: .75 }).addTo(editGroup);
+}
+
+function pointerLatLng(event) {
+  const rect = map.getContainer().getBoundingClientRect();
+  return map.containerPointToLatLng(L.point(event.clientX - rect.left, event.clientY - rect.top));
+}
+
+function routeDistanceFromPointer(trip, latlng) {
+  const target = map.latLngToLayerPoint(latlng);
+  const routePoints = tripLatLngs(trip).map(point => map.latLngToLayerPoint(point));
+  return ROUTE_INTERACTION.nearestPolylineDistance(target, routePoints);
+}
+
+function startEditPointer(event) {
+  if (state.editPointerId != null || state.editBusy || !state.editingTripId) return;
+  if (event.button != null && event.button !== 0) return;
+  if (event.target?.closest?.(".leaflet-control, .leaflet-marker-icon, .leaflet-popup")) return;
+  const trip = state.trips.find(item => item.id === state.editingTripId);
+  if (!trip) return;
+  const latlng = pointerLatLng(event);
+  if (routeDistanceFromPointer(trip, latlng) > ROUTE_INTERACTION.EDIT_HIT_TOLERANCE_PX) return;
+  state.editPointerId = event.pointerId;
+  startEditDrag(trip, { latlng, originalEvent: event });
+  if (!state.editDragging) {
+    state.editPointerId = null;
+    return;
+  }
+  try { map.getContainer().setPointerCapture(event.pointerId); } catch {}
+}
+
+function updateEditPointer(event) {
+  if (!state.editDragging || state.editPointerId !== event.pointerId) return;
+  event.preventDefault();
+  updateEditDrag({ latlng: pointerLatLng(event), originalEvent: event });
+}
+
+function finishEditPointer(event) {
+  if (!state.editDragging || state.editPointerId !== event.pointerId) return;
+  event.preventDefault();
+  updateEditDrag({ latlng: pointerLatLng(event), originalEvent: event });
+  state.editPointerId = null;
+  try { map.getContainer().releasePointerCapture(event.pointerId); } catch {}
+  finishEditDrag();
+}
+
+function cancelEditPointer(event) {
+  if (state.editPointerId !== event.pointerId) return;
+  state.editPointerId = null;
+  state.editDragging = false;
+  state.editDragStart = null;
+  state.editDragLast = null;
+  map.dragging.enable();
+  if (state.editGuideLine) editGroup.removeLayer(state.editGuideLine);
+  state.editGuideLine = null;
 }
 
 function updateEditDrag(event) {
@@ -3247,6 +3313,7 @@ async function deleteRouteWaypoint(trip, index) {
 function finishRouteEdit() {
   if (!state.editingTripId || state.editBusy) return;
   state.editDragging = false;
+  state.editPointerId = null;
   state.editBusy = false;
   state.editingTripId = null;
   state.editVisibleLine = null;
@@ -3421,6 +3488,10 @@ map.on("click", event => { if (state.drawing) addDraftPoint(event.latlng); });
 map.on("mousemove", updateEditDrag);
 map.on("mouseup", finishEditDrag);
 document.addEventListener("mouseup", () => { if (state.editDragging) finishEditDrag(); });
+map.getContainer().addEventListener("pointerdown", startEditPointer, true);
+map.getContainer().addEventListener("pointermove", updateEditPointer, true);
+map.getContainer().addEventListener("pointerup", finishEditPointer, true);
+map.getContainer().addEventListener("pointercancel", cancelEditPointer, true);
 window.addEventListener("resize", () => map.invalidateSize());
 
 newTripColorWheelController = setupColorWheel(els.newTripColorWheel, els.tripColor.value || DEFAULT_ROUTE_COLOR, color => {

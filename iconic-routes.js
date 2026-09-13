@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.0";
+  const APP_VERSION = "0.13.1";
   const GOLD = "#d6a21f";
   const GOLD_DARK = "#8c6200";
   const SILVER = "#aeb5ba";

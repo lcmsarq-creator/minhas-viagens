@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 36442)
-Total output lines: 3432
-
 const AUTH_USER_ID = window.MinhasViagensAuth?.getUser()?.id;
 if (!AUTH_USER_ID) throw new Error("A aplicação requer uma sessão autenticada.");
 const STORAGE_KEY = `minhasViagens.trips.${AUTH_USER_ID}.v1`;
@@ -1378,7 +1375,559 @@ function renderAchievements() {
       const visibleLabel = type === "city" ? `${item.city || item.label}${citySuffix}` : roadDisplayLabel(item.label);
       const card = document.createElement("button");
       card.type = "button";
- …6442 tokens truncated…ent.target)) hide();
+      card.className = `achievement-card${type === "road" ? " road-achievement-card" : ""}`;
+      if (type === "road") card.dataset.road = item.label;
+      card.setAttribute("aria-label", type === "city" ? `Focar ${item.label} no mapa` : `Mostrar a rodovia ${roadDisplayLabel(item.label)} inteira`);
+      card.innerHTML = `
+        <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
+        <div>
+          <strong>${escapeHtml(visibleLabel)}</strong>
+          <small>${type === "road" ? "Rodovia conquistada" : `${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}`}</small>
+        </div>`;
+      card.addEventListener("click", () => type === "city" ? focusCityAchievement(item) : showFullHighway(item));
+      container.appendChild(card);
+      if (type === "city") window.MinhasViagensCityFlags?.decorate(card.querySelector(".achievement-icon"), item);
+    });
+  };
+
+  const cityGroups = window.MinhasViagensAchievements?.groupCities(cityItems) || [{ key: "ALL", uf: "BR", name: "Cidades", cities: cityItems }];
+  const selectedGroup = cityGroups.find(group => group.key === state.achievementStateKey);
+  if (state.achievementStateKey && !selectedGroup) state.achievementStateKey = null;
+
+  els.cityAchievementHeader.innerHTML = "";
+  if (selectedGroup) {
+    const backButton = document.createElement("button");
+    backButton.type = "button";
+    backButton.className = "achievement-back-btn";
+    backButton.textContent = "← Voltar aos estados e países";
+    backButton.addEventListener("click", () => {
+      state.achievementStateKey = null;
+      renderAchievements();
+    });
+    els.cityAchievementHeader.appendChild(backButton);
+    const title = document.createElement("div");
+    title.className = "achievement-browser-title";
+    title.innerHTML = `<h2>${escapeHtml(selectedGroup.name)}</h2><span>${selectedGroup.cities.length} ${selectedGroup.cities.length === 1 ? "cidade" : "cidades"}</span>`;
+    els.cityAchievementHeader.appendChild(title);
+    els.cityAchievementList.classList.remove("state-achievement-grid");
+    renderList(els.cityAchievementList, selectedGroup.cities, "city");
+  } else {
+    els.cityAchievementHeader.innerHTML = '<div class="achievement-browser-title"><h2>Estados e países conquistados</h2></div>';
+    els.cityAchievementList.innerHTML = "";
+    els.cityAchievementList.classList.add("state-achievement-grid");
+    if (!cityGroups.length) {
+      els.cityAchievementList.classList.remove("state-achievement-grid");
+      els.cityAchievementList.innerHTML = '<p class="empty">Nenhuma cidade conquistada ainda.</p>';
+    } else {
+      cityGroups.forEach(group => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "state-achievement-card";
+        card.setAttribute("aria-label", `Abrir cidades conquistadas em ${group.name}`);
+        const flagMarkup = group.flagUrl
+          ? `<img src="${escapeHtml(group.flagUrl)}" alt="Bandeira de ${escapeHtml(group.name)}" loading="lazy"><span class="state-achievement-icon-fallback hidden">${escapeHtml(group.code || group.uf)}</span>`
+          : `<span class="state-achievement-icon-fallback">${escapeHtml(group.code || group.uf)}</span>`;
+        card.innerHTML = `
+          <span class="state-achievement-icon">${flagMarkup}</span>
+          <strong>${escapeHtml(group.name)}</strong>
+          <small>${group.cities.length} ${group.cities.length === 1 ? "cidade" : "cidades"}</small>`;
+        const flag = card.querySelector(".state-achievement-icon img");
+        flag?.addEventListener("error", () => {
+          flag.classList.add("hidden");
+          card.querySelector(".state-achievement-icon-fallback")?.classList.remove("hidden");
+        });
+        card.addEventListener("click", () => {
+          state.achievementStateKey = group.key;
+          renderAchievements();
+        });
+        els.cityAchievementList.appendChild(card);
+      });
+    }
+  }
+  renderList(els.roadAchievementList, roadItems, "road");
+
+  const citiesActive = state.achievementView === "cities";
+  const roadsActive = state.achievementView === "roads";
+  const iconicActive = state.achievementView === "iconic";
+  els.cityAchievementsTabBtn.classList.toggle("active", citiesActive);
+  els.roadAchievementsTabBtn.classList.toggle("active", roadsActive);
+  els.iconicAchievementsTabBtn?.classList.toggle("active", iconicActive);
+  els.cityAchievementsTabBtn.setAttribute("aria-selected", String(citiesActive));
+  els.roadAchievementsTabBtn.setAttribute("aria-selected", String(roadsActive));
+  els.iconicAchievementsTabBtn?.setAttribute("aria-selected", String(iconicActive));
+  els.cityAchievementsView.classList.toggle("hidden", !citiesActive);
+  els.roadAchievementsView.classList.toggle("hidden", !roadsActive);
+  els.iconicAchievementsView?.classList.toggle("hidden", !iconicActive);
+  window.MinhasViagensIconicRoutes?.renderAchievements?.();
+}
+
+function celebrateConquests(items, tripName) {
+  if (!items.length) return;
+  clearTimeout(state.achievementTimer);
+  const labels = items.slice(0, 5).map(item => item.label);
+  els.achievementToastTitle.textContent = items.length === 1 ? items[0].label : `${items.length} novas conquistas`;
+  els.achievementToastSubtitle.textContent = `${labels.join(" · ")}${items.length > 5 ? ` · +${items.length - 5}` : ""}${tripName ? ` — ${tripName}` : ""}`;
+  els.achievementToast.classList.remove("hidden");
+  state.achievementTimer = setTimeout(() => els.achievementToast.classList.add("hidden"), 3800);
+}
+
+function showTripList() {
+  state.activeTripDetailId = null;
+  els.tripsPanel.classList.remove("hidden");
+  els.tripDetailPanel.classList.add("hidden");
+  els.achievementsPanel.classList.add("hidden");
+  els.tripsTabBtn.classList.add("active");
+  els.achievementsTabBtn.classList.remove("active");
+  els.tripsTabBtn.setAttribute("aria-selected", "true");
+  els.achievementsTabBtn.setAttribute("aria-selected", "false");
+  renderTrips();
+}
+
+function openTripDetails(tripId) {
+  const trip = state.trips.find(item => item.id === tripId);
+  if (!trip) return;
+  state.activeTripDetailId = tripId;
+  els.tripsPanel.classList.add("hidden");
+  els.tripDetailPanel.classList.remove("hidden");
+  els.achievementsPanel.classList.add("hidden");
+  els.tripsTabBtn.classList.add("active");
+  els.achievementsTabBtn.classList.remove("active");
+  els.tripsTabBtn.setAttribute("aria-selected", "true");
+  els.achievementsTabBtn.setAttribute("aria-selected", "false");
+  renderTrips();
+  focusTrip(trip);
+  els.tripDetailPanel.scrollIntoView({ block: "start" });
+}
+
+function switchSidebarTab(tab) {
+  if (tab === "achievements") {
+    state.activeTripDetailId = null;
+    els.tripsPanel.classList.add("hidden");
+    els.tripDetailPanel.classList.add("hidden");
+    els.achievementsPanel.classList.remove("hidden");
+    els.tripsTabBtn.classList.remove("active");
+    els.achievementsTabBtn.classList.add("active");
+    els.tripsTabBtn.setAttribute("aria-selected", "false");
+    els.achievementsTabBtn.setAttribute("aria-selected", "true");
+    renderTrips();
+    return;
+  }
+  showTripList();
+}
+
+async function deleteTrip(trip) {
+  if (!confirm(`Excluir a viagem "${trip.name}"?`)) return;
+  if (state.editingTripId === trip.id) finishRouteEdit();
+  window.MinhasViagensSync?.recordDeletion(trip.id);
+  state.trips = state.trips.filter(t => t.id !== trip.id);
+  if (state.tripRoadKey.startsWith(`${trip.id}|`)) closeTripRoadHighlight();
+  saveTrips();
+  state.activeTripDetailId = null;
+  showTripList();
+}
+
+function renderTripDetail() {
+  const trip = state.trips.find(item => item.id === state.activeTripDetailId);
+  if (!trip) {
+    els.tripDetailContent.innerHTML = '<p class="empty">Viagem não encontrada.</p>';
+    return;
+  }
+  ensureTripSchema(trip);
+  const latlngs = tripLatLngs(trip);
+  const startAddress = trip.startPlace?.label || trip.startAddress || "Partida não informada";
+  const endAddress = trip.endPlace?.label || trip.endAddress || "Chegada não informada";
+  const distance = Number.isFinite(trip.distance) ? formatDistance(trip.distance) : `${latlngs.length} pontos`;
+  const routeColor = trip.color || DEFAULT_ROUTE_COLOR;
+  const stopList = (trip.stopPlaces || []).map(place => place.label || place.city).filter(Boolean);
+  const roads = trip.conquests?.roads || [];
+  els.tripDetailContent.innerHTML = `
+    <article class="trip-detail-card">
+      <div class="trip-detail-title-row">
+        <h2>${escapeHtml(trip.name || "Viagem")}</h2>
+        <button type="button" class="edit-name-btn" title="Editar nome da viagem" aria-label="Editar nome da viagem">✎</button>
+      </div>
+      <div class="trip-name-editor hidden">
+        <input type="text" class="trip-name-edit-input" maxlength="80" value="${escapeHtml(trip.name || "Viagem")}" aria-label="Novo nome da viagem">
+        <button type="button" class="save-name-btn primary-btn small">Salvar</button>
+        <button type="button" class="cancel-name-btn ghost-btn small">Cancelar</button>
+      </div>
+      <div class="trip-meta">${formatDate(trip.date)} · ${modeLabel(trip.mode)} · ${distance}</div>
+      <div class="trip-route">
+        <div><span>De:</span> <strong>${escapeHtml(shortText(startAddress, 80))}</strong></div>
+        ${stopList.length ? `<div><span>Paradas:</span> <strong>${escapeHtml(stopList.join(" → "))}</strong></div>` : ""}
+        <div><span>Para:</span> <strong>${escapeHtml(shortText(endAddress, 80))}</strong></div>
+        ${Number.isFinite(trip.duration) ? `<div><span>Tempo estimado:</span> <strong>${formatDuration(trip.duration)}</strong></div>` : ""}
+        ${trip.pointsOfInterest.length ? `<div><span>Pontos adicionados:</span> <strong>${trip.pointsOfInterest.length}</strong></div>` : ""}
+        ${trip.notes ? `<div><span>Observações:</span> <strong>${escapeHtml(trip.notes)}</strong></div>` : ""}
+      </div>
+      <div class="detail-section-title">Rodovias desta viagem</div>
+      ${roads.length
+        ? `<div class="detail-road-list">${roads.map(road => `<button type="button" data-road="${escapeHtml(road)}" title="Destacar ${escapeHtml(roadDisplayLabel(road))} nesta viagem" aria-label="Destacar ${escapeHtml(roadDisplayLabel(road))} nesta viagem">${roadShieldMarkup(road, "achievement")}</button>`).join("")}</div>`
+        : `<p class="micro-hint detail-no-roads">Nenhuma rodovia foi identificada automaticamente nesta viagem.</p>`}
+      <div class="trip-detail-actions">
+        <button type="button" class="focus-btn">Ver no mapa</button>
+        <button type="button" class="edit-places-btn" ${!["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Editar cidades</button>
+        <button type="button" class="edit-route-btn" ${latlngs.length < 2 || !["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Ajustar rota</button>
+        <button type="button" class="refresh-roads-btn" ${latlngs.length < 2 || !["carro", "moto"].includes(trip.mode) ? "disabled" : ""}>Atualizar rodovias</button>
+        <div class="trip-detail-color-wheel-wrap" title="Arraste pelo globo para mudar a cor da rota">
+          <canvas class="trip-color-wheel color-wheel" width="68" height="68" tabindex="0" role="slider" aria-label="Cor da rota ${escapeHtml(trip.name || "Viagem")}"></canvas>
+        </div>
+        <button type="button" class="delete-btn">Excluir</button>
+      </div>
+    </article>`;
+
+  const titleRow = els.tripDetailContent.querySelector(".trip-detail-title-row");
+  const editor = els.tripDetailContent.querySelector(".trip-name-editor");
+  const nameInput = els.tripDetailContent.querySelector(".trip-name-edit-input");
+  els.tripDetailContent.querySelector(".edit-name-btn")?.addEventListener("click", () => {
+    titleRow?.classList.add("hidden");
+    editor?.classList.remove("hidden");
+    nameInput?.focus();
+    nameInput?.select();
+  });
+  els.tripDetailContent.querySelector(".cancel-name-btn")?.addEventListener("click", () => {
+    renderTripDetail();
+  });
+  els.tripDetailContent.querySelector(".save-name-btn")?.addEventListener("click", () => {
+    const nextName = String(nameInput?.value || "").trim();
+    if (!nextName) {
+      nameInput?.focus();
+      return;
+    }
+    trip.name = nextName.slice(0, 80);
+    saveTrips();
+    renderTrips();
+  });
+  nameInput?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      els.tripDetailContent.querySelector(".save-name-btn")?.click();
+    }
+    if (event.key === "Escape") renderTripDetail();
+  });
+
+  els.tripDetailContent.querySelector(".focus-btn")?.addEventListener("click", () => focusTrip(trip));
+  els.tripDetailContent.querySelector(".edit-places-btn")?.addEventListener("click", () => openEditPlacesDialog(trip));
+  els.tripDetailContent.querySelector(".edit-route-btn")?.addEventListener("click", () => beginRouteEdit(trip));
+  els.tripDetailContent.querySelector(".refresh-roads-btn")?.addEventListener("click", () => refreshTripRoads(trip));
+  els.tripDetailContent.querySelectorAll(".detail-road-list [data-road]").forEach(button => button.addEventListener("click", () => showTripRoadSegment(trip, button.dataset.road, button)));
+  const detailColorWheel = els.tripDetailContent.querySelector(".trip-color-wheel");
+  if (detailColorWheel) {
+    setupColorWheel(detailColorWheel, routeColor, color => {
+      trip.color = color;
+      const line = state.tripLineLayers.get(trip.id);
+      if (line) line.setStyle({ color });
+    }, color => {
+      trip.color = color;
+      saveTrips();
+    });
+  }
+  els.tripDetailContent.querySelector(".delete-btn")?.addEventListener("click", () => deleteTrip(trip));
+}
+
+function renderTrips() {
+  tripLayers.clearLayers();
+  pointLayers.clearLayers();
+  state.tripLineLayers.clear();
+  els.tripList.innerHTML = "";
+  els.tripCount.textContent = String(state.trips.length);
+
+  if (!state.trips.length) {
+    state.activeTripDetailId = null;
+    els.tripList.innerHTML = '<p class="empty">Nenhuma viagem cadastrada ainda.</p>';
+    els.tripDetailPanel.classList.add("hidden");
+    els.tripsPanel.classList.remove("hidden");
+    renderAchievements();
+    return;
+  }
+
+  const hasFocusedTrip = Boolean(state.activeTripDetailId);
+
+  state.trips.forEach(trip => {
+    ensureTripSchema(trip);
+    const latlngs = tripLatLngs(trip);
+    const startAddress = trip.startPlace?.label || trip.startAddress || "Partida não informada";
+    const endAddress = trip.endPlace?.label || trip.endAddress || "Chegada não informada";
+    const routeColor = trip.color || DEFAULT_ROUTE_COLOR;
+    const isFocused = !hasFocusedTrip || state.activeTripDetailId === trip.id;
+
+    const card = document.createElement("article");
+    card.className = `trip-card${state.activeTripDetailId === trip.id ? " active" : ""}`;
+    card.innerHTML = `
+      <div class="trip-compact-row">
+        <input class="trip-toggle" type="checkbox" ${trip.visible !== false ? "checked" : ""} aria-label="Mostrar viagem ${escapeHtml(trip.name || "Viagem")}">
+        <button type="button" class="trip-name-btn" title="Abrir detalhes de ${escapeHtml(trip.name || "Viagem")}">${escapeHtml(trip.name || "Viagem")}</button>
+      </div>`;
+
+    const toggle = card.querySelector(".trip-toggle");
+    toggle.style.accentColor = routeColor;
+    toggle.addEventListener("change", event => {
+      trip.visible = event.target.checked;
+      saveTrips();
+      renderTrips();
+    });
+    card.querySelector(".trip-name-btn").addEventListener("click", () => openTripDetails(trip.id));
+    els.tripList.appendChild(card);
+
+    if (trip.visible !== false && latlngs.length >= 2 && state.editingTripId !== trip.id) {
+      const routeIsInteractive = !hasFocusedTrip || isFocused;
+      const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("trip-route-hit", 24, routeIsInteractive));
+      const line = L.polyline(latlngs, {
+        color: routeColor,
+        weight: hasFocusedTrip ? (isFocused ? 7 : 3) : 5,
+        opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9,
+        dashArray: trip.mode === "aviao" ? "12 10" : null,
+        interactive: routeIsInteractive
+      });
+      line._routeHitLine = hitLine;
+      line.bindPopup(`
+        <div class="popup-title">${escapeHtml(trip.name || "Viagem")}</div>
+        <div class="popup-meta">${formatDate(trip.date)} · ${modeLabel(trip.mode)}</div>
+        <div class="popup-detail"><b>Partida:</b> ${escapeHtml(startAddress)}</div>
+        <div class="popup-detail"><b>Chegada:</b> ${escapeHtml(endAddress)}</div>
+        ${Number.isFinite(trip.distance) ? `<div class="popup-detail"><b>Distância:</b> ${formatDistance(trip.distance)}</div>` : ""}
+        <div class="popup-detail"><b>Dica:</b> clique na rota para adicionar um ponto com foto ou vídeo.</div>`);
+      const handleRouteClick = event => {
+        if ((!hasFocusedTrip || isFocused) && !state.drawing && !state.editingTripId && els.routeChooser.classList.contains("hidden")) {
+          openRoutePointDialog(trip, event.latlng);
+        }
+      };
+      line.on("click", handleRouteClick);
+      hitLine.on("click", handleRouteClick);
+      tripLayers.addLayer(hitLine);
+      tripLayers.addLayer(line);
+      state.tripLineLayers.set(trip.id, line);
+      if (isFocused && hasFocusedTrip) {
+        hitLine.bringToFront();
+        line.bringToFront();
+      }
+
+      const endpointOpacity = hasFocusedTrip && !isFocused ? .25 : 1;
+      tripLayers.addLayer(L.circleMarker(latlngs[0], {
+        radius: hasFocusedTrip && isFocused ? 7 : 6,
+        weight: 2,
+        color: routeColor,
+        fillColor: "#fff",
+        fillOpacity: endpointOpacity,
+        opacity: endpointOpacity
+      }));
+      tripLayers.addLayer(L.circleMarker(latlngs[latlngs.length - 1], {
+        radius: hasFocusedTrip && isFocused ? 8 : 7,
+        weight: 2,
+        color: routeColor,
+        fillColor: routeColor,
+        fillOpacity: endpointOpacity,
+        opacity: endpointOpacity
+      }));
+
+      // Quando uma viagem está selecionada, apenas as placas dela permanecem no mapa.
+      if ((!hasFocusedTrip || isFocused) && trip.mode !== "aviao") {
+        for (const badge of trip.roadLabels || []) {
+          if (!Number.isFinite(Number(badge.lat)) || !Number.isFinite(Number(badge.lng))) continue;
+          tripLayers.addLayer(L.marker([badge.lat, badge.lng], {
+            interactive: false,
+            icon: roadMapIcon(badge.label)
+          }));
+        }
+      } else if ((!hasFocusedTrip || isFocused) && trip.mode === "aviao" && trip.flightAirports?.length) {
+        for (const airport of trip.flightAirports) {
+          const marker = L.marker([airport.lat, airport.lng], {
+            icon: L.divIcon({ className: "", html: '<div class="flight-airport-marker">✈</div>', iconSize: [24,24], iconAnchor: [12,12] })
+          });
+          marker.bindTooltip(`${escapeHtml(airport.name)}${airport.iata ? ` (${escapeHtml(airport.iata)})` : ""}`);
+          tripLayers.addLayer(marker);
+        }
+      }
+    }
+
+    // Ao destacar uma viagem, também escondemos os pontos das demais para reduzir ruído visual.
+    if (trip.visible !== false && (!hasFocusedTrip || isFocused)) {
+      for (const point of trip.pointsOfInterest) {
+        const marker = L.marker([point.lat, point.lng], {
+          icon: L.divIcon({ className: "", html: '<div class="route-poi-marker"></div>', iconSize: [24, 24], iconAnchor: [12, 12] })
+        });
+        marker.bindTooltip(shortText(point.description || "Ponto da viagem", 55));
+        marker.on("click", () => openRoutePointDialog(trip, null, point));
+        pointLayers.addLayer(marker);
+      }
+    }
+  });
+
+  renderAchievements();
+  if (state.activeTripDetailId) renderTripDetail();
+  window.MinhasViagensIconicRoutes?.scheduleMapRender?.();
+}
+
+function focusTrip(trip) {
+  const latlngs = tripLatLngs(trip);
+  if (!latlngs.length) return;
+  map.fitBounds(L.latLngBounds(latlngs).pad(.15), { maxZoom: 14 });
+}
+
+function resetPlaceSelection(kind) {
+  state[`${kind}Place`] = null;
+  els[`${kind}Selected`].textContent = "Nenhum local selecionado.";
+  els[`${kind}Selected`].classList.remove("ok");
+  setAirportDisplay(kind, null);
+  updateRouteButtons();
+}
+
+function placeFromCityResult(result) {
+  const details = [result.admin1, result.country].filter(Boolean);
+  return {
+    label: [result.name, ...details].join(", "),
+    city: result.name,
+    region: result.admin1 || "",
+    country: result.country || "",
+    countryCode: result.country_code || "",
+    lat: Number(result.latitude),
+    lng: Number(result.longitude),
+    geonamesId: result.id || null
+  };
+}
+
+function setAirportDisplay(kind, airport = null) {
+  const el = els[`${kind}Airport`];
+  if (!el) return;
+  if (!airport) {
+    el.textContent = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = `✈ ${airportLabel(airport)} · ${airport.municipality || "aeroporto comercial"}`;
+  el.classList.remove("hidden");
+}
+
+async function verifyAirportForKind(kind, silent = false) {
+  const place = state[`${kind}Place`];
+  if (!place) return false;
+  if (els.tripMode.value !== "aviao") {
+    delete place.airport;
+    setAirportDisplay(kind, null);
+    return true;
+  }
+  const status = els[`${kind}Status`];
+  status.textContent = "Aeroporto…";
+  try {
+    const airport = await findAirportForPlace(place);
+    if (!airport) {
+      delete place.airport;
+      setAirportDisplay(kind, null);
+      if (!silent) setFormMessage(`${place.city} não possui aeroporto comercial compatível na base atual. Escolha outra cidade para o modo avião.`);
+      return false;
+    }
+    place.airport = airport;
+    setAirportDisplay(kind, airport);
+    return true;
+  } catch {
+    delete place.airport;
+    setAirportDisplay(kind, null);
+    if (!silent) setFormMessage("Não foi possível carregar a base de aeroportos agora. Tente novamente com internet ativa.");
+    return false;
+  } finally {
+    status.textContent = "";
+    updateRouteButtons();
+  }
+}
+
+function refreshFlightAirports() {
+  els.manualFromDialogBtn.classList.remove("hidden");
+  els.suggestRoutesBtn.textContent = "Sugerir rotas";
+  setFormMessage("");
+  updateRouteButtons();
+}
+
+function updateRouteButtons() {
+  const stopsReady = state.stopPlaces.every(item => item.place);
+  const ready = Boolean(state.startPlace && state.endPlace && stopsReady && els.tripName.value.trim());
+  els.suggestRoutesBtn.disabled = !ready;
+  els.manualFromDialogBtn.disabled = !ready;
+}
+
+function setFormMessage(message = "") {
+  els.formMessage.textContent = message;
+  els.formMessage.classList.toggle("hidden", !message);
+}
+
+function makeAutocomplete(kind) {
+  const input = els[`${kind}Address`];
+  const list = els[`${kind}Suggestions`];
+  const status = els[`${kind}Status`];
+  const selected = els[`${kind}Selected`];
+  let timer = null;
+  let controller = null;
+  const hide = () => list.classList.add("hidden");
+
+  input.addEventListener("input", () => {
+    resetPlaceSelection(kind);
+    clearTimeout(timer);
+    if (controller) controller.abort();
+    const q = input.value.trim();
+    list.innerHTML = "";
+    if (q.length < 2) {
+      status.textContent = "";
+      hide();
+      return;
+    }
+
+    timer = setTimeout(async () => {
+      controller = new AbortController();
+      status.textContent = "Buscando…";
+      try {
+        const url = `${CITY_SEARCH_ENDPOINT}?name=${encodeURIComponent(q)}&count=10&language=pt&format=json`;
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error("Falha na busca");
+        const data = await response.json();
+        let results = Array.isArray(data.results) ? data.results : [];
+        const cityResults = results.filter(item => !item.feature_code || String(item.feature_code).startsWith("PPL"));
+        if (cityResults.length) results = cityResults;
+        list.innerHTML = "";
+
+        if (!results.length) {
+          list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
+          list.classList.remove("hidden");
+          return;
+        }
+
+        results.slice(0, 8).forEach(result => {
+          if (!Number.isFinite(Number(result.latitude)) || !Number.isFinite(Number(result.longitude))) return;
+          const details = [result.admin1, result.country].filter(Boolean).join(" · ");
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "suggestion";
+          btn.setAttribute("role", "option");
+          btn.innerHTML = `<strong>${escapeHtml(result.name || "Cidade")}</strong><span>${escapeHtml(details)}</span>`;
+          btn.addEventListener("click", async () => {
+            const place = placeFromCityResult(result);
+            state[`${kind}Place`] = place;
+            input.value = place.label;
+            selected.textContent = `✓ ${place.label}`;
+            selected.classList.add("ok");
+            status.textContent = "";
+            hide();
+            setFormMessage("");
+            updateRouteButtons();
+          });
+          list.appendChild(btn);
+        });
+        if (!list.children.length) list.innerHTML = '<div class="suggestion-empty">Nenhum resultado encontrado.</div>';
+        list.classList.remove("hidden");
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          list.innerHTML = '<div class="suggestion-empty">Não foi possível consultar os locais agora.</div>';
+          list.classList.remove("hidden");
+        }
+      } finally {
+        status.textContent = "";
+      }
+    }, 250);
+  });
+
+  input.addEventListener("focus", () => {
+    if (list.children.length) list.classList.remove("hidden");
+  });
+  document.addEventListener("click", event => {
+    if (!input.parentElement.contains(event.target)) hide();
   });
 }
 

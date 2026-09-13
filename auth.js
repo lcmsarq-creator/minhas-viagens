@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.12.3";
+  const APP_VERSION = "0.12.4";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -48,12 +48,18 @@
     if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
   }
 
+  function markStartup(stage, detail = "") {
+    document.documentElement.dataset.mvStartupStage = stage;
+    document.documentElement.dataset.mvStartupDetail = detail;
+  }
+
   function loadScript(src, attempt = 0) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = src;
       script.async = false;
       script.onload = () => {
+        markStartup("script-loaded", src);
         displayCurrentVersion();
         resolve();
       };
@@ -84,10 +90,13 @@
     if (appLoaded) return;
     appLoaded = true;
     try {
+      markStartup("checking-map");
       await ensureLeaflet();
+      markStartup("loading-storage");
       await loadScript(`fetch-base.js?v=${APP_VERSION}`);
       await loadScript(`storage-pre.js?v=${APP_VERSION}`);
       await window.MinhasViagensStorageReady;
+      markStartup("loading-application");
       const sources = [
         "hotfix-pre.js", "achievements.js", "city-flags.js", "route-interaction.js",
         "script.js", "hotfix.js", "road-threshold-hotfix.js", "secondary-roads-hotfix.js",
@@ -98,11 +107,25 @@
         "escape-navigation.js", "iconic-routes-core.js", "iconic-routes.js"
       ];
       for (const src of sources) await loadScript(`${src}?v=${APP_VERSION}`);
+      markStartup("ready");
       displayCurrentVersion();
     } catch (error) {
+      markStartup("failed", error?.message || String(error));
       console.error("Falha ao carregar o aplicativo", error);
       showLogin("Não foi possível carregar o aplicativo. Atualize a página e tente novamente.", "error");
     }
+  }
+
+  function smokeClient() {
+    const result = Promise.resolve({ data: [], error: null });
+    let chain;
+    chain = new Proxy({}, {
+      get(_target, property) {
+        if (property === "then") return result.then.bind(result);
+        return () => chain;
+      }
+    });
+    return { from: () => chain, auth: { signOut: async () => ({ error: null }) } };
   }
 
   function showApp(session) {
@@ -125,6 +148,12 @@
   }
 
   async function initialize() {
+    if (new URLSearchParams(location.search).get("startup-smoke") === "0124") {
+      client = smokeClient();
+      currentSession = { user: { id: "startup-smoke", email: "teste@local" } };
+      showApp(currentSession);
+      return;
+    }
     const callbackError = authErrorFromUrl();
     if (!configured()) {
       emailInput.disabled = true;

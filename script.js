@@ -2932,6 +2932,7 @@ function beginRouteEdit(trip) {
     routeWaypoints: trip.routeWaypoints || [],
     stopPlaces: trip.stopPlaces || [],
     roadLabels: trip.roadLabels || [],
+    roadBadgeLayoutVersion: trip.roadBadgeLayoutVersion || null,
     distance: trip.distance ?? null,
     duration: trip.duration ?? null,
     conquests: trip.conquests || { cities: [], roads: [] }
@@ -3171,6 +3172,7 @@ function cancelRouteEdit() {
     trip.routeWaypoints = state.editSnapshot.routeWaypoints;
     trip.stopPlaces = state.editSnapshot.stopPlaces || trip.stopPlaces || [];
     trip.roadLabels = state.editSnapshot.roadLabels;
+    trip.roadBadgeLayoutVersion = state.editSnapshot.roadBadgeLayoutVersion;
     trip.distance = state.editSnapshot.distance;
     trip.duration = state.editSnapshot.duration;
     trip.conquests = state.editSnapshot.conquests;

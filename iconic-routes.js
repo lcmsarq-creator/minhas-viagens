@@ -1,13 +1,14 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.3";
+  const APP_VERSION = "0.13.4";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     gold: { color: "#d6a21f", width: 6 },
     silver: { color: "#aeb5ba", width: 5 }
   };
+  const SECONDARY_OPACITY = .22;
   const routeStyle = kind => STYLE_LAB?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
   const core = window.MinhasViagensIconicCore;
   const catalog = window.MinhasViagensIconicCatalog;
@@ -176,6 +177,17 @@
     }
   }
 
+  function setIconicRoutesSecondary(secondary) {
+    for (const layer of state.iconicRouteLayer?.getLayers?.() || []) {
+      if (typeof layer?.setStyle !== "function") continue;
+      if (!Number.isFinite(layer._iconicPrimaryOpacity)) {
+        const opacity = Number(layer.options?.opacity);
+        layer._iconicPrimaryOpacity = Number.isFinite(opacity) ? opacity : 1;
+      }
+      layer.setStyle({ opacity: secondary ? SECONDARY_OPACITY : layer._iconicPrimaryOpacity });
+    }
+  }
+
   async function renderMap() {
     const generation = ++mapRenderGeneration;
     state.iconicRouteLayer.clearLayers();
@@ -187,6 +199,7 @@
       if (!result) continue;
       paintTraveled(state.iconicRouteLayer, result.alternateCoverage?.segments, "silver");
       paintTraveled(state.iconicRouteLayer, result.coverage?.segments, "gold");
+      if (selectedRouteId) setIconicRoutesSecondary(true);
       await new Promise(resolve => requestAnimationFrame(resolve));
     }
   }
@@ -202,6 +215,7 @@
     selectedRouteId = "";
     selectedRouteResult = null;
     state.iconicPreviewLayer?.clearLayers();
+    setIconicRoutesSecondary(false);
     document.querySelectorAll(".iconic-route-card.active").forEach(card => card.classList.remove("active"));
     if (!state.highwayLayer && !state.tripRoadLayer) setTripsSecondary(false);
   }
@@ -230,6 +244,7 @@
     clearPreview();
     selectedRouteId = result.route.id;
     selectedRouteResult = result;
+    setIconicRoutesSecondary(true);
     card?.classList.add("active");
     setTripsSecondary(true);
     paintRoutePreview(result);

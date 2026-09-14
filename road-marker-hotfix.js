@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.3";
+  const APP_VERSION = "0.13.4";
   const BADGE_LAYOUT_SCHEMA = "road-badges-v1-20km";
   const layout = window.MinhasViagensRoadMarkerLayout;
   const baseExtractRoadLabels = typeof extractRoadLabelsFromRoute === "function" ? extractRoadLabelsFromRoute : null;

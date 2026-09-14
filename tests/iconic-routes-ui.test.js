@@ -90,7 +90,13 @@ function fixture() {
     },
     L: {
       layerGroup: layer,
-      polyline(_line, options) { return { options, addTo(target) { target.layers.push(this); return this; } }; },
+      polyline(_line, options) {
+        return {
+          options: { ...options },
+          addTo(target) { target.layers.push(this); return this; },
+          setStyle(next) { Object.assign(this.options, next); return this; }
+        };
+      },
       latLngBounds() { return { pad() { return this; } }; }
     },
     document: {
@@ -135,4 +141,20 @@ test("a interface carrega os 30 recortes em Outras rotas quando não há viagens
   els.iconicOtherTabBtn.click();
   assert.equal(els.iconicOtherList.classList.contains("hidden"), false);
   assert.equal(els.iconicAchievementList.classList.contains("hidden"), true);
+});
+
+
+test("ao focar uma rota icônica, as demais ficam em meio-tom e voltam ao normal ao fechar", async () => {
+  const { context, els } = fixture();
+  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 30; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  const backgroundRoute = context.L.polyline([[0, 0], [1, 1]], { opacity: .94 })
+    .addTo(context.state.iconicRouteLayer);
+
+  els.iconicOtherList.children[0].click();
+  assert.equal(backgroundRoute.options.opacity, .22);
+
+  context.MinhasViagensIconicRoutes.clearPreview();
+  assert.equal(backgroundRoute.options.opacity, .94);
 });

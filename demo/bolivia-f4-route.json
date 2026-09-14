@@ -1,0 +1,192 @@
+{
+  "schema": "route-demo-v1",
+  "countryCode": "BO",
+  "roadRef": "F4",
+  "canonicalRoadId": "INT:BO:F:4",
+  "start": {
+    "name": "Cochabamba",
+    "lat": -17.389564,
+    "lng": -66.157175
+  },
+  "end": {
+    "name": "Villa Tunari",
+    "lat": -16.973,
+    "lng": -65.42
+  },
+  "distanceKm": 159.0,
+  "durationSeconds": 9203,
+  "precision": 5,
+  "encodedPolyline": "vkciBhixrKcI`AsAmMsOoIc@qAuA@yHmEHaBw@gAiB@gArBmDRgBMiAaAaL_r@BwEeAqB{DsSwI}RSg\\bDwJr^qm@~D{EpD{RneAkvIjDeLx\\ep@xAyGJm_AxA{InM}c@~S{bC\\uL]mZnGqc@~C{f@K}QgAmLeWecAa@kH^wFzAqFtDaGzTwMzCiDzEeMvFmHxBwFbQ{NxQsYnCcHxCuNx@qMWyk@sAgC{CsAkPd@cCg@}CmCs@kC@wCdB{DlGyDpAsCQ_EsCcGCuBhAuCdCqAfFe@zKz@nCm@tBaBnAqFgAoMmAqDiF_Hg@aCHiDzBsDfMqDbD{BdQuWdAwEQkDgAwCoWyT{BmDeAeEMcJ`DwSzFkNc@qE{SaTmD}AcPkD{KiIqDkG_J}YqJiSaQod@iCoByIo@cFgBkFiFgDmGiBkI_Bg_@sVsi@s@cEq@iSkGqOmCeLgA{Rb@aWgDyJIaJm@cDNeGoBaHe@mLoA}FKsClAqJu@eGyBoC_F}@iDv@aMpI}IzBqK^os@_@}KxAyN|Fw|FrgFyHrEoEr@}FAoWmF_KzBcK_@oAq@mBqF[}E|EyOp@qKiAaLiDgHGcFgAgAiBW{OfK_LlMgCbAcTxCgOlOuEvBaE\\_d@e@gSlAgIrCmLfBkXfKqKfBsL?mHtBmT`CwQ`FkXhVmVn\\yKtDsO~QwKpIsShHyMlSqDbBiCIyCmBoLoUgHaGwHgBiORaCoAiDaIgBaBmViAov@jDmItHqYtK}DvGaE`BmD[}JaHaIo@eBcAgCeEuIsBeF_E_Qv@iCj@cMjIeKv@uBdAkFpKwFzGuBnGcHlBgGdIkGBoHaEgUq@cC\\oDrBwR|AmHvFoFQiI~@_DtB_HfAgSe@mVkC{@oCjDsJLeE_L__@d@aInDcFvF}A~a@YfWqFzGgE~OmNtHyB~J}@vG_DhJ_SnImIdDs@fLlBrLa@pEoBjGeI`BgKg@eMh@}HoCgOb@kCfDcGCyFiDoCcFb@_KrMsFrB_De@uAkEbBcDhMgLhRkHhAcC?{FeCwBsPFeOsDePeK_DaHAwAv@qAxCiAvIcLdCoPoAuKL}CtEkJxDyX`AyAlCqA~AeD~@oO~D_KWkH`@aBtDeBtJ\\nFjAdIwCpDuEv@aNxB_HfCkF~GqFf@qAu@oCqBc@qGdEwNkB}JvAmEKqEoBiIuJmDcAmg@nB{HuAiCgD`@aFmCsBcCaK{CgCsAsLmBiDz@qC~DcFbAaFyDuFyAuF_BeB}D_Kn@_BnHsCxB_GxHqAHwDqHqBcFoEkKd@wLiF_IA{DmA{K_@_FuAqIk@y@_BTsEiEsEoD_Jq@wH^yCyFaDr@iFQwCuDwFyGyRy@sPbFeI\\eBeC_HC_BpEeBfBwCnIaFtBmIlEWrCiCfI`@dD_Bj@yCcFiFkCsNVuBdAcAbGqAzAgBhEeLp@gQbAu@`FA|BcBzE{@xNyGfAgBCqCcBwBiLkG_H}AcDkESgFl@}BfGuDz@uAAwBkA_DoWmGqEgEqKoFuc@_^eFs@{LvA_OoGuRK{DmAkGvBuF{AqBuB}Cw@gCoBqFuA}`@f@mC}@yFeF{K_DuI}EyFmGsFaV_@eL|E{OQeD_JwGiJj@aMoDwAsA_@aCZmB`E_HfAaIvAs@jDzCpHvAl@dAUjE|@bBbHoAtGNvHsCpF~AlASv@iCu@qB_Em@eDsBoHf@oFcA{E_E]mAt@sBzAI~B|DbBb@vKeJlB\\|C`DfBq@OkBeI{GaJeAcF_GkHqE{S_CeG}BoBeBsHmNcLwH_K}DgJkIkEgJqGyFuAaKuAoC}NyGuFIcH|@{Dw@sp@ko@gM}CkIX_FwDiIiC{DQqNtA{IqC_Ng@sJoByDuHkMsIqCiFyCU_HvD}B@uImD}NeDkGaLiKe@yFaDiI{JuByHKmHcAuBaScF}FyFkIkAgD_EuB_HgEsGuJaD{E{E}FkX~B}HOgG{FsLjAePyE{EkF_A{OrCmDnAgHvG{XxEkc@jMiRhNyXvKkOrKaEdHiDdBqHuA_FgD{LqE}BEmO|C_EMqNuKsf@qMoXsQyCwFiCuK_CyDiD}B_OmE_DeD}@uCgAyRyLoM}A}D}BcQwBkHgReWaCmIuFw[bAcJYuKr@}EQaNz@sDy@sEGaaB~@wDbB}B~CcBnGu@zCaBvFuJxEcSf@{O~@kFcAwDgEwDqV{KwAaDQqDla@aqAfEoYvHkLfE_C`FQrDbAdG`EpRpArKgEvEgHCqAmAuBfAyEGuBiDaHcCKw@s@EwDaB_Ek@}[XqCvXu~@lMi^AqGmF_NeBkL@sErEoZ|FsRb@oJ`BuHjOwQnAaRxGcg@RaVu@iPob@ihCsKqc@kR{i@yk@ssA}GiMwNgQiT{Ng~Bo{@mNyKeHwKqEqK}FhCgIkS",
+  "segments": [
+    {
+      "ref": "",
+      "name": "Calle España",
+      "distanceKm": 0.183,
+      "encodedPolyline": "vkciBhixrKcI`A"
+    },
+    {
+      "ref": "",
+      "name": "Calle México",
+      "distanceKm": 0.13,
+      "encodedPolyline": "raciBjkxrKe@oF"
+    },
+    {
+      "ref": "",
+      "name": "Plaza Cristobal Colón",
+      "distanceKm": 0.11,
+      "encodedPolyline": "l`ciBzcxrKc@kE"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Daniel Salamanca",
+      "distanceKm": 0.355,
+      "encodedPolyline": "h_ciBn}wrK}OaJ"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Daniel Salamanca",
+      "distanceKm": 0.105,
+      "encodedPolyline": "jnbiBlrwrKc@qAuA@"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Daniel Salamanca",
+      "distanceKm": 0.205,
+      "encodedPolyline": "pjbiB|owrKyHmE"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Oquendo",
+      "distanceKm": 0.23,
+      "encodedPolyline": "v`biBniwrKDmBcAaAgBPi@zA"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Oquendo",
+      "distanceKm": 0.179,
+      "encodedPolyline": "fzaiBlgwrK{HH"
+    },
+    {
+      "ref": "",
+      "name": "Avenida 23 de Marzo",
+      "distanceKm": 0.941,
+      "encodedPolyline": "jpaiBvgwrKuAmC_Kio@"
+    },
+    {
+      "ref": "",
+      "name": "Avenida 23 de Marzo",
+      "distanceKm": 0.132,
+      "encodedPolyline": "taaiB~rurKIiF"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 0.031,
+      "encodedPolyline": "jaaiBtkurK[q@"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 1.428,
+      "encodedPolyline": "n`aiBbjurKwEaUiH_Ow@gDI}ZfBoF"
+    },
+    {
+      "ref": "F4",
+      "name": "Rotonda Eliodoro Villazón y 6 de Junio",
+      "distanceKm": 0.028,
+      "encodedPolyline": "rq`iBj{rrKVg@"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 1.136,
+      "encodedPolyline": "jr`iBbzrrKv_@qp@nCoC"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 0.053,
+      "encodedPolyline": "rwaiB`dqrKp@qA"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 6.847,
+      "encodedPolyline": "dyaiBnaqrKnDuRraAefI|EwWtIoQ"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Eliodoro Villazón",
+      "distanceKm": 0.804,
+      "encodedPolyline": "|rdiBj{drKjVkg@"
+    },
+    {
+      "ref": "F4",
+      "name": "Doble Vía Sacaba-Chiñata",
+      "distanceKm": 7.777,
+      "encodedPolyline": "hjeiB~rcrKr@_JKex@xA{InM}c@~S{bC\\uL]mZnGqc@vCsb@J{OwAwRiPep@"
+    },
+    {
+      "ref": "F4",
+      "name": "RN4: Chiñata-Colomi",
+      "distanceKm": 26.941,
+      "encodedPolyline": "lkfiB~suqKwFeVBoHpB_JjGqIdRgKzCiDzEeMvFmHxBwFbQ{NzNiUlFmLbB{GnBkTWyk@sAgC{CsAkPd@cCg@}CmCs@kC@wCdB{DlGyDpAsCQ_EsCcGCuBhAuCdCqAfFe@zKz@nCm@tBaBnAqFgAoMmAqDiF_Hg@aCHiDzBsDfMqDbD{BdQuWbAcHuB_HqVqS{BmDeAeEMcJ`DwSzFkNc@qE{SaTmD}AcPkD{KiIqDkG_J}YqJiSaQod@iCoByIo@cFgBkFiFgDmGiBkI_Bg_@sVsi@s@cEq@iSkGqOmCeLgA{Rb@aWgDyJIaJm@cDNeGoBaHe@mLoA}FKsClAqJu@eGyBoC_F}@iDv@aMpI}IzBqK^os@_@}KxAwK~D}U`RsvDnhD"
+    },
+    {
+      "ref": "F4",
+      "name": "RN4: Colomi-Villa Tunari",
+      "distanceKm": 10.454,
+      "encodedPolyline": "vdyhBnl_qKgq@~l@yHrEoEr@}FA_YqFoI~BcK_@aC_C{AuItFsS^cG_@gG{@aGyC_GGcFmB{A_BB_O~J_LlMgCbAcTxCgOlOuEvBaE\\_d@e@gSlAgIrCmLfBkXfKqKfBsL?mHtByRpBuPfE{C`BeVpTmVn\\"
+    },
+    {
+      "ref": "F4",
+      "name": "RN4: Colomi-Villa Tunari",
+      "distanceKm": 40.002,
+      "encodedPolyline": "tbkhBfccqKyKtDsO~QwKpIsShHyMlSqDbBiCIyCmBoLoUgHaGwHgBiORaCoAiDaIgBaBmViAov@jDmItHqYtK}DvGaE`BmD[}JaHaIo@eBcAgCeEuIsBeF_E_Qv@iCj@cMjIeKv@uBdAkFpKwFzGuBnGcHlBgGdIkGBoHaEgUq@cC\\oDrBwR|AmHvFoFQiI~@_DtB_HfAgSe@cUoBkA}@YmBjDsJLeEwJiZk@kGh@kEnDcFvF}A~a@YfWqFzGgE~OmNtHyB~J}@vG_DhJ_SnImIdDs@fLlBrLa@pEoBjGeI`BgKg@eMh@}HoCgOb@kCfDcGCyFiDoCcFb@_KrMsFrB_De@uAkEbBcDhMgLhRkHhAcC?{FeCwBsPFeOsDePeK_DaHAwAv@qAxCiAvIcLdCoPoAuKL}CtEkJxDyX`AyAlCqA~AeD~@oO~D_KWkH`@aBtDeBtJ\\nFjAdIwCpDuEv@aNxB_HfCkF~GqFf@qAu@oCqBc@qGdEwNkB}JvAmEKqEoBiIuJmDcAmg@nB{HuAiCgD`@aFmCsBcCaK{CgCsAsLmBiDz@qC~DcFbAaFyDuFyAuF_BeB}D_Kn@_BnHsCxB_GxHqAHwDqHqBcFoEkKd@wLiF_IA{DmA{K_@_FuAqIk@y@_BTsEiEsEoD_Jq@wH^yCyFaDr@iFQwCuDwFyGyRy@sPbFeI\\eBeC_HC_BpEeBfBwCnIaFtBmIlEWrCiCfI`@dD_Bj@yCcFiFiCqPzA{BbHmB~E_Kt@}DReNpAkAfEFvCmBzE{@xNyGfAgBDqBmA_CiMcHwE{@uCeBuAgCSgF"
+    },
+    {
+      "ref": "F4",
+      "name": "Doble Vía El Sillar",
+      "distanceKm": 29.01,
+      "encodedPolyline": "nb{gBnshpKlAgDrG_ETwBsAaEoWmGqEgEqKoFuc@_^eFs@{LvA_OoGuRK{DmAkGvBuF{AqBuB}Cw@gCoBqFuA}`@f@mC}@yFeF{K_DuI}EyFmGsFaV_@eL|E{OQeD_JwGiJj@aMoDwAsA_@aCZmB`E_HfAaIvAs@jDzCpHvAl@dAUjE|@bBbHoAtGNvHsCpF~AlASv@iCu@qB_Em@eDsBoHf@oFcA{E_E]mAt@sBzAI~B|DbBb@vKeJlB\\|C`DfBq@OkBeI{GaJeAcF_GkHqE{S_CeG}BoBeBsHmNcLwH_K}DgJkIkEgJqGyFuAaKuAoC}NyGuFIcH|@{Dw@sp@ko@gM}CkIX_FwDiIiC{DQqNtA{IqC_Ng@sJoByDuHkMsIqCiFyCU_HvD}B@uImD}NeDkGaLiKe@yFaDiI{JuByHKmHcAuBaScF}FyFkIkAgD_EuB_HgEsGuJaD{E{E}FkX~B}HOgG{FsLjAePyE{EkF_A{OrCmDnAgHvG{XxEkc@jMiRhNyXvKkOrKaEdHiDdBqHuA_FgDoKgEiDOeRbD{Ck@_E{C"
+    },
+    {
+      "ref": "F4",
+      "name": "RN4: Colomi-Villa Tunari",
+      "distanceKm": 22.308,
+      "encodedPolyline": "zc|fBfnvoKaIcGod@oLgSoM{FsFoE}O_CyDiD}B_OmEwBoBeBkEgAyRyLoM}A}D}BcQwBkHqPqTmBmEaIcd@dAkHYuKr@}EQaNz@sDy@sEGaaB~@wDbB}B~CcBnGu@zCaBvFuJxEcSf@{O|@eEs@gEuEmEqV{KwAaDGaFba@qoAfEoYvHkLfE_C`FQrDbAdG`EpRpArKgEvEgHCqAmAuBfAyEGuBiDaHcCKw@s@EwDaB_Es@_QP_LfYeaAxL{[P_JgG}PkAmIJqGhEqX|FsRb@oJ`BuHjOwQnAaRxGcg@RaVu@iPmMqx@"
+    },
+    {
+      "ref": "F4",
+      "name": "RN4: Colomi-Villa Tunari",
+      "distanceKm": 7.493,
+      "encodedPolyline": "la|fBp`unKaTwnAkNmj@sO_c@qs@i`B}O{RiT{Ni{Amj@"
+    },
+    {
+      "ref": "F4",
+      "name": "Avenida Integración",
+      "distanceKm": 1.544,
+      "encodedPolyline": "futfBzpjnKs^}MkLsHeMqPwEwK"
+    },
+    {
+      "ref": "",
+      "name": "Avenida Cochabamba",
+      "distanceKm": 0.166,
+      "encodedPolyline": "hsrfB~yhnKcG~B"
+    },
+    {
+      "ref": "",
+      "name": "Calle Hans Grether",
+      "distanceKm": 0.393,
+      "encodedPolyline": "dkrfB~}hnKgIkS"
+    },
+    {
+      "ref": "",
+      "name": "Calle Hans Grether",
+      "distanceKm": 0.0,
+      "encodedPolyline": "|`rfBrihnK??"
+    }
+  ],
+  "source": "OpenStreetMap / OSRM"
+}
+

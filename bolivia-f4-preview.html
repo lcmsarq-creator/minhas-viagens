@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f7f4ec" />
+  <title>Teste F4 · Bolívia · Minhas Viagens</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="bolivia-f4-preview.css?v=0.13.5" />
+</head>
+<body>
+  <main class="preview-shell">
+    <div id="preview-map" aria-label="Mapa da rota F4 entre Cochabamba e Villa Tunari"></div>
+
+    <section class="preview-card" aria-labelledby="preview-title">
+      <div class="preview-eyebrow">Teste de emblema · Bolívia</div>
+      <h1 id="preview-title">Cochabamba → Villa Tunari</h1>
+
+      <div class="preview-road-row">
+        <div id="preview-shield" class="preview-card-shield" aria-hidden="true"></div>
+        <div>
+          <strong>F4</strong>
+          <span id="preview-stats">Carregando o recorte…</span>
+        </div>
+      </div>
+
+      <p id="preview-status" class="preview-status" role="status">
+        Preparando a rota de demonstração.
+      </p>
+      <p class="preview-note">
+        Visualização isolada: não salva viagem, não cria conquista e não altera sua conta.
+      </p>
+      <a class="preview-back" href="./">Voltar ao app</a>
+    </section>
+
+    <div class="preview-legend" aria-label="Legenda">
+      <span><i class="preview-line-swatch"></i> trecho da F4</span>
+      <span><i class="preview-pin-swatch"></i> início e fim</span>
+    </div>
+  </main>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="road-marker-layout.js?v=0.13.5"></script>
+  <script src="international-road-shields.js?v=0.13.5"></script>
+  <script src="bolivia-f4-preview.js?v=0.13.5"></script>
+</body>
+</html>

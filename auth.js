@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.13.4";
+  const APP_VERSION = "0.13.5";
   let client = null;
   let currentSession = null;
   let appLoaded = false;
@@ -112,7 +112,7 @@
       markStartup("loading-application");
       const sources = [
         "hotfix-pre.js", "achievements.js", "city-flags.js", "route-interaction.js", "route-style-lab.js", "road-marker-layout.js",
-        "script.js", "hotfix.js", "road-threshold-hotfix.js", "secondary-roads-hotfix.js",
+        "script.js", "hotfix.js", "road-threshold-hotfix.js", "secondary-roads-hotfix.js", "international-road-shields.js",
         "road-marker-hotfix.js",
         "ux-hotfix.js", "endpoint-hotfix.js", "city-search-fast.js", "place-search-hotfix.js",
         "edit-dialog-hotfix.js", "route-click-hotfix.js", "geometry-compact-hotfix.js",

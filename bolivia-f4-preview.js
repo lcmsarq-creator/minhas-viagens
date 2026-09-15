@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.6";
+  const APP_VERSION = "0.13.8";
   const mapElement = document.getElementById("preview-map");
   const statusElement = document.getElementById("preview-status");
   const statsElement = document.getElementById("preview-stats");
@@ -108,7 +108,7 @@
     const start = L.marker([demo.start.lat, demo.start.lng], { icon: redPinIcon(), zIndexOffset: 500 })
       .addTo(map)
       .bindTooltip(`Início · ${demo.start.name}`, { className: "preview-tooltip", direction: "top" });
-    const end = L.marker([demo.end.lat, demo.end.lng], { icon: redPinIcon(), zIndexOffset: 500 })
+    L.marker([demo.end.lat, demo.end.lng], { icon: redPinIcon(), zIndexOffset: 500 })
       .addTo(map)
       .bindTooltip(`Fim · ${demo.end.name}`, { className: "preview-tooltip", direction: "top" });
 

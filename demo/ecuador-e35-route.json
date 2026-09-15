@@ -1,0 +1,23 @@
+{
+  "schema": "route-demo-v1",
+  "countryCode": "EC",
+  "roadRef": "E35",
+  "canonicalRoadId": "INT:EC:E:35",
+  "osmRelationId": 1651152,
+  "source": "OpenStreetMap Wiki · Ecuador/normalizacion de vias + catálogo OSM de rutas EC:national",
+  "geometryNote": "Geometria simplificada entre Machachi e Latacunga apenas para validar identificação, posicionamento e renderização do emblema.",
+  "start": { "name": "Machachi", "lat": -0.5101, "lng": -78.5671 },
+  "end": { "name": "Latacunga", "lat": -0.9340, "lng": -78.6146 },
+  "distanceKm": 47.6,
+  "durationSeconds": 2700,
+  "precision": 5,
+  "encodedPolyline": "bsbBjcp~MzmTbnCnvZf{C~q`@oA",
+  "segments": [
+    {
+      "ref": "E35",
+      "name": "Troncal de la Sierra · E35",
+      "distanceKm": 47.6,
+      "encodedPolyline": "bsbBjcp~MzmTbnCnvZf{C~q`@oA"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "route-demo-v1",
+  "countryCode": "UY",
+  "roadRef": "Ruta 5",
+  "canonicalRoadId": "INT:UY:RU:5",
+  "osmRelationId": 2626183,
+  "source": "OpenStreetMap Wiki · ES:Uruguay/Rutas nacionales y departamentales",
+  "geometryNote": "Geometria simplificada apenas para validar renderização e posicionamento do emblema.",
+  "start": { "name": "Progreso", "lat": -34.6669, "lng": -56.2185 },
+  "end": { "name": "Florida", "lat": -34.0956, "lng": -56.2142 },
+  "distanceKm": 63.5,
+  "durationSeconds": 3300,
+  "precision": 5,
+  "encodedPolyline": "b{qrErdcvIcu[c[_db@wQovn@~R",
+  "segments": [
+    {
+      "ref": "Ruta 5",
+      "name": "Ruta 5 · Brigadier General Fructuoso Rivera",
+      "distanceKm": 63.5,
+      "encodedPolyline": "b{qrErdcvIcu[c[_db@wQovn@~R"
+    }
+  ]
+}

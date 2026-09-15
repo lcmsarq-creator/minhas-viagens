@@ -12,7 +12,7 @@
   const accountEmail = document.getElementById("accountEmail");
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
-  const APP_VERSION = "0.13.10";
+  const APP_VERSION = "0.13.11";
   let client = null;
   let currentSession = null;
   let appLoaded = false;

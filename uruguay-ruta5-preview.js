@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.6";
+  const APP_VERSION = "0.13.8";
   const mapElement = document.getElementById("preview-map");
   const statusElement = document.getElementById("preview-status");
   const statsElement = document.getElementById("preview-stats");

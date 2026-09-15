@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.5";
+  const APP_VERSION = "0.13.6";
   const BOLIVIA_ASSET = `assets/road-shields/bol-national-default.svg?v=${APP_VERSION}`;
   const BOLIVIA_SAFE_AREA = Object.freeze({
     x: 205.5909,
@@ -33,6 +33,49 @@
     if (/\bD\s*-?\s*\d{3,4}\b/.test(value)) return "";
     const match = value.match(/(?:^|\b)(?:F|RN|RUTA(?:\s+NACIONAL)?)\s*-?\s*0*(\d{1,3}[A-Z]?)(?:\b|$)/);
     return match ? `INT:BO:F:${match[1]}` : "";
+  }
+
+  function autoCountryCodes(context) {
+    if (context && typeof context === "object" && Array.isArray(context.countries)) {
+      return context.countries.map(code => String(code).toUpperCase()).filter(Boolean);
+    }
+    const value = String(context || "").toUpperCase();
+    if (!value.startsWith("AUTO")) return [];
+    return value.slice(4).replace(/^[:|]/, "").split(/[,|:]/).map(code => code.trim()).filter(Boolean);
+  }
+
+  function autoCountryHint(context) {
+    return context && typeof context === "object" ? String(context.hint || "").toUpperCase() : "";
+  }
+
+  // Em uma rota multinacional os endpoints não determinam o país de cada etapa.
+  // Ainda assim, as redes nacionais com prefixo próprio são inequívocas. Para
+  // RN/Ruta (que também aparecem em dados brasileiros), só inferimos Argentina
+  // ou Uruguai quando o contexto não inclui o Brasil.
+  function autoInternationalRoadRef(raw, context) {
+    const countries = autoCountryCodes(context);
+    const hint = autoCountryHint(context);
+    if (!countries.length) return "";
+    const value = String(raw || "").toUpperCase().replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+    let match = value.match(/^PE\s*-?\s*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:PE:PE:${match[1]}`;
+    match = value.match(/^PY\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:PY:PY:${match[1]}`;
+    match = value.match(/^CH\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:CL:CH:${match[1]}`;
+    match = value.match(/^E\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:EC:E:${match[1]}`;
+    match = value.match(/^T\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:VE:T:${match[1]}`;
+    match = value.match(/^F\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:BO:F:${match[1]}`;
+    if (countries.includes("BR")) return "";
+    match = value.match(/^(?:RN|RUTA\s+NACIONAL)\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match) return `INT:AR:RN:${match[1]}`;
+    match = value.match(/^RUTA\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
+    if (match && hint === "AR") return `INT:AR:RN:${match[1]}`;
+    if (match && countries.includes("UY")) return `INT:UY:RU:${match[1]}`;
+    return "";
   }
 
   function exactVectorNumber(number) {
@@ -80,6 +123,7 @@
     version: APP_VERSION,
     templates: Object.freeze({ BO: Object.freeze({ asset: BOLIVIA_ASSET, safeArea: BOLIVIA_SAFE_AREA }) }),
     boliviaRoadRef,
+    autoInternationalRoadRef,
     boliviaShieldMarkup,
     exactVectorNumber
   });
@@ -88,7 +132,7 @@
   const baseInternationalRoadRef = typeof internationalRoadRef === "function" ? internationalRoadRef : null;
   if (baseInternationalRoadRef) {
     internationalRoadRef = function internationalRoadRefWithCountryTemplates(raw, countryCode) {
-      return boliviaRoadRef(raw, countryCode) || baseInternationalRoadRef(raw, countryCode);
+      return boliviaRoadRef(raw, countryCode) || autoInternationalRoadRef(raw, countryCode) || baseInternationalRoadRef(raw, countryCode);
     };
   }
 

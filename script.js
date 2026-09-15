@@ -266,16 +266,37 @@ const INTERNATIONAL_ROADS = {
 
 const COUNTRY_CODE_BY_NAME = {
   uruguay: "UY", argentina: "AR", paraguay: "PY", chile: "CL", bolivia: "BO",
-  peru: "PE", colombia: "CO", venezuela: "VE", ecuador: "EC"
+  peru: "PE", colombia: "CO", venezuela: "VE", ecuador: "EC", brasil: "BR", brazil: "BR"
 };
 
 function tripRoadCountry(trip) {
   const places = [trip?.startPlace, ...(trip?.stopPlaces || []), trip?.endPlace].filter(Boolean);
   const codes = places.map(place => {
     const direct = String(place.countryCode || "").toUpperCase();
-    return INTERNATIONAL_ROADS[direct] ? direct : COUNTRY_CODE_BY_NAME[normalizeSimple(place.country)] || "";
+    return direct === "BR" || INTERNATIONAL_ROADS[direct]
+      ? direct
+      : COUNTRY_CODE_BY_NAME[normalizeSimple(place.country)] || "";
   }).filter(Boolean);
   return codes.length && codes.every(code => code === codes[0]) ? codes[0] : "";
+}
+
+function tripRoadCountryContext(trip) {
+  const places = [trip?.startPlace, ...(trip?.stopPlaces || []), trip?.endPlace].filter(Boolean);
+  const codes = [...new Set(places.map(place => {
+    const direct = String(place.countryCode || "").toUpperCase();
+    return direct === "BR" || INTERNATIONAL_ROADS[direct]
+      ? direct
+      : COUNTRY_CODE_BY_NAME[normalizeSimple(place.country)] || "";
+  }).filter(Boolean))];
+  if (!codes.length) return "";
+  if (codes.length === 1) return codes[0];
+  return { mode: "AUTO", countries: codes, hint: "" };
+}
+
+function rememberRoadCountryContext(context, label) {
+  if (!context || typeof context !== "object" || context.mode !== "AUTO") return;
+  const match = String(label || "").match(/^INT:([A-Z]{2}):/i);
+  if (match) context.hint = match[1].toUpperCase();
 }
 
 function parseRoadCode(label) {
@@ -359,8 +380,12 @@ function ensureTripSchema(trip) {
   if (!trip.conquests || typeof trip.conquests !== "object") trip.conquests = {};
   if (!Array.isArray(trip.conquests.cities)) trip.conquests.cities = cityConquestsForTrip(trip);
   if (!Array.isArray(trip.conquests.roads)) trip.conquests.roads = [];
-  const roadCountry = tripRoadCountry(trip);
-  trip.conquests.roads = trip.conquests.roads.map(road => internationalRoadRef(road, roadCountry) || cleanRoadRef(road));
+  const roadCountry = tripRoadCountryContext(trip);
+  trip.conquests.roads = trip.conquests.roads.map(road => {
+    const label = internationalRoadRef(road, roadCountry) || cleanRoadRef(road);
+    rememberRoadCountryContext(roadCountry, label);
+    return label;
+  });
 
   // Migração v0.6.5: as conquistas de rodovias passam a usar exatamente
   // as placas principais exibidas sobre a rota. Isso remove referências
@@ -371,6 +396,7 @@ function ensureTripSchema(trip) {
     for (const badge of trip.roadLabels) {
       const rawLabel = typeof badge === "string" ? badge : badge?.label;
       const label = internationalRoadRef(rawLabel, roadCountry) || cleanRoadRef(rawLabel);
+      rememberRoadCountryContext(roadCountry, label);
       if (badge && typeof badge === "object") badge.label = label;
       if (!label || !isHighwayRef(label)) continue;
       const key = normalizeKey(label);
@@ -385,6 +411,18 @@ function ensureTripSchema(trip) {
     }
     trip.conquests.roads = uniqueRoads;
   }
+  // Referências internacionais antigas eram guardadas como "RN 14" ou
+  // "Ruta 15". Migra também as chaves dos segmentos para que o recorte já
+  // baixado continue reutilizável depois da normalização.
+  const normalizedRoadSegments = {};
+  for (const [rawLabel, lines] of Object.entries(trip.roadSegments || {})) {
+    const label = internationalRoadRef(rawLabel, roadCountry) || cleanRoadRef(rawLabel);
+    rememberRoadCountryContext(roadCountry, label);
+    if (!label || !Array.isArray(lines)) continue;
+    if (!normalizedRoadSegments[label]) normalizedRoadSegments[label] = [];
+    normalizedRoadSegments[label].push(...lines);
+  }
+  trip.roadSegments = normalizedRoadSegments;
   trip.conquests.cities = cityConquestsForTrip(trip);
   return trip;
 }
@@ -513,7 +551,7 @@ function roadRefsFromStep(step, countryCode = "") {
 
 function extractRoadLabelsFromRoute(route, trip = null) {
   const groups = [];
-  const countryCode = tripRoadCountry(trip);
+  const countryCode = tripRoadCountryContext(trip);
   let current = null;
   const finish = () => {
     if (!current) return;
@@ -528,6 +566,7 @@ function extractRoadLabelsFromRoute(route, trip = null) {
   for (const leg of route?.legs || []) {
     for (const step of leg.steps || []) {
       const refs = roadRefsFromStep(step, countryCode);
+      rememberRoadCountryContext(countryCode, refs[0]);
       const label = refs[0] || "";
       if (!label) {
         finish();
@@ -549,12 +588,14 @@ function extractRoadLabelsFromRoute(route, trip = null) {
 
 function extractRoadSegmentsFromRoute(route, trip = null) {
   const result = {};
-  const countryCode = tripRoadCountry(trip);
+  const countryCode = tripRoadCountryContext(trip);
   for (const leg of route?.legs || []) {
     for (const step of leg.steps || []) {
       const coords = (step?.geometry?.coordinates || []).map(([lng, lat]) => [lat, lng]);
       if (coords.length < 2) continue;
-      for (const label of roadRefsFromStep(step, countryCode)) {
+      const refs = roadRefsFromStep(step, countryCode);
+      rememberRoadCountryContext(countryCode, refs[0]);
+      for (const label of refs) {
         if (!result[label]) result[label] = [];
         const previous = result[label].at(-1);
         if (previous && haversineKm({ lat: previous.at(-1)[0], lng: previous.at(-1)[1] }, { lat: coords[0][0], lng: coords[0][1] }) < .15) previous.push(...coords.slice(1));

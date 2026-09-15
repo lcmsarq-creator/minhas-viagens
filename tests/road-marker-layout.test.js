@@ -113,7 +113,7 @@ test("o hotfix converte diretamente as etapas OSRM nos três marcadores do exemp
   const markers = context.extractRoadLabelsFromRoute(route, trip);
   assert.deepEqual(Array.from(markers, marker => marker.label), ["SP-425", "BR-153", "SP-425"]);
   assert.deepEqual(Array.from(context.extractHighwaysFromRoute(route, trip)), ["SP-425"]);
-  assert.equal(trip.roadBadgeLayoutVersion, "road-badges-v1-20km");
+  assert.equal(trip.roadBadgeLayoutVersion, "road-badges-v2-country-context");
 
   const shortRoute = {
     legs: [{ steps: [

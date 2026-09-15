@@ -57,12 +57,27 @@ test("a Bolívia reconhece apenas referências da rede nacional F", () => {
   assert.equal(context.internationalRoadRef("RN 4", "AR"), "base:AR:RN 4");
 });
 
+test("rotas multinacionais inferem a rede estrangeira sem transformar RN em estado brasileiro", () => {
+  const context = fixture();
+  const api = context.MinhasViagensInternationalRoadShields;
+
+  assert.equal(api.autoInternationalRoadRef("Ruta 15", "AUTO:UY,CO"), "INT:UY:RU:15");
+  assert.equal(api.autoInternationalRoadRef("Ruta 9", "AUTO:UY,CO"), "INT:UY:RU:9");
+  assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:UY,CO"), "INT:AR:RN:14");
+  assert.equal(api.autoInternationalRoadRef("RN 119", "AUTO:UY,CO"), "INT:AR:RN:119");
+  assert.equal(api.autoInternationalRoadRef("Ruta 8", { mode: "AUTO", countries: ["UY", "CO"], hint: "AR" }), "INT:AR:RN:8");
+  assert.equal(api.autoInternationalRoadRef("PE-1N", "AUTO:UY,PE,CO"), "INT:PE:PE:1N");
+  assert.equal(api.autoInternationalRoadRef("F4", "AUTO:AR,BO,CO"), "INT:BO:F:4");
+  assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:BR,AR"), "");
+  assert.equal(context.internationalRoadRef("RN 14", "AUTO:UY,CO"), "INT:AR:RN:14");
+});
+
 test("o F4 usa o desenho e o algarismo vetorial enviados, com recorte de segurança", () => {
   const context = fixture();
   const markup = context.roadShieldMarkup("INT:BO:F:4", "map");
 
-  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.5#shield-base/);
-  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.5#road-glyph-4/);
+  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.6#shield-base/);
+  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.6#road-glyph-4/);
   assert.match(markup, /clipPath/);
   assert.doesNotMatch(markup, /<text\b/);
   assert.equal(context.roadShieldMarkup("INT:AR:RN:4", "map"), "base-shield:INT:AR:RN:4:map");
@@ -107,8 +122,8 @@ test("a página de teste usa o mesmo motor de marcadores sem persistir dados", (
   const script = fs.readFileSync("bolivia-f4-preview.js", "utf8");
 
   assert.match(html, /id="preview-map"/);
-  assert.match(html, /road-marker-layout\.js\?v=0\.13\.5/);
-  assert.match(html, /international-road-shields\.js\?v=0\.13\.5/);
+  assert.match(html, /road-marker-layout\.js\?v=0\.13\.6/);
+  assert.match(html, /international-road-shields\.js\?v=0\.13\.6/);
   assert.match(script, /demo\/bolivia-f4-route\.json/);
   assert.match(script, /markersFromTimeline/);
   assert.match(script, /boliviaShieldMarkup/);

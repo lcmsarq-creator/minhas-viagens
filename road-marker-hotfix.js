@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.5";
-  const BADGE_LAYOUT_SCHEMA = "road-badges-v1-20km";
+  const APP_VERSION = "0.13.6";
+  const BADGE_LAYOUT_SCHEMA = "road-badges-v2-country-context";
   const layout = window.MinhasViagensRoadMarkerLayout;
   const baseExtractRoadLabels = typeof extractRoadLabelsFromRoute === "function" ? extractRoadLabelsFromRoute : null;
 
@@ -22,7 +22,9 @@
   }
 
   function routeTimeline(route, trip) {
-    const countryCode = tripRoadCountry(trip);
+    const countryCode = typeof tripRoadCountryContext === "function"
+      ? tripRoadCountryContext(trip)
+      : tripRoadCountry(trip);
     const chunks = [];
     for (const leg of route?.legs || []) {
       for (const step of leg.steps || []) {
@@ -32,6 +34,7 @@
           .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
         if (coordinates.length < 2) continue;
         const refs = roadRefsFromStep(step, countryCode);
+        if (typeof rememberRoadCountryContext === "function") rememberRoadCountryContext(countryCode, refs[0]);
         chunks.push({ label: refs[0] || "", line: coordinates });
       }
     }
@@ -79,6 +82,47 @@
     return Array.isArray(match?.[1]) ? match[1] : [];
   }
 
+  function normalizeStoredRoadData(trip) {
+    if (typeof tripRoadCountryContext !== "function") return false;
+    const context = tripRoadCountryContext(trip);
+    let changed = false;
+    const badgeLabels = new Map();
+    const normalize = raw => {
+      const label = internationalRoadRef(raw, context) || cleanRoadRef(raw);
+      if (typeof rememberRoadCountryContext === "function") rememberRoadCountryContext(context, label);
+      return label;
+    };
+
+    // roadLabels preserva a ordem da rota; ela é a melhor pista para separar
+    // "Ruta" uruguaia de "Ruta" argentina em viagens multinacionais.
+    for (const [index, badge] of (trip.roadLabels || []).entries()) {
+      const raw = typeof badge === "string" ? badge : badge?.label;
+      const label = normalize(raw);
+      if (raw) badgeLabels.set(normalizeSimple(raw), label);
+      if (typeof badge === "string" && badge !== label) { trip.roadLabels[index] = label; changed = true; }
+      if (badge && typeof badge === "object" && badge.label !== label) { badge.label = label; changed = true; }
+    }
+    const roads = (trip.conquests?.roads || []).map(raw => {
+      const known = badgeLabels.get(normalizeSimple(raw));
+      return known || normalize(raw);
+    });
+    if (roads.some((road, index) => road !== trip.conquests.roads[index])) {
+      trip.conquests.roads = roads;
+      changed = true;
+    }
+
+    const normalizedSegments = {};
+    for (const [raw, lines] of Object.entries(trip.roadSegments || {})) {
+      const label = normalize(raw);
+      if (!Array.isArray(lines)) continue;
+      if (!normalizedSegments[label]) normalizedSegments[label] = [];
+      normalizedSegments[label].push(...lines);
+      if (label !== raw) changed = true;
+    }
+    trip.roadSegments = normalizedSegments;
+    return changed;
+  }
+
   function badgesEqual(left, right) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
     return left.every((badge, index) => {
@@ -90,6 +134,7 @@
   }
 
   async function rebuildTripBadges(trip) {
+    const normalized = normalizeStoredRoadData(trip);
     const segmentMap = {};
     for (const label of candidateLabels(trip)) {
       let lines = memorySegments(trip, label);
@@ -110,7 +155,7 @@
     const changed = !badgesEqual(trip.roadLabels || [], markers) || trip.roadBadgeLayoutVersion !== BADGE_LAYOUT_SCHEMA;
     trip.roadLabels = markers;
     trip.roadBadgeLayoutVersion = BADGE_LAYOUT_SCHEMA;
-    return changed;
+    return changed || normalized;
   }
 
   let rebuildTimer = null;

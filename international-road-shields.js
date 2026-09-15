@@ -16,6 +16,15 @@
   const BOLIVIA_GLYPH_Y = 417.5206;
   const BOLIVIA_GLYPH_HEIGHT = 304.6502;
   const BOLIVIA_GLYPH_GAP = 36.9484;
+
+  const URUGUAY_ASSET = `assets/road-shields/ury-national-default.svg?v=${APP_VERSION}`;
+  const URUGUAY_SAFE_AREA = Object.freeze({
+    x: 143.8878,
+    y: 209.0568,
+    width: 402.3529,
+    height: 364.239
+  });
+
   let clipSequence = 0;
 
   function escapeMarkup(value) {
@@ -35,6 +44,15 @@
     return match ? `INT:BO:F:${match[1]}` : "";
   }
 
+  function uruguayRoadRef(raw, countryCode = "UY") {
+    if (String(countryCode || "").toUpperCase() !== "UY") return "";
+    const value = String(raw || "").toUpperCase().replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+    const canonical = value.match(/^INT:UY:RU:(\d{1,3}[A-Z]?)$/);
+    if (canonical) return `INT:UY:RU:${canonical[1]}`;
+    const match = value.match(/(?:^|\b)(?:RUTA(?:\s+NACIONAL)?|RN)\s*-?\s*0*(\d{1,3}[A-Z]?)(?:\b|$)/);
+    return match ? `INT:UY:RU:${match[1]}` : "";
+  }
+
   function autoCountryCodes(context) {
     if (context && typeof context === "object" && Array.isArray(context.countries)) {
       return context.countries.map(code => String(code).toUpperCase()).filter(Boolean);
@@ -49,9 +67,8 @@
   }
 
   // Em uma rota multinacional os endpoints não determinam o país de cada etapa.
-  // Ainda assim, as redes nacionais com prefixo próprio são inequívocas. Para
-  // RN/Ruta (que também aparecem em dados brasileiros), só inferimos Argentina
-  // ou Uruguai quando o contexto não inclui o Brasil.
+  // Redes com prefixo próprio continuam inequívocas. RN/Ruta Nacional, porém,
+  // só são atribuídas a Argentina ou Uruguai quando esse país existe no contexto.
   function autoInternationalRoadRef(raw, context) {
     const countries = autoCountryCodes(context);
     const hint = autoCountryHint(context);
@@ -70,11 +87,20 @@
     match = value.match(/^F\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
     if (match) return `INT:BO:F:${match[1]}`;
     if (countries.includes("BR")) return "";
+
     match = value.match(/^(?:RN|RUTA\s+NACIONAL)\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
-    if (match) return `INT:AR:RN:${match[1]}`;
+    if (match) {
+      if (hint === "UY") return `INT:UY:RU:${match[1]}`;
+      if (hint === "AR") return `INT:AR:RN:${match[1]}`;
+      if (countries.includes("UY") && !countries.includes("AR")) return `INT:UY:RU:${match[1]}`;
+      if (countries.includes("AR")) return `INT:AR:RN:${match[1]}`;
+    }
+
     match = value.match(/^RUTA\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
     if (match && hint === "AR") return `INT:AR:RN:${match[1]}`;
+    if (match && hint === "UY") return `INT:UY:RU:${match[1]}`;
     if (match && countries.includes("UY")) return `INT:UY:RU:${match[1]}`;
+    if (match && countries.includes("AR")) return `INT:AR:RN:${match[1]}`;
     return "";
   }
 
@@ -107,6 +133,15 @@
     return `<text x="${x.toFixed(4)}" y="${y.toFixed(4)}" fill="#f0f0f0" font-family="Arial, Helvetica, sans-serif" font-size="${size}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${escapeMarkup(value)}</text>`;
   }
 
+  function uruguayNumberMarkup(number) {
+    const value = String(number || "");
+    if (value === "5") return `<use href="${URUGUAY_ASSET}#road-glyph-5"/>`;
+    const size = value.length <= 1 ? 350 : value.length === 2 ? 280 : value.length === 3 ? 220 : 180;
+    const x = URUGUAY_SAFE_AREA.x + URUGUAY_SAFE_AREA.width / 2;
+    const y = URUGUAY_SAFE_AREA.y + URUGUAY_SAFE_AREA.height / 2;
+    return `<text x="${x.toFixed(4)}" y="${y.toFixed(4)}" fill="#fefeff" font-family="Arial, Helvetica, sans-serif" font-size="${size}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${escapeMarkup(value)}</text>`;
+  }
+
   function boliviaShieldMarkup(number, size = "achievement") {
     const value = String(number || "").toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 4);
     if (!value) return "";
@@ -119,12 +154,28 @@
     </svg>`;
   }
 
+  function uruguayShieldMarkup(number, size = "achievement") {
+    const value = String(number || "").toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 4);
+    if (!value) return "";
+    const clipId = `mv-uruguay-number-${++clipSequence}`;
+    return `<svg class="road-emblem-svg international uruguay ${escapeMarkup(size)}" viewBox="0 0 694.3001 868.7791" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Uruguai, Ruta ${escapeMarkup(value)}">
+      <defs><clipPath id="${clipId}"><rect x="${URUGUAY_SAFE_AREA.x}" y="${URUGUAY_SAFE_AREA.y}" width="${URUGUAY_SAFE_AREA.width}" height="${URUGUAY_SAFE_AREA.height}"/></clipPath></defs>
+      <use href="${URUGUAY_ASSET}#shield-base"/>
+      <g clip-path="url(#${clipId})">${uruguayNumberMarkup(value)}</g>
+    </svg>`;
+  }
+
   const api = Object.freeze({
     version: APP_VERSION,
-    templates: Object.freeze({ BO: Object.freeze({ asset: BOLIVIA_ASSET, safeArea: BOLIVIA_SAFE_AREA }) }),
+    templates: Object.freeze({
+      BO: Object.freeze({ asset: BOLIVIA_ASSET, safeArea: BOLIVIA_SAFE_AREA }),
+      UY: Object.freeze({ asset: URUGUAY_ASSET, safeArea: URUGUAY_SAFE_AREA })
+    }),
     boliviaRoadRef,
+    uruguayRoadRef,
     autoInternationalRoadRef,
     boliviaShieldMarkup,
+    uruguayShieldMarkup,
     exactVectorNumber
   });
   window.MinhasViagensInternationalRoadShields = api;
@@ -132,7 +183,7 @@
   const baseInternationalRoadRef = typeof internationalRoadRef === "function" ? internationalRoadRef : null;
   if (baseInternationalRoadRef) {
     internationalRoadRef = function internationalRoadRefWithCountryTemplates(raw, countryCode) {
-      return boliviaRoadRef(raw, countryCode) || autoInternationalRoadRef(raw, countryCode) || baseInternationalRoadRef(raw, countryCode);
+      return boliviaRoadRef(raw, countryCode) || uruguayRoadRef(raw, countryCode) || autoInternationalRoadRef(raw, countryCode) || baseInternationalRoadRef(raw, countryCode);
     };
   }
 
@@ -143,9 +194,12 @@
       if (parsed?.international && parsed.countryCode === "BO" && parsed.network === "F") {
         return boliviaShieldMarkup(parsed.number, size);
       }
+      if (parsed?.international && parsed.countryCode === "UY" && parsed.network === "RU") {
+        return uruguayShieldMarkup(parsed.number, size);
+      }
       return baseRoadShieldMarkup(label, size);
     };
   }
 
-  console.info(`Minhas Viagens ${APP_VERSION}: template vetorial das rodovias nacionais da Bolívia habilitado.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: templates vetoriais das rodovias nacionais da Bolívia e do Uruguai habilitados.`);
 })();

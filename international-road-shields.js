@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.6";
+  const APP_VERSION = "0.13.7";
   const BOLIVIA_ASSET = `assets/road-shields/bol-national-default.svg?v=${APP_VERSION}`;
   const BOLIVIA_SAFE_AREA = Object.freeze({
     x: 205.5909,

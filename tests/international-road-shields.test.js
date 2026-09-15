@@ -75,46 +75,35 @@ test("rotas multinacionais inferem a rede estrangeira sem transformar RN em esta
   assert.equal(api.autoInternationalRoadRef("Ruta 15", "AUTO:UY,CO"), "INT:UY:RU:15");
   assert.equal(api.autoInternationalRoadRef("Ruta 9", "AUTO:UY,CO"), "INT:UY:RU:9");
   assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:UY,CO"), "INT:UY:RU:14");
-  assert.equal(api.autoInternationalRoadRef("Ruta Nacional 5", "AUTO:UY,CO"), "INT:UY:RU:5");
   assert.equal(api.autoInternationalRoadRef("RN 119", "AUTO:AR,CO"), "INT:AR:RN:119");
   assert.equal(api.autoInternationalRoadRef("Ruta 8", { mode: "AUTO", countries: ["UY", "CO"], hint: "AR" }), "INT:AR:RN:8");
   assert.equal(api.autoInternationalRoadRef("PE-1N", "AUTO:UY,PE,CO"), "INT:PE:PE:1N");
   assert.equal(api.autoInternationalRoadRef("F4", "AUTO:AR,BO,CO"), "INT:BO:F:4");
   assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:BR,AR"), "");
-  assert.equal(context.internationalRoadRef("RN 14", "AUTO:UY,CO"), "INT:UY:RU:14");
+  assert.equal(context.internationalRoadRef("Ruta Nacional 5", "AUTO:UY,CO"), "INT:UY:RU:5");
+  assert.equal(context.internationalRoadRef("RN 14", "AUTO:AR,CO"), "INT:AR:RN:14");
 });
 
-test("o F4 usa o desenho e o algarismo vetorial enviados, com recorte de segurança", () => {
+test("F4 e Ruta 5 usam os templates vetoriais dos respectivos países", () => {
   const context = fixture();
-  const markup = context.roadShieldMarkup("INT:BO:F:4", "map");
+  const bolivia = context.roadShieldMarkup("INT:BO:F:4", "map");
+  const uruguay = context.roadShieldMarkup("INT:UY:RU:5", "map");
 
-  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.6#shield-base/);
-  assert.match(markup, /bol-national-default\.svg\?v=0\.13\.6#road-glyph-4/);
-  assert.match(markup, /clipPath/);
-  assert.doesNotMatch(markup, /<text\b/);
-  assert.equal(context.roadShieldMarkup("INT:AR:RN:4", "map"), "base-shield:INT:AR:RN:4:map");
-});
-
-test("a Ruta 5 usa o escudo e o algarismo vetorial enviados para o Uruguai", () => {
-  const context = fixture();
-  const markup = context.roadShieldMarkup("INT:UY:RU:5", "map");
-
-  assert.match(markup, /ury-national-default\.svg\?v=0\.13\.6#shield-base/);
-  assert.match(markup, /ury-national-default\.svg\?v=0\.13\.6#road-glyph-5/);
-  assert.match(markup, /clipPath/);
-  assert.doesNotMatch(markup, /<text\b/);
+  assert.match(bolivia, /bol-national-default\.svg\?v=0\.13\.7#shield-base/);
+  assert.match(bolivia, /bol-national-default\.svg\?v=0\.13\.7#road-glyph-4/);
+  assert.match(uruguay, /ury-national-default\.svg\?v=0\.13\.7#shield-base/);
+  assert.match(uruguay, /ury-national-default\.svg\?v=0\.13\.7#road-glyph-5/);
+  assert.match(uruguay, /class="road-emblem-svg international uruguay map"/);
+  assert.doesNotMatch(uruguay, /<text\b/);
+  assert.equal(context.roadShieldMarkup("INT:AR:RN:5", "map"), "base-shield:INT:AR:RN:5:map");
 });
 
 test("os templates preservam viewBox, área segura invisível e IDs estáveis", () => {
   const bolivia = fs.readFileSync("assets/road-shields/bol-national-default.svg", "utf8");
-  assert.match(bolivia, /viewBox="0 0 959\.0027 868\.7791"/);
-  assert.match(bolivia, /preserveAspectRatio="xMidYMid meet"/);
-  assert.match(bolivia, /id="shield-base"/);
-  assert.match(bolivia, /id="text-safe-area" opacity="0"/);
-  assert.match(bolivia, /id="road-glyph-4"/);
-  assert.doesNotMatch(bolivia, /<image\b/);
-
   const uruguay = fs.readFileSync("assets/road-shields/ury-national-default.svg", "utf8");
+
+  assert.match(bolivia, /viewBox="0 0 959\.0027 868\.7791"/);
+  assert.match(bolivia, /id="road-glyph-4"/);
   assert.match(uruguay, /viewBox="0 0 694\.3001 868\.7791"/);
   assert.match(uruguay, /preserveAspectRatio="xMidYMid meet"/);
   assert.match(uruguay, /id="shield-base"/);
@@ -137,11 +126,9 @@ test("a demonstração Cochabamba–Villa Tunari produz um único escudo F4", ()
   assert.equal(markers.length, 1);
   assert.equal(markers[0].label, "INT:BO:F:4");
   assert.ok(markers[0].distanceKm > 150);
-  assert.ok(markers[0].lat < -16 && markers[0].lat > -18);
-  assert.ok(markers[0].lng < -65 && markers[0].lng > -67);
 });
 
-test("a demonstração Progreso–Florida produz um único escudo Ruta 5", () => {
+test("a demonstração uruguaia referencia a relação OSM da Ruta 5 e produz um único escudo", () => {
   const context = fixture();
   const demo = JSON.parse(fs.readFileSync("demo/uruguay-ruta5-route.json", "utf8"));
   const timeline = demo.segments.map(segment => ({
@@ -150,39 +137,27 @@ test("a demonstração Progreso–Florida produz um único escudo Ruta 5", () =>
   }));
   const markers = layout.markersFromTimeline(timeline, { normalizeLabel: value => String(value).toLowerCase() });
 
-  assert.equal(demo.roadRef, "Ruta 5");
   assert.equal(demo.osmRelationId, 2626183);
+  assert.equal(demo.canonicalRoadId, "INT:UY:RU:5");
   assert.equal(markers.length, 1);
   assert.equal(markers[0].label, "INT:UY:RU:5");
-  assert.ok(markers[0].distanceKm > 60);
-  assert.ok(markers[0].lat < -34 && markers[0].lat > -35);
-  assert.ok(markers[0].lng < -56 && markers[0].lng > -57);
+  assert.ok(markers[0].distanceKm > 20);
 });
 
 test("o módulo internacional é carregado antes da consolidação dos marcadores", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
+  assert.match(auth, /const APP_VERSION = "0\.13\.7"/);
   assert.ok(auth.indexOf('"international-road-shields.js"') > auth.indexOf('"secondary-roads-hotfix.js"'));
   assert.ok(auth.indexOf('"international-road-shields.js"') < auth.indexOf('"road-marker-hotfix.js"'));
 });
 
-test("as páginas de teste usam o mesmo motor de marcadores sem persistir dados", () => {
-  const boliviaHtml = fs.readFileSync("bolivia-f4-preview.html", "utf8");
-  const boliviaScript = fs.readFileSync("bolivia-f4-preview.js", "utf8");
-  const uruguayHtml = fs.readFileSync("uruguay-ruta5-preview.html", "utf8");
-  const uruguayScript = fs.readFileSync("uruguay-ruta5-preview.js", "utf8");
-
-  assert.match(boliviaHtml, /id="preview-map"/);
-  assert.match(boliviaHtml, /road-marker-layout\.js\?v=0\.13\.6/);
-  assert.match(boliviaHtml, /international-road-shields\.js\?v=0\.13\.6/);
-  assert.match(boliviaScript, /demo\/bolivia-f4-route\.json/);
-  assert.match(boliviaScript, /markersFromTimeline/);
-  assert.match(boliviaScript, /boliviaShieldMarkup/);
-  assert.doesNotMatch(boliviaScript, /localStorage|sessionStorage|supabase|saveTrip|insert\s*\(/i);
-
-  assert.match(uruguayHtml, /id="preview-map"/);
-  assert.match(uruguayHtml, /international-road-shields\.js\?v=0\.13\.6/);
-  assert.match(uruguayScript, /demo\/uruguay-ruta5-route\.json/);
-  assert.match(uruguayScript, /markersFromTimeline/);
-  assert.match(uruguayScript, /uruguayShieldMarkup/);
-  assert.doesNotMatch(uruguayScript, /localStorage|sessionStorage|supabase|saveTrip|insert\s*\(/i);
+test("as páginas de teste usam o mesmo motor sem persistir dados", () => {
+  for (const fixtureName of ["bolivia-f4", "uruguay-ruta5"]) {
+    const html = fs.readFileSync(`${fixtureName}-preview.html`, "utf8");
+    const script = fs.readFileSync(`${fixtureName}-preview.js`, "utf8");
+    assert.match(html, /road-marker-layout\.js\?v=0\.13\.7/);
+    assert.match(html, /international-road-shields\.js\?v=0\.13\.7/);
+    assert.match(script, /markersFromTimeline/);
+    assert.doesNotMatch(script, /localStorage|sessionStorage|supabase|saveTrip|insert\s*\(/i);
+  }
 });

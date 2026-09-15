@@ -6,12 +6,11 @@ const vm = require("node:vm");
 function fixture() {
   const context = {
     console,
-    internationalRoadRef(raw, countryCode) { return `base:${countryCode}:${raw}`; },
+    INTERNATIONAL_ROADS: {},
+    COUNTRY_CODE_BY_NAME: {},
+    internationalRoadRef() { return ""; },
     roadShieldMarkup(label, size) { return `base-shield:${label}:${size}`; },
-    parseRoadCode(label) {
-      const match = String(label).match(/^INT:([A-Z]{2}):([A-Z]+):(\w+)$/);
-      return match ? { international: true, countryCode: match[1], network: match[2], number: match[3] } : null;
-    },
+    parseRoadCode() { return null; },
     escapeHtml(value) { return String(value); }
   };
   context.window = context;
@@ -21,31 +20,27 @@ function fixture() {
   return context;
 }
 
-test("Ruta/RN não recebe escudo uruguaio quando Argentina e Uruguai estão ambos no contexto", () => {
+test("Uruguai e Argentina são definidos pelo hint geográfico do próprio trecho", () => {
   const api = fixture().MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.autoInternationalRoadRef("Ruta 5", "AUTO:UY,AR,CL"), "");
-  assert.equal(api.autoInternationalRoadRef("Ruta 40", "AUTO:UY,AR,CL"), "");
-  assert.equal(api.autoInternationalRoadRef("RN 22", "AUTO:UY,AR,CL"), "");
-  assert.equal(api.autoInternationalRoadRef("Ruta Nacional 35", "AUTO:UY,AR,CL"), "");
+  assert.equal(api.internationalRoadRef("Ruta 15", { countries:["UY","AR"], hint:"UY" }), "INT:UY:RU:15");
+  assert.equal(api.internationalRoadRef("RN 9", { countries:["UY","AR"], hint:"AR" }), "INT:AR:RN:9");
+  assert.equal(api.internationalRoadRef("Ruta 5", { countries:["UY","AR"], hint:"" }), "");
 });
 
-test("contexto inequívoco ou hint explícito continua identificando o país correto", () => {
+test("Colômbia aceita ref nacional numérica e América Central aceita redes nacionais", () => {
   const api = fixture().MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.autoInternationalRoadRef("Ruta 5", "AUTO:UY,CL"), "INT:UY:RU:5");
-  assert.equal(api.autoInternationalRoadRef("Ruta 40", "AUTO:AR,CL"), "INT:AR:RN:40");
-  assert.equal(api.autoInternationalRoadRef("Ruta 5", { countries: ["UY", "AR", "CL"], hint: "UY" }), "INT:UY:RU:5");
-  assert.equal(api.autoInternationalRoadRef("Ruta 40", { countries: ["UY", "AR", "CL"], hint: "AR" }), "INT:AR:RN:40");
+  assert.equal(api.internationalRoadRef("25", { countries:["CO"], hint:"CO" }), "INT:CO:RN:25");
+  assert.equal(api.internationalRoadRef("CA-1", { countries:["GT"], hint:"GT" }), "INT:GT:CA:1");
+  assert.equal(api.internationalRoadRef("NIC-1", { countries:["NI"], hint:"NI" }), "INT:NI:NIC:1");
+  assert.equal(api.internationalRoadRef("2", { countries:["CR"], hint:"CR" }), "INT:CR:N:2");
 });
 
-test("release usa v0.13.9 para invalidar cache", () => {
+test("release v0.13.12 invalida o cache do shell e dos módulos", () => {
   const moduleSource = fs.readFileSync("international-road-shields.js", "utf8");
   const authSource = fs.readFileSync("auth.js", "utf8");
   const indexSource = fs.readFileSync("index.html", "utf8");
-
-  assert.match(moduleSource, /const APP_VERSION = "0\.13\.9"/);
-  assert.match(authSource, /const APP_VERSION = "0\.13\.9"/);
-  assert.match(indexSource, /MINHAS_VIAGENS_APP_VERSION = "0\.13\.9"/);
-  assert.match(indexSource, /auth\.js\?v=0\.13\.9/);
+  assert.match(moduleSource, /APP_VERSION = "0\.13\.12"/);
+  assert.match(authSource, /APP_VERSION="0\.13\.12"/);
+  assert.match(indexSource, /MINHAS_VIAGENS_APP_VERSION = "0\.13\.12"/);
+  assert.match(indexSource, /auth\.js\?v=0\.13\.12/);
 });

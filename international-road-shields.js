@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.8";
+  const APP_VERSION = "0.13.9";
   const BOLIVIA_ASSET = `assets/road-shields/bol-national-default.svg?v=${APP_VERSION}`;
   const BOLIVIA_SAFE_AREA = Object.freeze({
     x: 205.5909,
@@ -85,8 +85,8 @@
 
   // Em uma rota multinacional os endpoints não determinam o país de cada etapa.
   // Redes com prefixo próprio continuam inequívocas quando o país correspondente
-  // existe no contexto. RN/Ruta Nacional só são atribuídas a Argentina ou Uruguai
-  // quando esse país existe na rota.
+  // existe no contexto. RN/Ruta Nacional/Ruta entre Argentina e Uruguai só são
+  // atribuídas automaticamente quando apenas um dos dois países está no contexto.
   function autoInternationalRoadRef(raw, context) {
     const countries = autoCountryCodes(context);
     const hint = autoCountryHint(context);
@@ -108,17 +108,25 @@
 
     match = value.match(/^(?:RN|RUTA\s+NACIONAL)\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
     if (match) {
+      const hasUY = countries.includes("UY");
+      const hasAR = countries.includes("AR");
       if (hint === "UY") return `INT:UY:RU:${match[1]}`;
       if (hint === "AR") return `INT:AR:RN:${match[1]}`;
-      if (countries.includes("UY") && !countries.includes("AR")) return `INT:UY:RU:${match[1]}`;
-      if (countries.includes("AR")) return `INT:AR:RN:${match[1]}`;
+      if (hasUY && !hasAR) return `INT:UY:RU:${match[1]}`;
+      if (hasAR && !hasUY) return `INT:AR:RN:${match[1]}`;
+      return "";
     }
 
     match = value.match(/^RUTA\s*-?\s*0*(\d{1,3}[A-Z]?)$/);
-    if (match && hint === "AR") return `INT:AR:RN:${match[1]}`;
-    if (match && hint === "UY") return `INT:UY:RU:${match[1]}`;
-    if (match && countries.includes("UY")) return `INT:UY:RU:${match[1]}`;
-    if (match && countries.includes("AR")) return `INT:AR:RN:${match[1]}`;
+    if (match) {
+      const hasUY = countries.includes("UY");
+      const hasAR = countries.includes("AR");
+      if (hint === "UY") return `INT:UY:RU:${match[1]}`;
+      if (hint === "AR") return `INT:AR:RN:${match[1]}`;
+      if (hasUY && !hasAR) return `INT:UY:RU:${match[1]}`;
+      if (hasAR && !hasUY) return `INT:AR:RN:${match[1]}`;
+      return "";
+    }
     return "";
   }
 

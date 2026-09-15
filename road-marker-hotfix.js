@@ -1,10 +1,27 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.6";
-  const BADGE_LAYOUT_SCHEMA = "road-badges-v2-country-context";
+  const APP_VERSION = "0.13.10";
+  const BADGE_LAYOUT_SCHEMA = "road-badges-v3-safe-multicountry";
+  const TRANSIT_COUNTRIES = Object.freeze(["UY", "AR", "PY", "CL", "BO", "PE", "EC", "CO", "VE"]);
   const layout = window.MinhasViagensRoadMarkerLayout;
   const baseExtractRoadLabels = typeof extractRoadLabelsFromRoute === "function" ? extractRoadLabelsFromRoute : null;
+  const baseTripRoadCountryContext = typeof tripRoadCountryContext === "function" ? tripRoadCountryContext : null;
+
+  if (baseTripRoadCountryContext) {
+    tripRoadCountryContext = function tripRoadCountryContextSafeMulticountry(trip) {
+      const context = baseTripRoadCountryContext(trip);
+      if (!context || typeof context !== "object" || context.mode !== "AUTO") return context;
+      const current = Array.isArray(context.countries)
+        ? context.countries.map(code => String(code || "").toUpperCase()).filter(Boolean)
+        : [];
+      return {
+        mode: "AUTO",
+        countries: [...new Set([...current, ...TRANSIT_COUNTRIES])],
+        hint: ""
+      };
+    };
+  }
 
   const status = window.MinhasViagensRoadMarkers = {
     version: APP_VERSION,
@@ -13,6 +30,7 @@
     maxMinorInterruptionKm: layout?.MAX_MINOR_INTERRUPTION_KM ?? 20,
     rebuilding: false,
     rebuiltTrips: 0,
+    refreshedTrips: 0,
     missingSegmentCaches: 0
   };
 
@@ -48,9 +66,6 @@
     return markers;
   };
 
-  // A lista de conquistas tinha como fonte o extrator de placas. Como as placas
-  // agora exigem mais de 20 km, preserva aqui o extrator anterior, que já aplica
-  // exclusivamente o limite de 2 km definido para conceder uma rodovia.
   extractHighwaysFromRoute = function extractHighwaysFromRouteWithoutBadgeThreshold(route, trip = null) {
     const roads = new Map();
     for (const badge of baseExtractRoadLabels(route, trip) || []) {
@@ -93,8 +108,6 @@
       return label;
     };
 
-    // roadLabels preserva a ordem da rota; ela é a melhor pista para separar
-    // "Ruta" uruguaia de "Ruta" argentina em viagens multinacionais.
     for (const [index, badge] of (trip.roadLabels || []).entries()) {
       const raw = typeof badge === "string" ? badge : badge?.label;
       const label = normalize(raw);
@@ -114,7 +127,7 @@
     const normalizedSegments = {};
     for (const [raw, lines] of Object.entries(trip.roadSegments || {})) {
       const label = normalize(raw);
-      if (!Array.isArray(lines)) continue;
+      if (!label || !Array.isArray(lines)) continue;
       if (!normalizedSegments[label]) normalizedSegments[label] = [];
       normalizedSegments[label].push(...lines);
       if (label !== raw) changed = true;
@@ -133,7 +146,39 @@
     });
   }
 
+  async function refreshTripRoadDataFromRoute(trip) {
+    if (!["carro", "moto"].includes(trip?.mode)) return false;
+    if (typeof tripRoutingPoints !== "function" || typeof fetchOsrmRoute !== "function") return false;
+    const points = tripRoutingPoints(trip);
+    if (!Array.isArray(points) || points.length < 2) return false;
+
+    try {
+      const routes = await fetchOsrmRoute(points, false);
+      const preferredIndex = Number.isInteger(Number(trip.routeAlternativeIndex))
+        ? Number(trip.routeAlternativeIndex)
+        : 0;
+      const route = routes?.[preferredIndex] || routes?.[0];
+      if (!route) return false;
+
+      trip.roadLabels = extractRoadLabelsFromRoute(route, trip);
+      trip.conquests ||= {};
+      trip.conquests.roads = extractHighwaysFromRoute(route, trip);
+      trip.roadSegments = typeof extractRoadSegmentsFromRoute === "function"
+        ? extractRoadSegmentsFromRoute(route, trip)
+        : {};
+      trip.roadBadgeLayoutVersion = BADGE_LAYOUT_SCHEMA;
+      status.refreshedTrips += 1;
+      return true;
+    } catch (error) {
+      console.warn("Não foi possível reconsultar a rota para corrigir as placas", trip?.id, error);
+      return false;
+    }
+  }
+
   async function rebuildTripBadges(trip) {
+    const refreshed = await refreshTripRoadDataFromRoute(trip);
+    if (refreshed) return true;
+
     const normalized = normalizeStoredRoadData(trip);
     const segmentMap = {};
     for (const label of candidateLabels(trip)) {
@@ -168,6 +213,7 @@
     }
     status.rebuilding = true;
     status.rebuiltTrips = 0;
+    status.refreshedTrips = 0;
     status.missingSegmentCaches = 0;
     let changed = false;
 
@@ -218,5 +264,5 @@
   const brandCopy = document.querySelector(".brand p");
   if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${APP_VERSION}`);
 
-  console.info(`Minhas Viagens ${APP_VERSION}: um escudo por trecho de rodovia acima de 20 km; interrupções acima de 20 km iniciam novo trecho.`);
+  console.info(`Minhas Viagens ${APP_VERSION}: placas reconstruídas com contexto multinacional seguro; Equador E* preservado.`);
 })();

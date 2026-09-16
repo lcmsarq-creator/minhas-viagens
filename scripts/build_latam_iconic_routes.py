@@ -1,44 +1,36 @@
 #!/usr/bin/env python3
-"""Build static geometry for long Latin-American iconic routes.
+"""Build static geometry for Latin-American iconic road corridors.
 
-OSM route relations are preferred. The Mexican original Pan-American corridor is
-completed with routed waypoints because the current Pan-American OSM superrelation
-does not reach Nuevo Laredo. Generated files use the polyline5 schema consumed by
-the app and retain only the canonical corridor, not side branches.
+Long transnational OSM super-relations are often split into disconnected country
+components. For achievement matching we therefore route through documented corridor
+milestones on the OSM road graph. The Pan-American Highway is kept as two lines,
+with the Darien Gap deliberately absent.
 """
 
 from __future__ import annotations
 
-import heapq
 import json
 import math
 import os
-import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "iconic-routes" / "v1"
-USER_AGENT = "minhas-viagens-iconic-route-builder/1.1 (+https://github.com/lcmsarq-creator/minhas-viagens)"
-OVERPASS_ENDPOINTS = (
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
+USER_AGENT = "minhas-viagens-iconic-route-builder/1.2 (+https://github.com/lcmsarq-creator/minhas-viagens)"
+OSRM_ENDPOINTS = (
+    "https://router.project-osrm.org/route/v1/driving",
 )
-OSRM_ENDPOINT = "https://router.project-osrm.org/route/v1/driving"
 
 ROUTES = {
     "via-panamericana": {
-        "segments": [
+        "lines": [
             {
-                "kind": "osrm",
-                "label": "Nuevo Laredo–La Mesilla",
-                # Original Mexican corridor: MEX-85 north of Mexico City and
-                # MEX-190 southward. Intermediate points keep the router on it.
+                "label": "Nuevo Laredo–Yaviza",
                 "points": [
                     (27.4994, -99.5073), # Nuevo Laredo
-                    (25.6866, -100.3161),# Monterrey
+                    (25.6866, -100.3161),# Monterrey / MEX-85
                     (24.8577, -99.5674), # Linares
                     (23.7369, -99.1411), # Ciudad Victoria
                     (22.7433, -98.9711), # Ciudad Mante
@@ -46,48 +38,88 @@ ROUTES = {
                     (21.2590, -98.7890), # Tamazunchale
                     (20.1011, -98.7591), # Pachuca
                     (19.4326, -99.1332), # Ciudad de Mexico
-                    (19.0414, -98.2063), # Puebla
+                    (19.0414, -98.2063), # Puebla / MEX-190
                     (17.8079, -97.7796), # Huajuapan de Leon
                     (17.0732, -96.7266), # Oaxaca
                     (16.3246, -95.2380), # Tehuantepec
                     (16.7516, -93.1029), # Tuxtla Gutierrez
                     (16.7370, -92.6376), # San Cristobal de las Casas
                     (16.2470, -92.1350), # Comitan
-                    (15.6630, -92.1460), # La Mesilla
+                    (15.6630, -92.1460), # La Mesilla / Guatemala
+                    (14.6349, -90.5069), # Guatemala City
+                    (13.6929, -89.2182), # San Salvador
+                    (13.3003, -87.1908), # Choluteca
+                    (12.1150, -86.2362), # Managua
+                    (9.9281, -84.0907),  # San Jose
+                    (8.5330, -82.8380),  # Paso Canoas
+                    (8.4333, -82.4333),  # David
+                    (8.9824, -79.5199),  # Panama City
+                    (8.1587, -77.6928),  # Yaviza
                 ],
             },
             {
-                "kind": "relation",
-                "relation": 1661488,
-                "start": (15.6630, -92.1460), # La Mesilla / Guatemala border
-                "end": (8.1587, -77.6928),    # Yaviza, Panama
-                "label": "La Mesilla–Yaviza",
-            },
-            {
-                "kind": "relation",
-                "relation": 240861,
-                "start": (8.0928, -76.7282),  # northwestern Colombia / Turbo area
-                "end": (-34.6037, -58.3816),  # Buenos Aires
                 "label": "Colombia–Buenos Aires",
+                "points": [
+                    (8.0928, -76.7282),  # Turbo / NW Colombia
+                    (6.2442, -75.5812),  # Medellin
+                    (3.4516, -76.5320),  # Cali
+                    (2.4448, -76.6147),  # Popayan
+                    (1.2136, -77.2811),  # Pasto
+                    (0.8303, -77.6444),  # Ipiales / Rumichaca
+                    (-0.1807, -78.4678), # Quito / E35
+                    (-1.2491, -78.6168), # Ambato
+                    (-1.6636, -78.6546), # Riobamba
+                    (-2.9001, -79.0059), # Cuenca
+                    (-3.9931, -79.2042), # Loja
+                    (-4.3789, -79.9430), # Macara / La Tina
+                    (-5.1945, -80.6328), # Piura / PE-1N
+                    (-6.7714, -79.8409), # Chiclayo
+                    (-8.1091, -79.0215), # Trujillo
+                    (-12.0464, -77.0428),# Lima
+                    (-13.7135, -76.1842),# Pisco
+                    (-14.8340, -74.9380),# Nazca
+                    (-16.4090, -71.5375),# Arequipa corridor
+                    (-18.0146, -70.2536),# Tacna
+                    (-18.4783, -70.3126),# Arica / CH-5
+                    (-23.6509, -70.3975),# Antofagasta
+                    (-29.9027, -71.2519),# La Serena
+                    (-32.8400, -70.9560),# Llay-Llay, split north of Santiago
+                    (-32.8337, -70.5980),# Los Andes / CH-60
+                    (-32.8895, -68.8458),# Mendoza / AR RN7
+                    (-33.3017, -66.3378),# San Luis
+                    (-34.6037, -58.3816),# Buenos Aires
+                ],
             },
         ],
-        "source_type": "osm-route-relation+osrm-waypoints",
+        "source_type": "routed-waypoints",
         "source_url": "https://wiki.openstreetmap.org/wiki/Pan-American_Highway",
-        "note": "Eixo principal latino-americano em dois trechos, separado pelo Tapón del Darién.",
+        "osm_relation_ids": [1661488, 240861],
+        "note": "Eixo principal latino-americano em dois trechos, separado pelo Tapón del Darién; ramais para Quellón e Ushuaia não integram este recorte inicial.",
     },
     "carretera-austral": {
-        "segments": [
+        "lines": [
             {
-                "kind": "relation",
-                "relation": 6582701,
-                "start": (-41.4717, -72.9369), # Puerto Montt
-                "end": (-48.4666, -72.5592),   # Villa O'Higgins
                 "label": "Puerto Montt–Villa O'Higgins",
+                "points": [
+                    (-41.4717, -72.9369), # Puerto Montt
+                    (-41.6890, -72.6740), # Caleta La Arena
+                    (-41.9690, -72.4720), # Hornopiren
+                    (-42.6070, -72.6100), # Caleta Gonzalo
+                    (-42.9167, -72.7167), # Chaiten
+                    (-43.9740, -72.4050), # La Junta
+                    (-44.3260, -72.5570), # Puyuhuapi
+                    (-45.5712, -72.0685), # Coyhaique
+                    (-46.6260, -72.6700), # Puerto Rio Tranquilo
+                    (-47.2530, -72.5720), # Cochrane
+                    (-47.9700, -73.1350), # Puerto Yungay
+                    (-48.4666, -72.5592), # Villa O'Higgins
+                ],
             },
         ],
-        "source_type": "osm-route-relation",
+        "source_type": "routed-waypoints",
         "source_url": "https://www.openstreetmap.org/relation/6582701",
-        "note": "Ruta 7 / Longitudinal Austral; o corredor inclui conexões marítimas da rota.",
+        "osm_relation_ids": [6582701],
+        "note": "Ruta 7 / Longitudinal Austral; o corredor inclui as conexões marítimas que fazem parte da travessia.",
     },
 }
 
@@ -100,100 +132,23 @@ def haversine(a: tuple[float, float], b: tuple[float, float]) -> float:
     return 6371.0088 * 2 * math.asin(min(1.0, math.sqrt(h)))
 
 
-def overpass_ways(relation_id: int) -> list[dict]:
-    query = f"""[out:json][timeout:240][maxsize:1073741824];
-relation({relation_id})->.root;
-(.root; >>;)->.all;
-way.all;
-out geom;"""
-    payload = urllib.parse.urlencode({"data": query}).encode()
-    errors: list[str] = []
-    for endpoint in OVERPASS_ENDPOINTS:
-        for attempt in range(2):
-            try:
-                request = urllib.request.Request(
-                    endpoint, data=payload,
-                    headers={"User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(request, timeout=300) as response:
-                    data = json.load(response)
-                ways = [e for e in data.get("elements", []) if e.get("type") == "way" and len(e.get("geometry", [])) > 1]
-                if not ways:
-                    raise RuntimeError("Overpass returned no way geometry")
-                print(f"relation {relation_id}: {len(ways)} ways from {endpoint}")
-                return ways
-            except Exception as exc:
-                errors.append(f"{endpoint} attempt {attempt + 1}: {exc}")
-                time.sleep(4 + attempt * 4)
-    raise RuntimeError(f"Could not download relation {relation_id}: " + " | ".join(errors[-6:]))
-
-
-def graph_from_ways(ways: list[dict]):
-    coords: dict[object, tuple[float, float]] = {}
-    graph: dict[object, list[tuple[object, float]]] = {}
-    for way in ways:
-        geometry = way.get("geometry") or []
-        node_ids = way.get("nodes") or []
-        use_ids = len(node_ids) == len(geometry)
-        keys: list[object] = []
-        for index, point in enumerate(geometry):
-            lat, lon = float(point["lat"]), float(point["lon"])
-            key: object = node_ids[index] if use_ids else (round(lat, 7), round(lon, 7))
-            coords[key] = (lat, lon)
-            graph.setdefault(key, [])
-            keys.append(key)
-        for a, b in zip(keys, keys[1:]):
-            if a == b:
-                continue
-            weight = haversine(coords[a], coords[b])
-            if weight <= 0:
-                continue
-            graph[a].append((b, weight))
-            graph[b].append((a, weight))
-    return graph, coords
-
-
-def nearest_node(coords: dict, target: tuple[float, float]):
-    key, coord = min(coords.items(), key=lambda item: haversine(item[1], target))
-    return key, haversine(coord, target), coord
-
-
-def shortest_path(graph: dict, start, end) -> list:
-    queue = [(0.0, start)]
-    distance = {start: 0.0}
-    previous = {}
-    while queue:
-        cost, node = heapq.heappop(queue)
-        if cost != distance.get(node):
-            continue
-        if node == end:
-            break
-        for nxt, weight in graph.get(node, ()):
-            candidate = cost + weight
-            if candidate < distance.get(nxt, float("inf")):
-                distance[nxt] = candidate
-                previous[nxt] = node
-                heapq.heappush(queue, (candidate, nxt))
-    if end not in distance:
-        raise RuntimeError("Configured endpoints are not connected inside the OSM route relation")
-    result = [end]
-    while result[-1] != start:
-        result.append(previous[result[-1]])
-    return list(reversed(result))
-
-
-def osrm_route(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def route_osrm(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     coordinates = ";".join(f"{lon:.6f},{lat:.6f}" for lat, lon in points)
     query = urllib.parse.urlencode({"overview": "full", "geometries": "geojson", "steps": "false"})
-    url = f"{OSRM_ENDPOINT}/{coordinates}?{query}"
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=180) as response:
-        payload = json.load(response)
-    if payload.get("code") != "Ok" or not payload.get("routes"):
-        raise RuntimeError(f"OSRM route failed: {payload.get('code', 'unknown')}")
-    geometry = payload["routes"][0]["geometry"]["coordinates"]
-    return [(float(lat), float(lon)) for lon, lat in geometry]
+    last_error = None
+    for endpoint in OSRM_ENDPOINTS:
+        url = f"{endpoint}/{coordinates}?{query}"
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(request, timeout=240) as response:
+                payload = json.load(response)
+            if payload.get("code") != "Ok" or not payload.get("routes"):
+                raise RuntimeError(f"routing response {payload.get('code', 'unknown')}")
+            geometry = payload["routes"][0]["geometry"]["coordinates"]
+            return [(float(lat), float(lon)) for lon, lat in geometry]
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"OSM routing failed: {last_error}")
 
 
 def point_segment_distance_m(point, a, b) -> float:
@@ -249,18 +204,6 @@ def line_km(points):
     return sum(haversine(a, b) for a, b in zip(points, points[1:]))
 
 
-def merge_contiguous(lines: list[list[tuple[float, float]]], threshold_km: float = 25.0):
-    merged: list[list[tuple[float, float]]] = []
-    for line in lines:
-        if not line:
-            continue
-        if merged and haversine(merged[-1][-1], line[0]) <= threshold_km:
-            merged[-1].extend(line[1:])
-        else:
-            merged.append(list(line))
-    return merged
-
-
 def bounds(lines):
     pts = [p for line in lines for p in line]
     return [
@@ -269,47 +212,19 @@ def bounds(lines):
     ]
 
 
-def relation_line(route_id: str, segment: dict):
-    relation_id = int(segment["relation"])
-    ways = overpass_ways(relation_id)
-    graph, coords = graph_from_ways(ways)
-    start, start_snap, start_coord = nearest_node(coords, segment["start"])
-    end, end_snap, end_coord = nearest_node(coords, segment["end"])
-    if start_snap > 80 or end_snap > 80:
-        raise RuntimeError(
-            f"{route_id}/{segment['label']}: endpoint too far from relation "
-            f"(start {start_snap:.1f} km at {start_coord}, end {end_snap:.1f} km at {end_coord})"
-        )
-    nodes = shortest_path(graph, start, end)
-    return [coords[node] for node in nodes], relation_id, start_snap, end_snap
-
-
 def build_route(route_id: str, config: dict):
-    raw_lines = []
-    relation_ids = []
-    segment_meta = []
-    for segment in config["segments"]:
-        kind = segment.get("kind", "relation")
-        if kind == "osrm":
-            raw_line = osrm_route(segment["points"])
-            relation_id = None
-            start_snap = end_snap = 0.0
-        else:
-            raw_line, relation_id, start_snap, end_snap = relation_line(route_id, segment)
-            relation_ids.append(relation_id)
-        distance = line_km(raw_line)
-        simplified = simplify(raw_line)
-        print(
-            f"{route_id}/{segment['label']}: {len(raw_line)} -> {len(simplified)} points, "
-            f"{distance:.1f} km" + (f", snaps {start_snap:.1f}/{end_snap:.1f} km" if relation_id else "")
-        )
-        raw_lines.append(simplified)
-        meta = {"label": segment["label"], "source": kind, "totalKm": round(distance, 3)}
-        if relation_id:
-            meta["osmRelationId"] = relation_id
-        segment_meta.append(meta)
+    lines = []
+    segments = []
+    for definition in config["lines"]:
+        raw = route_osrm(definition["points"])
+        simplified = simplify(raw)
+        distance = line_km(raw)
+        if distance < 100:
+            raise RuntimeError(f"{route_id}/{definition['label']} returned an implausibly short route")
+        print(f"{route_id}/{definition['label']}: {len(raw)} -> {len(simplified)} points, {distance:.1f} km")
+        lines.append(simplified)
+        segments.append({"label": definition["label"], "totalKm": round(distance, 3)})
 
-    lines = merge_contiguous(raw_lines)
     payload = {
         "kind": "iconic_route_geometry",
         "schema": "iconic-route-polyline5-v1",
@@ -320,8 +235,8 @@ def build_route(route_id: str, config: dict):
         "bounds": bounds(lines),
         "sourceType": config["source_type"],
         "sourceUrl": config["source_url"],
-        "osmRelationIds": relation_ids,
-        "segments": segment_meta,
+        "osmRelationIds": config.get("osm_relation_ids", []),
+        "segments": segments,
         "note": config["note"],
     }
     OUT.mkdir(parents=True, exist_ok=True)

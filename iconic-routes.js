@@ -1,13 +1,22 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.6";
+  const APP_VERSION = "0.13.13";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     gold: { color: "#d6a21f", width: 6 },
     silver: { color: "#aeb5ba", width: 5 }
   };
+  const PANAM_EMBLEMS = Object.freeze({
+    CO: Object.freeze({ name: "COLÔMBIA" }),
+    EC: Object.freeze({ name: "ECUADOR" }),
+    PE: Object.freeze({ name: "PERU" }),
+    CL: Object.freeze({ name: "CHILE" }),
+    AR: Object.freeze({ name: "ARGENTINA" })
+  });
+  const PANAM_EMBLEM_ASSET = `assets/iconic-routes/via-panam-base.svg?v=${APP_VERSION}`;
+
   const SECONDARY_OPACITY = .22;
   const routeStyle = kind => STYLE_LAB?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
   const core = window.MinhasViagensIconicCore;
@@ -160,6 +169,64 @@
     return promise;
   }
 
+  function panamEmblemMarkup(countryCode, mapMarker = false) {
+    const emblem = PANAM_EMBLEMS[countryCode];
+    if (!emblem) return "";
+    const style = mapMarker
+      ? "width:52px;height:44px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.28))"
+      : "width:42px;height:35px;display:block";
+    return `<svg viewBox="0 0 1374 1145" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(`${emblem.name}, Vía Panam`)}" style="${style}">
+      <use href="${PANAM_EMBLEM_ASSET}#shield-base"></use>
+      <text x="687" y="275" fill="#000" font-family="Arial, Helvetica, sans-serif" font-size="180" font-weight="700" text-anchor="middle" dominant-baseline="middle">${escapeHtml(emblem.name)}</text>
+    </svg>`;
+  }
+
+  function iconicEmblemsMarkup(route) {
+    if (route?.emblemKey !== "via-panam") return "";
+    const countries = (route.emblemCountries || []).filter(code => PANAM_EMBLEMS[code]);
+    if (!countries.length) return "";
+    return `<span class="iconic-emblem-strip" aria-label="Emblemas disponíveis da Via Panam" style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:6px">${countries.map(code => panamEmblemMarkup(code)).join("")}</span>`;
+  }
+
+  function panamCountryForPoint(point) {
+    const lat = Number(point?.[0]), lon = Number(point?.[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
+    if (lat >= .5 && lat <= 8.6 && lon >= -79.6 && lon <= -73.0) return "CO";
+    if (lat < 1 && lat >= -4.7 && lon >= -81.6 && lon <= -76.5) return "EC";
+    if (lat < -4.0 && lat >= -18.25 && lon >= -82.2 && lon <= -68.0) return "PE";
+    if (lat < -18.2 && lat >= -33.2 && lon <= -69.5 && lon >= -72.5) return "CL";
+    if (lat < -31.5 && lat >= -36.0 && lon > -70.3 && lon <= -57.0) return "AR";
+    return "";
+  }
+
+  function paintPanamEmblems(result) {
+    if (result.route?.emblemKey !== "via-panam" || typeof L?.marker !== "function" || typeof L?.divIcon !== "function") return;
+    const segments = [...(result.alternateCoverage?.segments || []), ...(result.coverage?.segments || [])];
+    const byCountry = new Map();
+    for (const segment of segments) {
+      for (const point of segment || []) {
+        const code = panamCountryForPoint(point);
+        if (code && PANAM_EMBLEMS[code]) {
+          if (!byCountry.has(code)) byCountry.set(code, []);
+          byCountry.get(code).push(point);
+        }
+      }
+    }
+    for (const [code, points] of byCountry) {
+      const point = points[Math.floor(points.length / 2)];
+      L.marker(point, {
+        pane: "iconicRouteMain",
+        interactive: false,
+        icon: L.divIcon({
+          className: "iconic-panam-marker",
+          html: panamEmblemMarkup(code, true),
+          iconSize: [52, 44],
+          iconAnchor: [26, 22]
+        })
+      }).addTo(state.iconicPreviewLayer);
+    }
+  }
+
   function formatKm(value) {
     return Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   }
@@ -237,6 +304,7 @@
     }
     paintTraveled(state.iconicPreviewLayer, result.alternateCoverage?.segments, "silver");
     paintTraveled(state.iconicPreviewLayer, result.coverage?.segments, "gold");
+    paintPanamEmblems(result);
   }
 
   function focusRoute(result, card) {
@@ -308,6 +376,7 @@
       <span class="achievement-icon iconic-route-icon">★</span>
       <div class="iconic-route-copy">
         <strong>${escapeHtml(route.name)}</strong>
+        ${iconicEmblemsMarkup(route)}
         <small>${escapeHtml(route.category)} · ${escapeHtml(route.region)} · ${status}</small>
         <span class="iconic-source-label">${source}</span>
         ${progress}

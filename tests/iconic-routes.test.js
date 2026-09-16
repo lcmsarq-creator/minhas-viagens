@@ -6,10 +6,10 @@ const path = require("node:path");
 const core = require("../iconic-routes-core.js");
 const catalog = require("../iconic-routes-catalog.js");
 
-test("o catálogo expõe 29 famílias em 32 recortes", () => {
-  assert.equal(catalog.familyCount, 29);
-  assert.equal(catalog.routeCount, 32);
-  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 32);
+test("o catálogo expõe 41 famílias em 44 recortes", () => {
+  assert.equal(catalog.familyCount, 41);
+  assert.equal(catalog.routeCount, 44);
+  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 44);
   assert.equal(catalog.routes.filter(route => route.family === "Estrada Real").length, 4);
 });
 
@@ -97,6 +97,28 @@ test("geometrias latino-americanas mantêm o Darién separado e a Austral integr
   assert.equal(austral.encodedLines.length, 1);
   assert.ok(austral.totalKm > 1150 && austral.totalKm < 1300);
   assert.deepEqual(austral.osmRelationIds, [6582701]);
+});
+
+test("as 12 novas rotas latino-americanas fazem parte do catálogo", () => {
+  const ids = [
+    "ruta-40-argentina", "mexico-1-transpeninsular", "ruta-siete-lagos", "ruta-3-fin-del-mundo",
+    "espinazo-del-diablo", "paso-de-jama", "carretera-interoceanica-sur", "br-230-transamazonica",
+    "paso-los-libertadores", "avenida-de-los-volcanes", "camino-de-los-yungas", "ch5-atacama"
+  ];
+  for (const id of ids) {
+    const route = catalog.routes.find(item => item.id === id);
+    assert.ok(route, `${id} deve existir`);
+    assert.equal(route.long, true);
+  }
+  assert.equal(catalog.routes.find(item => item.id === "br-230-transamazonica").previewTraveledOnly, false);
+  for (const id of ids.filter(id => id !== "br-230-transamazonica")) {
+    assert.equal(catalog.routes.find(item => item.id === id).previewTraveledOnly, true, `${id} deve revelar somente o trecho viajado`);
+  }
+});
+
+test("Via Panam registra inicialmente os cinco emblemas enviados", () => {
+  const panam = catalog.routes.find(item => item.id === "via-panamericana");
+  assert.deepEqual(Array.from(panam.emblemCountries), ["CO", "EC", "PE", "CL", "AR"]);
 });
 
 test("a entrada BR-319 não é rotulada incorretamente como Transamazônica", () => {

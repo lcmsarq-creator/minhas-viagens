@@ -1,8 +1,9 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.14";
-  const MAX_PREVIEW_POINTS = 4500;
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.15";
+  const MAX_PREVIEW_POINTS = 2200;
+  const PRELOAD_CONCURRENCY = 4;
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     silver: { color: "#aeb5ba", width: 5 }
@@ -29,9 +30,11 @@
   function install(iconic, catalog, compact) {
     if (window.MinhasViagensIconicCatalogPreview?.installed) return;
 
-    const geometryCache = new Map();
+    const preparedGeometry = new Map();
+    const preparePromises = new Map();
     let activeSelection = null;
     let selectionGeneration = 0;
+    let preloadPromise = null;
 
     const routeStyle = kind => window.MinhasViagensRouteStyleLab?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
     const routeById = new Map(catalog.routes.map(route => [route.id, route]));
@@ -45,15 +48,17 @@
     function previewLine(line) {
       if (!Array.isArray(line) || line.length <= MAX_PREVIEW_POINTS) return line || [];
       const last = line.length - 1;
-      const sampled = [];
+      const sampled = new Array(MAX_PREVIEW_POINTS);
       for (let i = 0; i < MAX_PREVIEW_POINTS; i += 1) {
-        sampled.push(line[Math.round(i * last / (MAX_PREVIEW_POINTS - 1))]);
+        sampled[i] = line[Math.round(i * last / (MAX_PREVIEW_POINTS - 1))];
       }
       return sampled;
     }
 
-    async function loadGeometry(route) {
-      if (geometryCache.has(route.id)) return geometryCache.get(route.id);
+    function prepareGeometry(route) {
+      if (preparedGeometry.has(route.id)) return Promise.resolve(preparedGeometry.get(route.id));
+      if (preparePromises.has(route.id)) return preparePromises.get(route.id);
+
       const coreVersion = iconic.version || VERSION;
       const promise = fetch(`${route.geometryPath}?v=${coreVersion}`, { cache: "force-cache" })
         .then(response => {
@@ -65,19 +70,43 @@
           const sourceLines = decodeLines(payload.encodedLines, precision);
           const sourceAlternateLines = decodeLines(payload.alternateEncodedLines, precision);
           if (!sourceLines.length) throw new Error("Geometria da rota icônica vazia");
-          return {
+          const geometry = {
             lines: sourceLines.map(previewLine),
             alternateLines: sourceAlternateLines.map(previewLine),
             bounds: payload.bounds || null
           };
-        });
-      geometryCache.set(route.id, promise);
+          preparedGeometry.set(route.id, geometry);
+          return geometry;
+        })
+        .finally(() => preparePromises.delete(route.id));
+
+      preparePromises.set(route.id, promise);
       return promise;
+    }
+
+    async function preloadAllGeometries() {
+      if (preloadPromise) return preloadPromise;
+      const queue = [...catalog.routes].sort((a, b) => {
+        const score = route => Number(route.previewTraveledOnly === true) * 4 + Number(route.long === true) * 2 + Number(route.category === "Internacional");
+        return score(b) - score(a);
+      });
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < queue.length) {
+          const route = queue[cursor++];
+          await prepareGeometry(route).catch(() => null);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      };
+      preloadPromise = Promise.all(Array.from({ length: PRELOAD_CONCURRENCY }, worker)).finally(() => {
+        preloadPromise = null;
+      });
+      return preloadPromise;
     }
 
     function addStyledLine(line, options) {
       if (!Array.isArray(line) || line.length < 2) return;
-      L.polyline(line, { interactive: false, smoothFactor: 2.2, ...options }).addTo(state.iconicPreviewLayer);
+      L.polyline(line, { interactive: false, smoothFactor: 3, ...options }).addTo(state.iconicPreviewLayer);
     }
 
     function paintFullGeometry(geometry) {
@@ -109,9 +138,9 @@
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
       if (lat >= .5 && lat <= 8.6 && lon >= -79.6 && lon <= -73.0) return "CO";
       if (lat < 1 && lat >= -4.7 && lon >= -81.6 && lon <= -76.5) return "EC";
-      if (lat < -4.0 && lat >= -18.25 && lon >= -82.2 && lon <= -68.0) return "PE";
+      if (lat < -4 && lat >= -18.25 && lon >= -82.2 && lon <= -68) return "PE";
       if (lat < -18.2 && lat >= -33.2 && lon <= -69.5 && lon >= -72.5) return "CL";
-      if (lat < -31.5 && lat >= -36.0 && lon > -70.3 && lon <= -57.0) return "AR";
+      if (lat < -31.5 && lat >= -36 && lon > -70.3 && lon <= -57) return "AR";
       return "";
     }
 
@@ -127,7 +156,8 @@
       const allowed = new Set(route.emblemCountries || []);
       const pointsByCountry = new Map();
       for (const line of geometry.lines) {
-        for (let index = 0; index < line.length; index += Math.max(1, Math.floor(line.length / 800))) {
+        const stride = Math.max(1, Math.floor(line.length / 500));
+        for (let index = 0; index < line.length; index += stride) {
           const point = line[index];
           const code = panamCountryForPoint(point);
           if (!code || !allowed.has(code) || !PANAM_EMBLEMS[code]) continue;
@@ -156,42 +186,43 @@
       return points.length ? L.latLngBounds(points) : null;
     }
 
+    function showPreparedCatalogRoute(route, geometry, card) {
+      if (typeof closeFullHighway === "function") closeFullHighway();
+      if (typeof closeTripRoadHighlight === "function") closeTripRoadHighlight();
+      iconic.clearPreview?.();
+      state.iconicPreviewLayer?.clearLayers();
+      setBackgroundSecondary(true);
+      card?.classList.add("active");
+      if (typeof setTripsSecondary === "function") setTripsSecondary(true);
+      paintFullGeometry(geometry);
+      paintPanamFullEmblems(route, geometry);
+      const bounds = fullBounds(geometry);
+      if (bounds) map.fitBounds(bounds.pad(.08), { maxZoom: 13, animate: false });
+      activeSelection = { route, geometry, card };
+    }
+
     async function showFullCatalogRoute(route, card) {
       const generation = ++selectionGeneration;
+      const ready = preparedGeometry.get(route.id);
+      if (ready) {
+        showPreparedCatalogRoute(route, ready, card);
+        return;
+      }
       card?.classList.add("loading");
       try {
-        const geometry = await loadGeometry(route);
+        const geometry = await prepareGeometry(route);
         if (generation !== selectionGeneration) return;
-        if (typeof closeFullHighway === "function") closeFullHighway();
-        if (typeof closeTripRoadHighlight === "function") closeTripRoadHighlight();
-        iconic.clearPreview?.();
-        state.iconicPreviewLayer?.clearLayers();
-        setBackgroundSecondary(true);
-        card?.classList.add("active");
-        if (typeof setTripsSecondary === "function") setTripsSecondary(true);
-        paintFullGeometry(geometry);
-        paintPanamFullEmblems(route, geometry);
-        const bounds = fullBounds(geometry);
-        if (bounds) map.fitBounds(bounds.pad(.08), { maxZoom: 13 });
-        activeSelection = { route, geometry, card };
+        showPreparedCatalogRoute(route, geometry, card);
       } finally {
         card?.classList.remove("loading");
       }
     }
 
-    function otherRouteIds() {
-      return [...els.iconicOtherList.querySelectorAll?.("[data-iconic-route]") || []]
-        .map(card => card.dataset.iconicRoute)
-        .filter(Boolean);
-    }
-
-    async function preloadOtherGeometries() {
-      const ids = otherRouteIds();
-      for (const id of ids) {
-        const route = routeById.get(id);
-        if (route) loadGeometry(route).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 0));
-      }
+    function warmRouteFromEvent(event) {
+      const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
+      if (!card || !els.iconicOtherList.contains(card)) return;
+      const route = routeById.get(card.dataset.iconicRoute);
+      if (route) prepareGeometry(route).catch(() => {});
     }
 
     document.addEventListener("click", event => {
@@ -208,22 +239,11 @@
       showFullCatalogRoute(route, card).catch(error => console.warn("Não foi possível abrir a rota icônica completa", error));
     }, true);
 
-    document.addEventListener("pointerenter", event => {
-      const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
-      if (!card || !els.iconicOtherList.contains(card)) return;
-      const route = routeById.get(card.dataset.iconicRoute);
-      if (route) loadGeometry(route).catch(() => {});
-    }, true);
-
-    document.addEventListener("touchstart", event => {
-      const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
-      if (!card || !els.iconicOtherList.contains(card)) return;
-      const route = routeById.get(card.dataset.iconicRoute);
-      if (route) loadGeometry(route).catch(() => {});
-    }, { capture: true, passive: true });
+    document.addEventListener("pointerdown", warmRouteFromEvent, { capture: true, passive: true });
+    document.addEventListener("touchstart", warmRouteFromEvent, { capture: true, passive: true });
 
     els.iconicOtherTabBtn?.addEventListener("click", () => {
-      preloadOtherGeometries().catch(() => {});
+      preloadAllGeometries().catch(() => {});
     });
 
     window.MinhasViagensRouteStyleLab?.subscribe?.(() => {
@@ -236,11 +256,18 @@
     window.MinhasViagensIconicCatalogPreview = {
       installed: true,
       version: VERSION,
-      loadGeometry,
-      preloadOtherGeometries,
+      prepareGeometry,
+      preloadAllGeometries,
       showFullCatalogRoute,
+      preparedCount: () => preparedGeometry.size,
       maxPreviewPoints: MAX_PREVIEW_POINTS
     };
+
+    // O preload começa no startup, antes de o usuário abrir a aba "Outras rotas".
+    setTimeout(() => preloadAllGeometries().catch(() => {}), 0);
+
+    const brandCopy = document.querySelector(".brand p");
+    if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${VERSION}`);
   }
 
   waitForApp();

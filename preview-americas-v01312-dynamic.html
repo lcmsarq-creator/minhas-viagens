@@ -11,7 +11,7 @@
 <h1>Emblemas rodoviários — render dinâmico</h1>
 <p>A numeração usa diretamente a <strong>altura do text-safe-area</strong> de cada SVG. O SVG-fonte fornece apenas o desenho-base e a área segura; o número é escrito pelo app.</p>
 <div class="grid" id="grid"></div>
-<div class="note"><strong>Atualização:</strong> Chile usa o último SVG enviado no pacote e a nova área segura <code>612,9412 × 383,698</code>. Os números abaixo são dinâmicos.</div>
+<div class="note"><strong>Atualização:</strong> Chile usa o <strong>último SVG enviado</strong>, sem “I REGIÓN”, com <code>viewBox 0 0 949.2581 867.6</code> e área segura <code>612,9412 × 383,698</code>. Os números abaixo são dinâmicos.</div>
 </div>
 <script>
 const items=[
@@ -21,10 +21,10 @@ const items=[
 {name:'Argentina',file:'arg-national-default.svg',viewBox:'3458.8884 0 671.4470 871',safe:[3546.7462,429.0563,494.9649,254.2546],num:'293',color:'#241f1d'},
 {name:'Venezuela',file:'ven-national-default.svg',viewBox:'0 0 837.9978 849.0861',safe:[177.602,303.1223,478.5589,346.6903],num:'1',color:'#111'},
 {name:'Paraguai',file:'pry-national-default.svg',viewBox:'0 0 733.9542 797.6207',safe:[108.5467,295.9771,516.7059,334.1023],num:'03',color:'#040404'},
-{name:'Chile',file:'chl-national-default.svg',viewBox:'0 0 949.3313 867.4136',safe:[151.6173,245.6746,612.9412,383.698],num:'5',color:'#fefefe'},
+{name:'Chile',file:'chl-national-default.svg',viewBox:'0 0 949.2581 867.6',safe:[151.7435,245.7459,612.9412,383.698],num:'5',color:'#fefefe'},
 {name:'Uruguai',file:'ury-national-default.svg',viewBox:'0 0 694.3001 868.7791',safe:[143.8878,209.0568,402.3529,364.239],num:'5',color:'#fefeff'},
 {name:'Bolívia',file:'bol-national-default.svg',viewBox:'0 0 959.0027 868.7791',safe:[205.5909,411.0845,535.0588,311.0864],num:'24',color:'#f0f0f0'}
 ];
 const grid=document.getElementById('grid');
-for(const x of items){const [sx,sy,sw,sh]=x.safe,cx=sx+sw/2,cy=sy+sh/2,fs=sh;const card=document.createElement('div');card.className='card';card.innerHTML=`<div class="art"><svg viewBox="${x.viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${x.name} ${x.num}"><defs><clipPath id="clip-${x.name}"><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}"/></clipPath></defs><use href="assets/road-shields/${x.file}?v=0.13.12#shield-base"></use><text x="${cx}" y="${cy}" clip-path="url(#clip-${x.name})" fill="${x.color}" font-family="Arial,Helvetica,sans-serif" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${x.num}</text></svg></div><div class="name">${x.name}</div><div class="file">${x.file} · altura do número = ${sh}</div>`;grid.appendChild(card)}
+for(const x of items){const [sx,sy,sw,sh]=x.safe,cx=sx+sw/2,cy=sy+sh/2,fs=sh;const card=document.createElement('div');card.className='card';card.innerHTML=`<div class="art"><svg viewBox="${x.viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${x.name} ${x.num}"><defs><clipPath id="clip-${x.name}"><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}"/></clipPath></defs><use href="assets/road-shields/${x.file}?v=0.13.12-r8#shield-base"></use><text x="${cx}" y="${cy}" clip-path="url(#clip-${x.name})" fill="${x.color}" font-family="Arial,Helvetica,sans-serif" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${x.num}</text></svg></div><div class="name">${x.name}</div><div class="file">${x.file} · altura do número = ${sh}</div>`;grid.appendChild(card)}
 </script></body></html>

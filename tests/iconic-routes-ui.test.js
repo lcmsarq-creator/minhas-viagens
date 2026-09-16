@@ -130,13 +130,13 @@ function fixture() {
   return { context, els };
 }
 
-test("a interface carrega os 30 recortes em Outras rotas quando não há viagens", async () => {
+test("a interface carrega os 32 recortes em Outras rotas quando não há viagens", async () => {
   const { context, els } = fixture();
-  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 30; attempt++) {
+  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 32; attempt++) {
     await new Promise(resolve => setImmediate(resolve));
   }
-  assert.equal(context.MinhasViagensIconicRoutes.routes.length, 30);
-  assert.equal(els.iconicOtherList.children.length, 30);
+  assert.equal(context.MinhasViagensIconicRoutes.routes.length, 32);
+  assert.equal(els.iconicOtherList.children.length, 32);
   assert.equal(els.iconicAchievementCount.textContent, "0");
   els.iconicOtherTabBtn.click();
   assert.equal(els.iconicOtherList.classList.contains("hidden"), false);
@@ -146,7 +146,7 @@ test("a interface carrega os 30 recortes em Outras rotas quando não há viagens
 
 test("ao focar uma rota icônica, as demais ficam em meio-tom e voltam ao normal ao fechar", async () => {
   const { context, els } = fixture();
-  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 30; attempt++) {
+  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 32; attempt++) {
     await new Promise(resolve => setImmediate(resolve));
   }
   const backgroundRoute = context.L.polyline([[0, 0], [1, 1]], { opacity: .94 })
@@ -157,4 +157,12 @@ test("ao focar uma rota icônica, as demais ficam em meio-tom e voltam ao normal
 
   context.MinhasViagensIconicRoutes.clearPreview();
   assert.equal(backgroundRoute.options.opacity, .94);
+});
+
+
+test("rotas internacionais marcadas não revelam a geometria integral no preview", () => {
+  const source = fs.readFileSync("iconic-routes.js", "utf8");
+  assert.match(source, /previewTraveledOnly === true/);
+  assert.match(source, /const traveledLines = \[\.\.\.\(result\.alternateCoverage\?\.segments \|\| \[\]\), \.\.\.\(result\.coverage\?\.segments \|\| \[\]\)\]/);
+  assert.match(source, /const focusLines = result\.route\?\.previewTraveledOnly === true/);
 });

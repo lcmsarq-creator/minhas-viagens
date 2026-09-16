@@ -22,7 +22,9 @@
     officialAndAlternative: options.officialAndAlternative === true,
     sourceName: options.sourceName || "OpenStreetMap",
     sourceUrl: options.sourceUrl || "https://www.openstreetmap.org/copyright",
-    note: options.note || ""
+    note: options.note || "",
+    previewTraveledOnly: options.previewTraveledOnly === true,
+    emblemKey: options.emblemKey || ""
   });
 
   const routes = [
@@ -58,6 +60,18 @@
     route("caminhos-de-pedra", "Caminhos de Pedra", "Cultural", "Rio Grande do Sul"),
     route("rota-romantica", "Rota Romântica", "Turística", "Rio Grande do Sul", { long: true, roadRefs: ["BR-116", "ERS-235"] }),
     route("estrada-do-pacifico", "Estrada do Pacífico", "Internacional", "Acre", { long: true, roadRefs: ["BR-317"] }),
+    route("via-panamericana", "Via Panamericana", "Internacional", "México → Buenos Aires", {
+      family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam",
+      sourceName: "OpenStreetMap Wiki",
+      sourceUrl: "https://wiki.openstreetmap.org/wiki/Pan-American_Highway",
+      note: "Eixo principal latino-americano em dois trechos separados pelo Tapón del Darién. Ramais para Quellón e Ushuaia ficam fora deste recorte inicial."
+    }),
+    route("carretera-austral", "Carretera Austral", "Cênica", "Chile — Puerto Montt → Villa O’Higgins", {
+      family: "Carretera Austral", long: true, roadRefs: ["INT:CL:CH:7"], previewTraveledOnly: true,
+      sourceName: "Dirección de Vialidad · MOP Chile",
+      sourceUrl: "https://vialidad.mop.gob.cl/2024/12/30/el-director-nacional-de-vialidad-del-mop-horacio-pfeiffer-firmo-la-declaratoria-que-define-a-la-carretera-austral-como-ruta-escenica/",
+      note: "Ruta 7 / Longitudinal Austral; inclui as conexões marítimas que fazem parte da travessia."
+    }),
     route("br-319-manaus-porto-velho", "BR-319 — Manaus–Porto Velho", "Aventura", "AM e RO", {
       long: true, roadRefs: ["BR-319"],
       note: "A Transamazônica é a BR-230; este recorte segue a BR-319 informada na lista."
@@ -78,8 +92,8 @@
   ];
 
   return Object.freeze({
-    version: "1.0.0",
-    familyCount: 27,
+    version: "1.1.0",
+    familyCount: 29,
     routeCount: routes.length,
     routes: Object.freeze(routes)
   });

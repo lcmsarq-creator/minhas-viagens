@@ -224,20 +224,27 @@
     state.iconicPreviewLayer?.clearLayers();
     const commonStyle = routeStyle("common");
     const silverStyle = routeStyle("silver");
-    for (const line of result.geometry.lines) {
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: commonStyle.width + 4, opacity: .88 });
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: commonStyle.color, weight: commonStyle.width, opacity: .55 });
-    }
-    for (const line of result.geometry.alternateLines) {
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: silverStyle.width + 4, opacity: .82 });
-      addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: silverStyle.color, weight: silverStyle.width, opacity: .65, dashArray: "7 7" });
+    const traveledOnly = result.route?.previewTraveledOnly === true;
+    if (!traveledOnly) {
+      for (const line of result.geometry.lines) {
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: commonStyle.width + 4, opacity: .88 });
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: commonStyle.color, weight: commonStyle.width, opacity: .55 });
+      }
+      for (const line of result.geometry.alternateLines) {
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: silverStyle.width + 4, opacity: .82 });
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: silverStyle.color, weight: silverStyle.width, opacity: .65, dashArray: "7 7" });
+      }
     }
     paintTraveled(state.iconicPreviewLayer, result.alternateCoverage?.segments, "silver");
     paintTraveled(state.iconicPreviewLayer, result.coverage?.segments, "gold");
   }
 
   function focusRoute(result, card) {
-    const points = [...result.geometry.lines, ...result.geometry.alternateLines].flat();
+    const traveledLines = [...(result.alternateCoverage?.segments || []), ...(result.coverage?.segments || [])];
+    const focusLines = result.route?.previewTraveledOnly === true
+      ? traveledLines
+      : [...result.geometry.lines, ...result.geometry.alternateLines];
+    const points = focusLines.flat();
     if (!points.length) return;
     closeFullHighway();
     closeTripRoadHighlight();

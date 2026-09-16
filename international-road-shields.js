@@ -86,9 +86,9 @@
       color: "#040404", pad2: true
     }),
     CL: Object.freeze({
-      asset: `assets/road-shields/chl-national-default.svg?v=${APP_VERSION}`,
-      viewBox: "0 0 949.3313 867.4136",
-      safe: Object.freeze({ x: 151.6173, y: 245.6746, width: 612.9412, height: 383.698 }),
+      asset: `assets/road-shields/chl-national-default.svg?v=${APP_VERSION}-chl2`,
+      viewBox: "0 0 949.2581 867.6",
+      safe: Object.freeze({ x: 151.7435, y: 245.7459, width: 612.9412, height: 383.698 }),
       color: "#fefefe"
     })
   });

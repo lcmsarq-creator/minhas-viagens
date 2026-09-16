@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preview dinâmico América · v0.13.12</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202423;background:#f3f5f4}*{box-sizing:border-box}body{margin:0;padding:28px 18px 52px}.wrap{max-width:980px;margin:auto}.tag{display:inline-block;background:#202423;color:#fff;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;margin-bottom:14px}h1{font-size:30px;margin:0 0 6px}p{color:#65706b;margin:0 0 24px;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.card{background:#fff;border:1px solid #dde2df;border-radius:18px;padding:16px;min-height:320px;box-shadow:0 4px 16px rgba(0,0,0,.04)}.art{height:220px;display:flex;align-items:center;justify-content:center;background:#eef1ef;border-radius:12px;overflow:hidden;margin-bottom:12px}.art svg{width:90%;height:90%}.name{font-size:18px;font-weight:800;margin-bottom:4px}.file{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#717a76}.note{margin-top:22px;padding:16px 18px;background:#fff;border:1px solid #dde2df;border-radius:16px;color:#414946;font-size:14px;line-height:1.5}
+</style>
+</head><body><div class="wrap">
+<span class="tag">BRANCH DE TESTE · v0.13.12</span>
+<h1>Emblemas rodoviários — render dinâmico</h1>
+<p>A numeração usa diretamente a <strong>altura do text-safe-area</strong> de cada SVG. O SVG-fonte fornece apenas o desenho-base e a área segura; o número é escrito pelo app.</p>
+<div class="grid" id="grid"></div>
+<div class="note"><strong>Atualização:</strong> Chile usa o <strong>último SVG enviado</strong>, sem “I REGIÓN”, com <code>viewBox 0 0 949.2581 867.6</code> e área segura <code>612,9412 × 383,698</code>. Os números abaixo são dinâmicos.</div>
+</div>
+<script>
+const items=[
+{name:'Equador',file:'ecu-national-default.svg',viewBox:'0 0 870.4126 870.1371',safe:[99.7353,299.1382,662.8235,293.8446],num:'E35',color:'#fefefe'},
+{name:'Colômbia',file:'col-national-default.svg',viewBox:'0 0 856.1027 848.699',safe:[183.4032,189.6977,484.9412,351.5294],num:'95',color:'#111'},
+{name:'Peru',file:'per-national-default.svg',viewBox:'0 0 748.1937 870.7807',safe:[116.5398,483.6301,508.8476,239.3856],num:'22',color:'#262429'},
+{name:'Argentina',file:'arg-national-default.svg',viewBox:'3458.8884 0 671.4470 871',safe:[3546.7462,429.0563,494.9649,254.2546],num:'293',color:'#241f1d'},
+{name:'Venezuela',file:'ven-national-default.svg',viewBox:'0 0 837.9978 849.0861',safe:[177.602,303.1223,478.5589,346.6903],num:'1',color:'#111'},
+{name:'Paraguai',file:'pry-national-default.svg',viewBox:'0 0 733.9542 797.6207',safe:[108.5467,295.9771,516.7059,334.1023],num:'03',color:'#040404'},
+{name:'Chile',file:'chl-national-default.svg',viewBox:'0 0 949.2581 867.6',safe:[151.7435,245.7459,612.9412,383.698],num:'5',color:'#fefefe'},
+{name:'Uruguai',file:'ury-national-default.svg',viewBox:'0 0 694.3001 868.7791',safe:[143.8878,209.0568,402.3529,364.239],num:'5',color:'#fefeff'},
+{name:'Bolívia',file:'bol-national-default.svg',viewBox:'0 0 959.0027 868.7791',safe:[205.5909,411.0845,535.0588,311.0864],num:'24',color:'#f0f0f0'}
+];
+const grid=document.getElementById('grid');
+for(const x of items){const [sx,sy,sw,sh]=x.safe,cx=sx+sw/2,cy=sy+sh/2,fs=sh;const card=document.createElement('div');card.className='card';card.innerHTML=`<div class="art"><svg viewBox="${x.viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${x.name} ${x.num}"><defs><clipPath id="clip-${x.name}"><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}"/></clipPath></defs><use href="assets/road-shields/${x.file}?v=0.13.12-r8#shield-base"></use><text x="${cx}" y="${cy}" clip-path="url(#clip-${x.name})" fill="${x.color}" font-family="Arial,Helvetica,sans-serif" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${x.num}</text></svg></div><div class="name">${x.name}</div><div class="file">${x.file} · altura do número = ${sh}</div>`;grid.appendChild(card)}
+</script></body></html>

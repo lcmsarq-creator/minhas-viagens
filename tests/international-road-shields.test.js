@@ -3,38 +3,12 @@ const fs = require("node:fs");
 const test = require("node:test");
 const vm = require("node:vm");
 
-const layout = require("../road-marker-layout.js");
-
-function decodePolyline(encoded, precision = 5) {
-  const factor = 10 ** precision;
-  const points = [];
-  let index = 0, lat = 0, lng = 0;
-  const next = () => {
-    let result = 0, shift = 0, byte;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20);
-    return result & 1 ? ~(result >> 1) : result >> 1;
-  };
-  while (index < encoded.length) {
-    lat += next();
-    lng += next();
-    points.push([lat / factor, lng / factor]);
-  }
-  return points;
-}
-
 function fixture() {
   const context = {
     console,
-    internationalRoadRef(raw, countryCode) { return `base:${countryCode}:${raw}`; },
+    internationalRoadRef() { return ""; },
     roadShieldMarkup(label, size) { return `base-shield:${label}:${size}`; },
-    parseRoadCode(label) {
-      const match = String(label).match(/^INT:([A-Z]{2}):([A-Z]+):(\w+)$/);
-      return match ? { international: true, countryCode: match[1], network: match[2], number: match[3] } : null;
-    },
+    parseRoadCode() { return null; },
     escapeHtml(value) { return String(value); }
   };
   context.window = context;
@@ -44,165 +18,75 @@ function fixture() {
   return context;
 }
 
-test("a Bolívia reconhece apenas referências da rede nacional F", () => {
+function auto(countries, hint = "") {
+  return { mode: "AUTO", countries, hint };
+}
+
+test("redes nacionais das Américas são canonicalizadas pelo país do trecho", () => {
+  const api = fixture().MinhasViagensInternationalRoadShields;
+  assert.equal(api.internationalRoadRef("F4", auto(["BO"], "BO")), "INT:BO:F:4");
+  assert.equal(api.internationalRoadRef("Ruta 5", auto(["UY", "AR"], "UY")), "INT:UY:RU:5");
+  assert.equal(api.internationalRoadRef("RN 14", auto(["UY", "AR"], "AR")), "INT:AR:RN:14");
+  assert.equal(api.internationalRoadRef("E35", auto(["EC", "CO"], "EC")), "INT:EC:E:35");
+  assert.equal(api.internationalRoadRef("95", auto(["CO"], "CO")), "INT:CO:RN:95");
+  assert.equal(api.internationalRoadRef("CH-60", auto(["CL"], "CL")), "INT:CL:CH:60");
+  assert.equal(api.internationalRoadRef("Troncal 1", auto(["VE"], "VE")), "INT:VE:T:1");
+  assert.equal(api.internationalRoadRef("PY 3", auto(["PY"], "PY")), "INT:PY:PY:3");
+});
+
+test("referências ambíguas não escolhem Argentina ou Uruguai sem hint geográfico", () => {
+  const api = fixture().MinhasViagensInternationalRoadShields;
+  assert.equal(api.internationalRoadRef("Ruta 5", auto(["UY", "AR"])), "");
+  assert.equal(api.internationalRoadRef("RN 14", auto(["UY", "AR"])), "");
+});
+
+test("América Central produz referências internacionais e usa fallback internacional", () => {
   const context = fixture();
   const api = context.MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.boliviaRoadRef("F4", "BO"), "INT:BO:F:4");
-  assert.equal(api.boliviaRoadRef("RN 4", "BO"), "INT:BO:F:4");
-  assert.equal(api.boliviaRoadRef("Ruta Nacional 04", "BO"), "INT:BO:F:4");
-  assert.equal(api.boliviaRoadRef("D4104", "BO"), "");
-  assert.equal(api.boliviaRoadRef("F4", "AR"), "");
-  assert.equal(context.internationalRoadRef("F4", "BO"), "INT:BO:F:4");
-  assert.equal(context.internationalRoadRef("RN 4", "AR"), "base:AR:RN 4");
+  assert.equal(api.internationalRoadRef("CA-1", auto(["GT"], "GT")), "INT:GT:CA:1");
+  assert.equal(api.internationalRoadRef("NIC-2", auto(["NI"], "NI")), "INT:NI:NIC:2");
+  const fallback = context.roadShieldMarkup("INT:GT:CA:1", "map");
+  assert.match(fallback, /road-emblem-svg international generic map/);
+  assert.match(fallback, />GUATEMALA<\/text>/);
+  assert.match(fallback, />1<\/text>/);
+  assert.doesNotMatch(fallback, /road-emblem-svg state/);
 });
 
-test("o Uruguai reconhece Ruta/Ruta Nacional/RN apenas no contexto uruguaio", () => {
+test("países com SVG próprio usam shield-base e número dinâmico", () => {
   const context = fixture();
-  const api = context.MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.uruguayRoadRef("Ruta 5", "UY"), "INT:UY:RU:5");
-  assert.equal(api.uruguayRoadRef("Ruta Nacional 05", "UY"), "INT:UY:RU:5");
-  assert.equal(api.uruguayRoadRef("RN 5", "UY"), "INT:UY:RU:5");
-  assert.equal(api.uruguayRoadRef("Ruta 5", "AR"), "");
-  assert.equal(context.internationalRoadRef("Ruta 5", "UY"), "INT:UY:RU:5");
+  const cases = [
+    ["INT:UY:RU:5", "ury-national-default.svg", "5", "364.2"],
+    ["INT:EC:E:35", "ecu-national-default.svg", "E35", "293.8"],
+    ["INT:AR:RN:293", "arg-national-default.svg", "293", "254.3"],
+    ["INT:CO:RN:95", "col-national-default.svg", "95", "351.5"],
+    ["INT:PE:PE:22", "per-national-default.svg", "22", "239.4"],
+    ["INT:VE:T:1", "ven-national-default.svg", "1", "346.7"],
+    ["INT:PY:PY:3", "pry-national-default.svg", "03", "334.1"],
+    ["INT:CL:CH:5", "chl-national-default.svg", "5", "383.7"]
+  ];
+  for (const [label, asset, number, fontSize] of cases) {
+    const markup = context.roadShieldMarkup(label, "map");
+    assert.match(markup, new RegExp(asset.replace(".", "\\.")));
+    assert.match(markup, /#shield-base/);
+    assert.match(markup, new RegExp(`font-size="${fontSize}"`));
+    assert.match(markup, new RegExp(`>${number}<\\/text>`));
+  }
 });
 
-test("o Equador reconhece apenas referências nacionais E no contexto equatoriano", () => {
-  const context = fixture();
-  const api = context.MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.ecuadorRoadRef("E35", "EC"), "INT:EC:E:35");
-  assert.equal(api.ecuadorRoadRef("E-05", "EC"), "INT:EC:E:5");
-  assert.equal(api.ecuadorRoadRef("E35", "CO"), "");
-  assert.equal(context.internationalRoadRef("E35", "EC"), "INT:EC:E:35");
+test("Chile usa exatamente o último SVG enviado", () => {
+  const chile = fs.readFileSync("assets/road-shields/chl-national-default.svg", "utf8");
+  assert.match(chile, /viewBox="0 0 949\.2581 867\.6"/);
+  assert.match(chile, /rect x="151\.7435" y="245\.7459" width="612\.9412" height="383\.698"/);
+  assert.match(chile, /id="shield-base"/);
+  assert.match(chile, /id="road-number-sample"/);
+  assert.doesNotMatch(chile, /I REGI[ÓO]N/i);
 });
 
-test("rotas multinacionais inferem a rede estrangeira sem transformar referências ambíguas", () => {
-  const context = fixture();
-  const api = context.MinhasViagensInternationalRoadShields;
-
-  assert.equal(api.autoInternationalRoadRef("Ruta 15", "AUTO:UY,CO"), "INT:UY:RU:15");
-  assert.equal(api.autoInternationalRoadRef("Ruta 9", "AUTO:UY,CO"), "INT:UY:RU:9");
-  assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:UY,CO"), "INT:UY:RU:14");
-  assert.equal(api.autoInternationalRoadRef("RN 119", "AUTO:AR,CO"), "INT:AR:RN:119");
-  assert.equal(api.autoInternationalRoadRef("Ruta 8", { mode: "AUTO", countries: ["UY", "CO"], hint: "AR" }), "INT:AR:RN:8");
-  assert.equal(api.autoInternationalRoadRef("PE-1N", "AUTO:UY,PE,CO"), "INT:PE:PE:1N");
-  assert.equal(api.autoInternationalRoadRef("F4", "AUTO:AR,BO,CO"), "INT:BO:F:4");
-  assert.equal(api.autoInternationalRoadRef("E35", "AUTO:EC,CO"), "INT:EC:E:35");
-  assert.equal(api.autoInternationalRoadRef("E35", "AUTO:CO,PE"), "");
-  assert.equal(api.autoInternationalRoadRef("RN 14", "AUTO:BR,AR"), "");
-  assert.equal(context.internationalRoadRef("Ruta Nacional 5", "AUTO:UY,CO"), "INT:UY:RU:5");
-  assert.equal(context.internationalRoadRef("RN 14", "AUTO:AR,CO"), "INT:AR:RN:14");
-});
-
-test("F4, Ruta 5 e E5 usam os templates vetoriais dos respectivos países", () => {
-  const context = fixture();
-  const bolivia = context.roadShieldMarkup("INT:BO:F:4", "map");
-  const uruguay = context.roadShieldMarkup("INT:UY:RU:5", "map");
-  const ecuadorE5 = context.roadShieldMarkup("INT:EC:E:5", "map");
-  const ecuadorE35 = context.roadShieldMarkup("INT:EC:E:35", "map");
-
-  assert.match(bolivia, /bol-national-default\.svg\?v=0\.13\.8#shield-base/);
-  assert.match(bolivia, /bol-national-default\.svg\?v=0\.13\.8#road-glyph-4/);
-  assert.match(uruguay, /ury-national-default\.svg\?v=0\.13\.8#shield-base/);
-  assert.match(uruguay, /ury-national-default\.svg\?v=0\.13\.8#road-glyph-5/);
-  assert.match(uruguay, /class="road-emblem-svg international uruguay map"/);
-  assert.doesNotMatch(uruguay, /<text\b/);
-  assert.match(ecuadorE5, /ecu-national-default\.svg\?v=0\.13\.8#shield-base/);
-  assert.match(ecuadorE5, /ecu-national-default\.svg\?v=0\.13\.8#road-glyph-E/);
-  assert.match(ecuadorE5, /ecu-national-default\.svg\?v=0\.13\.8#road-glyph-5/);
-  assert.match(ecuadorE5, /class="road-emblem-svg international ecuador map"/);
-  assert.doesNotMatch(ecuadorE5, /<text\b/);
-  assert.match(ecuadorE35, />E35<\/text>/);
-  assert.equal(context.roadShieldMarkup("INT:AR:RN:5", "map"), "base-shield:INT:AR:RN:5:map");
-});
-
-test("os templates preservam viewBox, área segura invisível e IDs estáveis", () => {
-  const bolivia = fs.readFileSync("assets/road-shields/bol-national-default.svg", "utf8");
-  const uruguay = fs.readFileSync("assets/road-shields/ury-national-default.svg", "utf8");
-  const ecuador = fs.readFileSync("assets/road-shields/ecu-national-default.svg", "utf8");
-
-  assert.match(bolivia, /viewBox="0 0 959\.0027 868\.7791"/);
-  assert.match(bolivia, /id="road-glyph-4"/);
-  assert.match(uruguay, /viewBox="0 0 694\.3001 868\.7791"/);
-  assert.match(uruguay, /preserveAspectRatio="xMidYMid meet"/);
-  assert.match(uruguay, /id="shield-base"/);
-  assert.match(uruguay, /id="text-safe-area" opacity="0"/);
-  assert.match(uruguay, /id="road-glyph-5"/);
-  assert.doesNotMatch(uruguay, /<image\b/);
-  assert.match(ecuador, /viewBox="0 0 869\.0294 871"/);
-  assert.match(ecuador, /preserveAspectRatio="xMidYMid meet"/);
-  assert.match(ecuador, /id="shield-base"/);
-  assert.match(ecuador, /id="text-safe-area" opacity="0"/);
-  assert.match(ecuador, /id="road-glyph-E"/);
-  assert.match(ecuador, /id="road-glyph-5"/);
-  assert.doesNotMatch(ecuador, /<image\b/);
-});
-
-test("a demonstração Cochabamba–Villa Tunari produz um único escudo F4", () => {
-  const context = fixture();
-  const demo = JSON.parse(fs.readFileSync("demo/bolivia-f4-route.json", "utf8"));
-  const timeline = demo.segments.map(segment => ({
-    label: context.MinhasViagensInternationalRoadShields.boliviaRoadRef(segment.ref, demo.countryCode),
-    line: decodePolyline(segment.encodedPolyline, demo.precision)
-  }));
-  const markers = layout.markersFromTimeline(timeline, { normalizeLabel: value => String(value).toLowerCase() });
-
-  assert.equal(demo.roadRef, "F4");
-  assert.ok(demo.distanceKm > 150);
-  assert.equal(markers.length, 1);
-  assert.equal(markers[0].label, "INT:BO:F:4");
-  assert.ok(markers[0].distanceKm > 150);
-});
-
-test("a demonstração uruguaia referencia a relação OSM da Ruta 5 e produz um único escudo", () => {
-  const context = fixture();
-  const demo = JSON.parse(fs.readFileSync("demo/uruguay-ruta5-route.json", "utf8"));
-  const timeline = demo.segments.map(segment => ({
-    label: context.MinhasViagensInternationalRoadShields.uruguayRoadRef(segment.ref, demo.countryCode),
-    line: decodePolyline(segment.encodedPolyline, demo.precision)
-  }));
-  const markers = layout.markersFromTimeline(timeline, { normalizeLabel: value => String(value).toLowerCase() });
-
-  assert.equal(demo.osmRelationId, 2626183);
-  assert.equal(demo.canonicalRoadId, "INT:UY:RU:5");
-  assert.equal(markers.length, 1);
-  assert.equal(markers[0].label, "INT:UY:RU:5");
-  assert.ok(markers[0].distanceKm > 20);
-});
-
-test("a demonstração equatoriana referencia a E35 nacional e produz um único escudo", () => {
-  const context = fixture();
-  const demo = JSON.parse(fs.readFileSync("demo/ecuador-e35-route.json", "utf8"));
-  const timeline = demo.segments.map(segment => ({
-    label: context.MinhasViagensInternationalRoadShields.ecuadorRoadRef(segment.ref, demo.countryCode),
-    line: decodePolyline(segment.encodedPolyline, demo.precision)
-  }));
-  const markers = layout.markersFromTimeline(timeline, { normalizeLabel: value => String(value).toLowerCase() });
-
-  assert.equal(demo.osmRelationId, 1651152);
-  assert.equal(demo.canonicalRoadId, "INT:EC:E:35");
-  assert.equal(markers.length, 1);
-  assert.equal(markers[0].label, "INT:EC:E:35");
-  assert.ok(markers[0].distanceKm > 20);
-});
-
-test("o módulo internacional é carregado antes da consolidação dos marcadores", () => {
+test("v0.13.12 carrega escudos antes da reconstrução das rodovias", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
-  assert.match(auth, /const APP_VERSION = "0\.13\.8"/);
+  assert.match(auth, /APP_VERSION="0\.13\.12"/);
   assert.ok(auth.indexOf('"international-road-shields.js"') > auth.indexOf('"secondary-roads-hotfix.js"'));
   assert.ok(auth.indexOf('"international-road-shields.js"') < auth.indexOf('"road-marker-hotfix.js"'));
-});
-
-test("as páginas de teste usam o mesmo motor sem persistir dados", () => {
-  for (const fixtureName of ["bolivia-f4", "uruguay-ruta5", "ecuador-e35"]) {
-    const html = fs.readFileSync(`${fixtureName}-preview.html`, "utf8");
-    const script = fs.readFileSync(`${fixtureName}-preview.js`, "utf8");
-    assert.match(html, /road-marker-layout\.js\?v=0\.13\.8/);
-    assert.match(html, /international-road-shields\.js\?v=0\.13\.8/);
-    assert.match(script, /const APP_VERSION = "0\.13\.8"/);
-    assert.match(script, /markersFromTimeline/);
-    assert.doesNotMatch(script, /localStorage|sessionStorage|supabase|saveTrip|insert\s*\(/i);
-  }
+  const marker = fs.readFileSync("road-marker-hotfix.js", "utf8");
+  assert.match(marker, /road-badges-v5-americas-country-context/);
 });

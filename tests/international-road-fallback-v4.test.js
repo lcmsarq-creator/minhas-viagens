@@ -6,35 +6,30 @@ const markerSource = fs.readFileSync("road-marker-hotfix.js", "utf8");
 const shieldSource = fs.readFileSync("international-road-shields.js", "utf8");
 const coreSource = fs.readFileSync("script.js", "utf8");
 
-test("novo schema força reconstrução das placas já salvas", () => {
-  assert.match(markerSource, /road-badges-v4-geographic-country-context/);
+test("schema v5 força reconstrução das placas já salvas", () => {
+  assert.match(markerSource, /road-badges-v5-americas-country-context/);
   assert.match(markerSource, /refreshTripRoadDataFromRoute/);
-  assert.match(markerSource, /extractRoadSegmentsFromRouteByInternationalTimeline/);
+  assert.match(markerSource, /extractRoadSegmentsFromRouteAmericas/);
 });
 
-test("RN e Ruta recebem país pelo trecho e não viram estado brasileiro fora do Brasil", () => {
-  assert.match(markerSource, /countryHintFromCoordinates/);
-  assert.match(markerSource, /routeRefFromHint/);
-  assert.match(markerSource, /BRAZILIAN_ROAD_REF/);
-  assert.match(markerSource, /countries\.includes\("BR"\)/);
-  assert.match(markerSource, /INT:\$\{hint\}:\$\{network\}:/);
+test("rodovia federal brasileira sobrevive mesmo quando Brasil é apenas trânsito", () => {
+  assert.match(markerSource, /BRAZIL_FEDERAL_REF/);
+  assert.match(markerSource, /if\(BRAZIL_FEDERAL_REF\.test\(value\)\)return true/);
 });
 
-test("Uruguai, Argentina e Colômbia possuem rede internacional explícita", () => {
-  assert.match(markerSource, /UY: "RU"/);
-  assert.match(markerSource, /AR: "RN"/);
-  assert.match(markerSource, /CO: "RN"/);
-  assert.match(markerSource, /URUGUAY_POLYGON/);
+test("placa estadual brasileira só é aceita em step localizado no Brasil", () => {
+  assert.match(markerSource, /BRAZIL_STATE_REF/);
+  assert.match(markerSource, /return hint==="BR"/);
 });
 
-test("países sem SVG próprio continuam no template internacional base usado pelo Peru", () => {
+test("país sem SVG próprio usa o template internacional base e nunca o estadual brasileiro", () => {
+  assert.match(shieldSource, /genericInternationalShield/);
+  assert.match(shieldSource, /viewBox="0 0 100 120"/);
   assert.match(coreSource, /if \(parsed\.international\)/);
-  assert.match(coreSource, /viewBox="0 0 100 120"/);
-  assert.match(shieldSource, /return baseRoadShieldMarkup\(label, size\)/);
 });
 
-test("Equador, Uruguai e Bolívia mantêm seus SVGs próprios", () => {
-  assert.match(shieldSource, /ecuadorShieldMarkup/);
-  assert.match(shieldSource, /uruguayShieldMarkup/);
-  assert.match(shieldSource, /boliviaShieldMarkup/);
+test("SVGs próprios estão ligados aos países enviados", () => {
+  for (const code of ["arg", "chl", "col", "ecu", "per", "pry", "ven"]) {
+    assert.match(shieldSource, new RegExp(`assets/road-shields/${code}-national-default\\.svg`));
+  }
 });

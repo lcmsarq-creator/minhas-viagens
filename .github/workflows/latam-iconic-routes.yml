@@ -7,6 +7,7 @@ on:
       - feat/iconic-routes-panam-austral
     paths:
       - "scripts/build_latam_iconic_routes.py"
+      - "scripts/apply_latam_iconic_routes.py"
       - ".github/workflows/latam-iconic-routes.yml"
 
 permissions:
@@ -32,8 +33,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Gerar geometrias a partir das relações OSM
+      - name: Gerar geometrias na rede rodoviária OSM
         run: python scripts/build_latam_iconic_routes.py
+
+      - name: Integrar rotas ao catálogo e à interface
+        run: python scripts/apply_latam_iconic_routes.py
 
       - name: Validar arquivos gerados
         run: |
@@ -55,14 +59,23 @@ jobs:
               print(route_id, payload["totalKm"], "km")
           PY
 
-      - name: Publicar geometrias na branch
+      - name: Testar catálogo e interface de rotas icônicas
+        run: node --test tests/iconic-routes.test.js tests/iconic-routes-ui.test.js
+
+      - name: Publicar integração na branch
         run: |
           git config user.name "minhas-viagens-route-bot"
           git config user.email "route-bot@users.noreply.github.com"
-          git add iconic-routes/v1/via-panamericana.json iconic-routes/v1/carretera-austral.json
+          git add \
+            iconic-routes-catalog.js \
+            iconic-routes.js \
+            tests/iconic-routes.test.js \
+            tests/iconic-routes-ui.test.js \
+            iconic-routes/v1/via-panamericana.json \
+            iconic-routes/v1/carretera-austral.json
           if git diff --cached --quiet; then
-            echo "Geometrias já estão atualizadas."
+            echo "Integração já está atualizada."
           else
-            git commit -m "data: gerar Panamericana e Carretera Austral"
+            git commit -m "feat: cadastrar Panamericana e Carretera Austral"
             git push origin HEAD:${{ github.ref_name }}
           fi

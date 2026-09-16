@@ -27,9 +27,15 @@ def patch_catalog():
             1,
         )
 
-    text = text.replace(
-        'family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam",',
-        'family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam", emblemCountries: ["CO", "EC", "PE", "CL", "AR"],',
+    panam_plain = 'family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam",'
+    panam_canonical = 'family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam", emblemCountries: ["CO", "EC", "PE", "CL", "AR"],'
+    if panam_plain in text:
+        text = text.replace(panam_plain, panam_canonical, 1)
+    text = re.sub(
+        r'family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam",(?: emblemCountries: \["CO", "EC", "PE", "CL", "AR"\],)+',
+        panam_canonical,
+        text,
+        count=1,
     )
 
     additions = '''    route("ruta-40-argentina", "Ruta Nacional 40", "Cênica", "Argentina — Cabo Vírgenes → La Quiaca", {
@@ -254,7 +260,7 @@ test("Via Panam registra inicialmente os cinco emblemas enviados", () => {
   const source = fs.readFileSync("iconic-routes.js", "utf8");
   assert.match(source, /PANAM_EMBLEMS/);
   assert.match(source, /paintPanamEmblems/);
-  assert.match(source, /via-panam-base\.svg/);
+  assert.match(source, /via-panam-base[.]svg/);
   assert.match(source, /previewTraveledOnly === true/);
 });
 '''

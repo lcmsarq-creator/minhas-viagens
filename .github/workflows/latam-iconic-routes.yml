@@ -1,0 +1,68 @@
+name: Gerar rotas icônicas latino-americanas
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/iconic-routes-panam-austral
+    paths:
+      - "scripts/build_latam_iconic_routes.py"
+      - ".github/workflows/latam-iconic-routes.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: latam-iconic-routes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref_name }}
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar geometrias a partir das relações OSM
+        run: python scripts/build_latam_iconic_routes.py
+
+      - name: Validar arquivos gerados
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = {
+              "via-panamericana": 2,
+              "carretera-austral": 1,
+          }
+          for route_id, line_count in expected.items():
+              path = Path("iconic-routes/v1") / f"{route_id}.json"
+              payload = json.loads(path.read_text())
+              assert payload["id"] == route_id
+              assert payload["precision"] == 5
+              assert len(payload["encodedLines"]) == line_count
+              assert payload["totalKm"] > 100
+              assert len(payload["bounds"]) == 2
+              print(route_id, payload["totalKm"], "km")
+          PY
+
+      - name: Publicar geometrias na branch
+        run: |
+          git config user.name "minhas-viagens-route-bot"
+          git config user.email "route-bot@users.noreply.github.com"
+          git add iconic-routes/v1/via-panamericana.json iconic-routes/v1/carretera-austral.json
+          if git diff --cached --quiet; then
+            echo "Geometrias já estão atualizadas."
+          else
+            git commit -m "data: gerar Panamericana e Carretera Austral"
+            git push origin HEAD:${{ github.ref_name }}
+          fi

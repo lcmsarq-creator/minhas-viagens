@@ -62,7 +62,7 @@
     route("rota-romantica", "Rota Romântica", "Turística", "Rio Grande do Sul", { long: true, roadRefs: ["BR-116", "ERS-235"] }),
     route("estrada-do-pacifico", "Estrada do Pacífico", "Internacional", "Acre", { long: true, roadRefs: ["BR-317"] }),
     route("via-panamericana", "Via Panamericana", "Internacional", "México → Buenos Aires", {
-      family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam", emblemCountries: ["CO", "EC", "PE", "CL", "AR"], emblemCountries: ["CO", "EC", "PE", "CL", "AR"],
+      family: "Via Panamericana", long: true, previewTraveledOnly: true, emblemKey: "via-panam", emblemCountries: ["CO", "EC", "PE", "CL", "AR"],
       sourceName: "OpenStreetMap Wiki",
       sourceUrl: "https://wiki.openstreetmap.org/wiki/Pan-American_Highway",
       note: "Eixo principal latino-americano em dois trechos separados pelo Tapón del Darién. Ramais para Quellón e Ushuaia ficam fora deste recorte inicial."

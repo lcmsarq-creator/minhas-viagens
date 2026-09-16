@@ -6,10 +6,10 @@ const path = require("node:path");
 const core = require("../iconic-routes-core.js");
 const catalog = require("../iconic-routes-catalog.js");
 
-test("o catálogo expõe as 27 rotas pedidas em 30 recortes", () => {
-  assert.equal(catalog.familyCount, 27);
-  assert.equal(catalog.routeCount, 30);
-  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 30);
+test("o catálogo expõe 41 famílias em 44 recortes", () => {
+  assert.equal(catalog.familyCount, 41);
+  assert.equal(catalog.routeCount, 44);
+  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 44);
   assert.equal(catalog.routes.filter(route => route.family === "Estrada Real").length, 4);
 });
 
@@ -73,6 +73,52 @@ test("estadual e secundária recebem prata em 90%", () => {
 test("conquista icônica dá ouro ao emblema e prevalece sobre a prata", () => {
   assert.equal(core.roadMedal("PR-410", 12, true), "gold");
   assert.equal(core.roadMedal("PR-410", 100, true), "gold");
+});
+
+test("Panamericana e Carretera Austral preservam somente o trecho percorrido ao focar", () => {
+  const panam = catalog.routes.find(item => item.id === "via-panamericana");
+  const austral = catalog.routes.find(item => item.id === "carretera-austral");
+  assert.equal(panam.long, true);
+  assert.equal(panam.previewTraveledOnly, true);
+  assert.equal(panam.emblemKey, "via-panam");
+  assert.deepEqual(Array.from(panam.roadRefs), []);
+  assert.match(panam.note, /Darién/);
+  assert.equal(austral.long, true);
+  assert.equal(austral.previewTraveledOnly, true);
+  assert.deepEqual(Array.from(austral.roadRefs), ["INT:CL:CH:7"]);
+});
+
+test("geometrias latino-americanas mantêm o Darién separado e a Austral integral", () => {
+  const panam = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "iconic-routes", "v1", "via-panamericana.json"), "utf8"));
+  const austral = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "iconic-routes", "v1", "carretera-austral.json"), "utf8"));
+  assert.equal(panam.encodedLines.length, 2);
+  assert.ok(panam.totalKm > 13000 && panam.totalKm < 14000);
+  assert.deepEqual(panam.osmRelationIds, [1661488, 240861]);
+  assert.equal(austral.encodedLines.length, 1);
+  assert.ok(austral.totalKm > 1150 && austral.totalKm < 1300);
+  assert.deepEqual(austral.osmRelationIds, [6582701]);
+});
+
+test("as 12 novas rotas latino-americanas fazem parte do catálogo", () => {
+  const ids = [
+    "ruta-40-argentina", "mexico-1-transpeninsular", "ruta-siete-lagos", "ruta-3-fin-del-mundo",
+    "espinazo-del-diablo", "paso-de-jama", "carretera-interoceanica-sur", "br-230-transamazonica",
+    "paso-los-libertadores", "avenida-de-los-volcanes", "camino-de-los-yungas", "ch5-atacama"
+  ];
+  for (const id of ids) {
+    const route = catalog.routes.find(item => item.id === id);
+    assert.ok(route, `${id} deve existir`);
+    assert.equal(route.long, true);
+  }
+  assert.equal(catalog.routes.find(item => item.id === "br-230-transamazonica").previewTraveledOnly, false);
+  for (const id of ids.filter(id => id !== "br-230-transamazonica")) {
+    assert.equal(catalog.routes.find(item => item.id === id).previewTraveledOnly, true, `${id} deve revelar somente o trecho viajado`);
+  }
+});
+
+test("Via Panam registra inicialmente os cinco emblemas enviados", () => {
+  const panam = catalog.routes.find(item => item.id === "via-panamericana");
+  assert.deepEqual(Array.from(panam.emblemCountries), ["CO", "EC", "PE", "CL", "AR"]);
 });
 
 test("a entrada BR-319 não é rotulada incorretamente como Transamazônica", () => {

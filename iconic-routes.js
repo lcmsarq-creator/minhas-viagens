@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.14.0";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.2";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
@@ -23,6 +23,7 @@
   const catalog = window.MinhasViagensIconicCatalog;
   const progressEngine = window.MinhasViagensRoadProgress;
   const compact = window.MinhasViagensGeometryCompact;
+  const hostedCatalog = window.MinhasViagensIconicRouteCatalog;
   if (!core || !catalog?.routes?.length || !progressEngine?.corridorCoverage || !compact?.decodePolyline) return;
 
   const routes = catalog.routes;
@@ -255,12 +256,63 @@
     }
   }
 
+  async function routeMetadata() {
+    try {
+      return (await hostedCatalog?.loadManifest?.())?.routes || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  async function candidateRoutesForTrips(trips) {
+    if (!trips?.length) return [];
+    const metadata = await routeMetadata();
+    if (!Object.keys(metadata).length) return routes;
+    const tripBoxes = trips.map(trip => tripBounds(tripLatLngs(trip))).filter(Boolean);
+    return routes.filter(route => {
+      const bounds = metadata?.[route.id]?.bounds;
+      return !Array.isArray(bounds) || tripBoxes.some(box => overlaps(box, bounds, .04));
+    });
+  }
+
+  async function mapWithConcurrency(items, limit, worker) {
+    const output = new Array(items.length);
+    let cursor = 0;
+    const run = async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        output[index] = await worker(items[index], index);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length || 1) }, run));
+    return output;
+  }
+
+  function undiscoveredResult(route, meta = {}) {
+    return {
+      route,
+      geometry: {
+        lines: [], alternateLines: [],
+        totalKm: Number(meta.km) || 0,
+        alternateTotalKm: 0,
+        bounds: meta.bounds || null,
+        sourceType: "hosted-manifest"
+      },
+      coverage: { segments: [], traveledKm: 0 },
+      alternateCoverage: { segments: [], traveledKm: 0 },
+      traveledKm: 0, percent: 0, longestContinuousKm: 0,
+      alternateTraveledKm: 0, alternatePercent: 0, alternateLongestContinuousKm: 0,
+      discovered: false, completed: false, goldCompleted: false, silverCompleted: false, medal: ""
+    };
+  }
+
   async function renderMap() {
     const generation = ++mapRenderGeneration;
     state.iconicRouteLayer.clearLayers();
     const trips = eligibleTrips(true);
     if (!trips.length) return;
-    for (const route of routes) {
+    const candidates = await candidateRoutesForTrips(trips);
+    for (const route of candidates) {
       const result = await progressFor(route, trips).catch(() => null);
       if (generation !== mapRenderGeneration) return;
       if (!result) continue;
@@ -328,12 +380,25 @@
 
   async function routeResults() {
     const trips = eligibleTrips(false);
-    const results = [];
-    for (const route of routes) {
-      results.push(await progressFor(route, trips).catch(error => ({ route, error })));
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    return results;
+    const metadata = await routeMetadata();
+    const resultById = new Map(routes.map(route => [route.id, undiscoveredResult(route, metadata?.[route.id]) ]));
+    if (!trips.length) return routes.map(route => resultById.get(route.id));
+    const candidates = await candidateRoutesForTrips(trips);
+    const computed = await mapWithConcurrency(candidates, 6, route =>
+      progressFor(route, trips).catch(error => ({ route, error }))
+    );
+    computed.forEach(result => result?.route?.id && resultById.set(result.route.id, result));
+    return routes.map(route => resultById.get(route.id));
+  }
+
+  async function crossedRoutesForTrip(trip) {
+    if (!trip || tripLatLngs(trip).length < 2) return [];
+    const candidates = await candidateRoutesForTrips([trip]);
+    const results = await mapWithConcurrency(candidates, 5, route =>
+      progressFor(route, [trip]).catch(() => null)
+    );
+    return results.filter(result => result?.discovered)
+      .sort((a, b) => b.traveledKm - a.traveledKm || a.route.name.localeCompare(b.route.name, "pt-BR"));
   }
 
   function geometrySourceLabel(result) {
@@ -342,14 +407,33 @@
     return "Recorte inicial por marcos";
   }
 
+  function googleMapsUrlForResult(result) {
+    const route = result?.route || {};
+    const lines = (result?.geometry?.lines || []).filter(line => Array.isArray(line) && line.length > 1);
+    if (!lines.length) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(route.name || "Rota icônica")}`;
+    const line = [...lines].sort((a, b) => lineLengthKm(b) - lineLengthKm(a))[0];
+    const count = Math.min(10, line.length);
+    const points = [];
+    for (let index = 0; index < count; index++) {
+      const point = line[Math.round(index * (line.length - 1) / Math.max(1, count - 1))];
+      if (point && (!points.length || point[0] !== points.at(-1)[0] || point[1] !== points.at(-1)[1])) points.push(point);
+    }
+    if (points.length < 2) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(route.name || "Rota icônica")}`;
+    const origin = `${points[0][0]},${points[0][1]}`;
+    const destination = `${points.at(-1)[0]},${points.at(-1)[1]}`;
+    const waypoints = points.slice(1, -1).map(point => `${point[0]},${point[1]}`).join("|");
+    return `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ""}`;
+  }
+
   function makeRouteCard(result) {
     const route = result.route;
-    const card = document.createElement("button");
-    card.type = "button";
+    const card = document.createElement("div");
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
     card.dataset.iconicRoute = route.id;
     card.className = `achievement-card iconic-route-card${result.goldCompleted ? " completed" : ""}${result.silverCompleted ? " silver-completed" : ""}${result.discovered ? " discovered" : ""}`;
     if (result.error) {
-      card.disabled = true;
+      card.setAttribute("aria-disabled", "true");
       card.innerHTML = `<span class="achievement-icon iconic-route-icon">★</span><div><strong>${escapeHtml(route.name)}</strong><small>Não foi possível carregar este recorte agora.</small></div>`;
       return card;
     }
@@ -381,8 +465,31 @@
         <span class="iconic-source-label">${source}</span>
         ${progress}
         ${route.note ? `<span class="iconic-route-note">${escapeHtml(route.note)}</span>` : ""}
+        <a class="iconic-google-maps-btn" data-iconic-google-maps="true" href="${escapeHtml(googleMapsUrlForResult(result))}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;margin-top:8px;font-size:.68rem;font-weight:700;color:inherit;text-decoration:underline;position:relative;z-index:2">Abrir no Google Maps ↗</a>
       </div>`;
-    card.addEventListener("click", () => focusRoute(result, card));
+    const focusPrepared = async () => {
+      let prepared = result;
+      if (!prepared.geometry?.lines?.length && route.previewTraveledOnly !== true) {
+        const geometry = await loadGeometry(route).catch(() => null);
+        if (geometry) prepared = { ...prepared, geometry };
+      }
+      focusRoute(prepared, card);
+    };
+    const open = event => {
+      if (event?.target?.closest?.("[data-iconic-google-maps]")) return;
+      if (route.previewTraveledOnly !== true) setIconicRoutesSecondary(true);
+      focusPrepared().catch(error => {
+        setIconicRoutesSecondary(false);
+        console.warn("Não foi possível abrir a rota icônica", error);
+      });
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => {
+      if ((event.key === "Enter" || event.key === " ") && !event.target?.closest?.("[data-iconic-google-maps]")) {
+        event.preventDefault();
+        focusPrepared().catch(error => console.warn("Não foi possível abrir a rota icônica", error));
+      }
+    });
     return card;
   }
 
@@ -528,6 +635,8 @@
     catalog,
     routes,
     progressFor,
+    crossedRoutesForTrip,
+    candidateRoutesForTrips,
     renderAchievements,
     decorateRoadCards,
     scheduleMapRender,

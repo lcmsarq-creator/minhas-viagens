@@ -130,13 +130,13 @@ function fixture() {
   return { context, els };
 }
 
-test("a interface carrega os 44 recortes em Outras rotas quando não há viagens", async () => {
+test("a interface carrega os 86 recortes em Outras rotas quando não há viagens", async () => {
   const { context, els } = fixture();
-  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 44; attempt++) {
+  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 86; attempt++) {
     await new Promise(resolve => setImmediate(resolve));
   }
-  assert.equal(context.MinhasViagensIconicRoutes.routes.length, 44);
-  assert.equal(els.iconicOtherList.children.length, 44);
+  assert.equal(context.MinhasViagensIconicRoutes.routes.length, 86);
+  assert.equal(els.iconicOtherList.children.length, 86);
   assert.equal(els.iconicAchievementCount.textContent, "0");
   els.iconicOtherTabBtn.click();
   assert.equal(els.iconicOtherList.classList.contains("hidden"), false);
@@ -146,7 +146,7 @@ test("a interface carrega os 44 recortes em Outras rotas quando não há viagens
 
 test("ao focar uma rota icônica, as demais ficam em meio-tom e voltam ao normal ao fechar", async () => {
   const { context, els } = fixture();
-  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 44; attempt++) {
+  for (let attempt = 0; attempt < 100 && els.iconicOtherList.children.length !== 86; attempt++) {
     await new Promise(resolve => setImmediate(resolve));
   }
   const backgroundRoute = context.L.polyline([[0, 0], [1, 1]], { opacity: .94 })

@@ -10,6 +10,9 @@ on:
       - 'scripts/patch_brazil_route_builder.py'
       - 'scripts/patch_brazil_route_builder_empty.py'
       - 'scripts/patch_brazil_short_routes.py'
+      - 'tests/iconic-routes.test.js'
+      - 'tests/iconic-routes-ui.test.js'
+      - 'tests/iconic-route-catalog.test.js'
       - '.github/workflows/build-brazil-park-pilgrimage-routes.yml'
   workflow_dispatch:
 
@@ -69,6 +72,8 @@ jobs:
               text=text.replace('routeCount, 44','routeCount, 86')
               text=text.replace('routes.length, 44','routes.length, 86')
               text=text.replace('cards.length, 44','cards.length, 86')
+              text=text.replace('children.length !== 44','children.length !== 86')
+              text=text.replace('children.length, 44','children.length, 86')
               path.write_text(text,encoding='utf-8')
           PY
 

@@ -1,0 +1,109 @@
+name: Apply validated v0.14.2
+
+on:
+  push:
+    branches:
+      - feat/iconic-road-interactions-v0142
+    paths:
+      - '.github/workflows/apply-v0142.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct validated source payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/v0142-payload/part-*.txt > /tmp/v0142.b64
+          echo '37e21293c702d8c256ab8becc194c05da7aed6bca1ad4260b7fea3af12fe3850  /tmp/v0142.b64' | sha256sum -c -
+          base64 -d /tmp/v0142.b64 > /tmp/v0142-source.tar.gz
+          tar -xzf /tmp/v0142-source.tar.gz -C .
+
+      - name: Rebuild hosted iconic-route catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_iconic_route_catalog.py
+          mkdir -p /tmp/v0142-catalog
+          for file in \
+            bundle.json \
+            manifest.json \
+            caminho-do-ceu-canastra.json \
+            caminhos-de-pedra.json \
+            caminhos-de-sao-tiago.json \
+            estrada-parque-brejo-grande.json \
+            estrada-parque-maringa-maromba.json \
+            estrada-parque-morro-do-diabo.json \
+            estrada-parque-se100-litoral-norte.json \
+            serra-branca-canastra.json; do
+            cp "iconic-route-catalog/v1/$file" "/tmp/v0142-catalog/$file"
+          done
+          git checkout HEAD -- iconic-route-catalog/v1
+          cp /tmp/v0142-catalog/*.json iconic-route-catalog/v1/
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            auth.js \
+            iconic-catalog-preview-hotfix.js \
+            iconic-route-catalog.js \
+            iconic-routes-catalog.js \
+            iconic-routes.js \
+            road-marker-hotfix.js \
+            v0142-adjustments.js; do
+            node --check "$file"
+          done
+
+      - name: Run Node test suite
+        run: node --test tests/*.test.js
+
+      - name: Run Python test suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pytest
+          python -m pytest -q
+
+      - name: Verify release state
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '0.14.2' index.html
+          grep -q 'v0142-adjustments.js' auth.js
+          python - <<'PY'
+          import json
+          manifest = json.load(open('iconic-route-catalog/v1/manifest.json', encoding='utf-8'))
+          bundle = json.load(open('iconic-route-catalog/v1/bundle.json', encoding='utf-8'))
+          assert manifest['routeCount'] == 86, manifest['routeCount']
+          assert bundle['routeCount'] == 86, bundle['routeCount']
+          PY
+
+      - name: Remove temporary engineering files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/v0142-payload
+          rm -f .github/workflows/export-working-tree-v0142.yml
+          rm -f .github/workflows/resolve-route-sources-v0142.yml
+          rm -f .github/workflows/fetch-route-data-v0142.yml
+
+      - name: Commit validated v0.14.2 state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git status --short
+          git commit -m 'feat: ajustes de rotas icônicas e interações rodoviárias v0.14.2'
+          git push origin HEAD:feat/iconic-road-interactions-v0142

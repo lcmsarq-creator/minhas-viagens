@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.0";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.1";
   const baseShieldApi = window.MinhasViagensInternationalRoadShields || {};
 
   const COUNTRY_META = Object.freeze({

@@ -1,9 +1,9 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.12";
-  const BADGE_LAYOUT_SCHEMA = "road-badges-v5-americas-country-context";
-  const TRANSIT_COUNTRIES = Object.freeze(["BR","UY","AR","PY","CL","BO","PE","EC","CO","VE","GY","SR","GF","PA","CR","NI","HN","SV","GT","BZ"]);
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.1";
+  const BADGE_LAYOUT_SCHEMA = "road-badges-v6-north-america-country-context";
+  const TRANSIT_COUNTRIES = Object.freeze(["BR","UY","AR","PY","CL","BO","PE","EC","CO","VE","GY","SR","GF","PA","CR","NI","HN","SV","GT","BZ","MX","US","CA"]);
   const BRAZIL_FEDERAL_REF = /^BR-\d{1,4}[A-Z]?$/i;
   const BRAZIL_STATE_REF = /^(?:AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)-\d{1,4}[A-Z]?$/i;
   const layout = window.MinhasViagensRoadMarkerLayout;
@@ -28,9 +28,16 @@
   const URUGUAY=Object.freeze([[-34.98,-56.16],[-34.86,-57.97],[-33.25,-58.42],[-30.11,-57.63],[-30.08,-56.00],[-30.36,-53.18],[-32.65,-53.10],[-33.75,-53.35],[-34.30,-53.40],[-34.85,-53.80],[-35.00,-54.95]]);
   const COLOMBIA=Object.freeze([[12.6,-71.7],[11.4,-74.4],[8.5,-77.5],[1.4,-79.1],[-4.3,-69.9],[-1.5,-67.0],[4.0,-67.5],[7.0,-72.0],[10.8,-72.8]]);
   const VENEZUELA=Object.freeze([[12.3,-71.7],[11.4,-66.0],[10.6,-61.7],[8.4,-60.5],[5.5,-61.0],[1.0,-66.8],[4.0,-67.5],[7.0,-72.0],[9.0,-73.3]]);
+  const MEXICO=Object.freeze([[32.72,-117.13],[32.55,-114.72],[31.33,-111.07],[31.78,-108.20],[31.33,-106.50],[31.76,-104.50],[29.78,-102.30],[28.96,-100.30],[26.00,-99.00],[25.84,-97.15],[22.00,-97.80],[18.00,-94.00],[18.20,-90.70],[21.50,-86.70],[18.20,-87.80],[14.50,-92.20],[16.00,-98.00],[17.50,-101.50],[20.00,-105.70],[23.00,-106.60],[23.00,-110.00],[28.00,-114.00],[32.00,-117.00]]);
+  const USA_LOWER48=Object.freeze([[49.00,-124.80],[49.00,-95.00],[48.00,-89.50],[46.50,-84.50],[45.00,-82.50],[42.00,-83.20],[41.70,-82.70],[42.00,-79.80],[43.60,-76.80],[44.80,-74.70],[47.50,-69.20],[45.00,-66.90],[40.00,-73.70],[35.00,-75.50],[30.00,-80.00],[25.00,-80.50],[24.40,-82.00],[29.00,-97.50],[25.80,-97.20],[29.80,-101.00],[31.80,-106.50],[32.50,-117.20],[42.00,-124.80]]);
   function chileEastLimit(lat){if(lat>-23)return-68.4;if(lat>-30)return-69.0;if(lat>-35)return-70.0;if(lat>-45)return-71.0;return-72.0;}
   function countryHintFromPoint(lat,lng){
     if(!Number.isFinite(lat)||!Number.isFinite(lng))return"";
+    if(pointInPolygon(lat,lng,MEXICO))return"MX";
+    if(pointInPolygon(lat,lng,USA_LOWER48))return"US";
+    if(lat>=54.5&&lat<=71.6&&lng>=-170.0&&lng<=-141.0)return"US";
+    if(lat>=18.8&&lat<=22.4&&lng>=-160.6&&lng<=-154.5)return"US";
+    if(lat>=41.6&&lat<=83.2&&lng>=-141.1&&lng<=-52.6)return"CA";
     if(lat>=15.7&&lat<=18.6&&lng>=-89.3&&lng<=-87.4)return"BZ";
     if(lat>=13.0&&lat<=14.6&&lng>=-90.2&&lng<=-87.6)return"SV";
     if(lat>=13.7&&lat<=17.9&&lng>=-92.3&&lng<=-88.0)return"GT";
@@ -60,7 +67,7 @@
   const status=window.MinhasViagensRoadMarkers={version:APP_VERSION,schema:BADGE_LAYOUT_SCHEMA,minRoadKm:layout?.MIN_BADGE_ROAD_KM??20,maxMinorInterruptionKm:layout?.MAX_MINOR_INTERRUPTION_KM??20,rebuilding:false,rebuiltTrips:0,refreshedTrips:0,missingSegmentCaches:0};
   if(!layout){console.warn("Marcadores de rodovia: núcleo de layout indisponível.");return;}
   function routeTimeline(route,trip){const baseContext=typeof tripRoadCountryContext==="function"?tripRoadCountryContext(trip):tripRoadCountry(trip),chunks=[];for(const leg of route?.legs||[]){for(const step of leg.steps||[]){const coordinates=(step?.geometry?.coordinates||[]).filter(p=>Array.isArray(p)&&p.length>=2).map(([lng,lat])=>[Number(lat),Number(lng)]).filter(([lat,lng])=>Number.isFinite(lat)&&Number.isFinite(lng));if(coordinates.length<2)continue;const context=stepContext(baseContext,coordinates),refs=sanitizeRefs(roadRefsFromStep(step,context),context);chunks.push({label:refs[0]||"",line:coordinates,countryCode:context.hint||""});}}return chunks;}
-  function lineKm(line){let meters=0;for(let i=1;i<(line||[]).length;i+=1){const a=line[i-1],b=line[i];if(!Array.isArray(a)||!Array.isArray(b))continue;if(typeof map?.distance==="function"&&typeof L?.latLng==="function")meters+=map.distance(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));}return meters/1000;}
+  function lineKm(line){if(typeof layout?.lineLengthKm==="function")return layout.lineLengthKm(line);let meters=0;if(typeof map==="undefined"||typeof L==="undefined"||typeof map.distance!=="function"||typeof L.latLng!=="function")return 0;for(let i=1;i<(line||[]).length;i+=1){const a=line[i-1],b=line[i];if(!Array.isArray(a)||!Array.isArray(b))continue;meters+=map.distance(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));}return meters/1000;}
   extractRoadLabelsFromRoute=function extractRoadLabelsFromRouteAmericas(route,trip=null){const markers=layout.markersFromTimeline(routeTimeline(route,trip),{normalizeLabel:normalizeKey});if(trip)trip.roadBadgeLayoutVersion=BADGE_LAYOUT_SCHEMA;return markers;};
   extractHighwaysFromRoute=function extractHighwaysFromRouteAmericas(route,trip=null){const totals=new Map(),labels=new Map();for(const chunk of routeTimeline(route,trip)){const label=String(chunk.label||"").trim();if(!label||!isHighwayRef(label))continue;const key=normalizeKey(label);totals.set(key,(totals.get(key)||0)+lineKm(chunk.line));if(!labels.has(key))labels.set(key,label);}return[...labels.entries()].filter(([key])=>(totals.get(key)||0)>=2).map(([,label])=>label).sort((a,b)=>a.localeCompare(b,"pt-BR",{numeric:true}));};
   extractRoadSegmentsFromRoute=function extractRoadSegmentsFromRouteAmericas(route,trip=null){const result={};for(const chunk of routeTimeline(route,trip)){const label=String(chunk.label||"").trim();if(!label||!Array.isArray(chunk.line)||chunk.line.length<2)continue;if(!result[label])result[label]=[];result[label].push(chunk.line);}return result;};

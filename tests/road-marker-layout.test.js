@@ -101,6 +101,11 @@ test("o hotfix converte diretamente as etapas OSRM nos três marcadores do exemp
   vm.createContext(context);
   vm.runInContext(fs.readFileSync("road-marker-hotfix.js", "utf8"), context);
 
+  const countryApi = context.MinhasViagensRoadCountry;
+  assert.equal(countryApi.countryHintFromPoint(19.4326, -99.1332), "MX", "Cidade do México deve ser MX");
+  assert.equal(countryApi.countryHintFromPoint(34.0522, -118.2437), "US", "Los Angeles deve ser US");
+  assert.equal(countryApi.countryHintFromPoint(43.6532, -79.3832), "CA", "Toronto deve ser CA");
+
   const trip = {};
   const route = {
     legs: [{ steps: [
@@ -112,8 +117,8 @@ test("o hotfix converte diretamente as etapas OSRM nos três marcadores do exemp
 
   const markers = context.extractRoadLabelsFromRoute(route, trip);
   assert.deepEqual(Array.from(markers, marker => marker.label), ["SP-425", "BR-153", "SP-425"]);
-  assert.deepEqual(Array.from(context.extractHighwaysFromRoute(route, trip)), ["SP-425"]);
-  assert.equal(trip.roadBadgeLayoutVersion, "road-badges-v2-country-context");
+  assert.deepEqual(Array.from(context.extractHighwaysFromRoute(route, trip)), ["BR-153", "SP-425"]);
+  assert.equal(trip.roadBadgeLayoutVersion, "road-badges-v6-north-america-country-context");
 
   const shortRoute = {
     legs: [{ steps: [

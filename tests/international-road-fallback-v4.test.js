@@ -6,8 +6,8 @@ const markerSource = fs.readFileSync("road-marker-hotfix.js", "utf8");
 const shieldSource = fs.readFileSync("international-road-shields.js", "utf8");
 const coreSource = fs.readFileSync("script.js", "utf8");
 
-test("schema v5 força reconstrução das placas já salvas", () => {
-  assert.match(markerSource, /road-badges-v5-americas-country-context/);
+test("schema v6 força reconstrução das placas já salvas", () => {
+  assert.match(markerSource, /road-badges-v6-north-america-country-context/);
   assert.match(markerSource, /refreshTripRoadDataFromRoute/);
   assert.match(markerSource, /extractRoadSegmentsFromRouteAmericas/);
 });

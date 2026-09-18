@@ -1,0 +1,25 @@
+name: Validate v0.14.2 PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          for file in auth.js iconic-catalog-preview-hotfix.js iconic-route-catalog.js iconic-routes-catalog.js iconic-routes.js road-marker-hotfix.js v0142-adjustments.js; do
+            node --check "$file"
+          done
+      - name: Node tests
+        run: node --test tests/*.test.js
+      - name: Python tests
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest -q

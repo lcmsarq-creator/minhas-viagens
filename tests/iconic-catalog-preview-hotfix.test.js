@@ -2,34 +2,21 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
-test("Outras rotas intercepta o clique e abre geometria integral", () => {
+test("Outras rotas intercepta o clique e abre geometria integral hospedada", () => {
   const source = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
+  assert.match(source, /MinhasViagensIconicRouteCatalog/);
   assert.match(source, /iconicOtherList\.contains\(card\)/);
   assert.match(source, /event\.stopImmediatePropagation\(\)/);
   assert.match(source, /showPreparedCatalogRoute\(route, ready, card\)/);
   assert.match(source, /map\.fitBounds\(bounds\.pad\(\.08\), \{ maxZoom: 13, animate: false \}\)/);
 });
 
-test("preview integral usa geometria leve sem alterar a base de progresso", () => {
+test("preview não consulta mais geometryPath detalhado no clique", () => {
   const source = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
-  assert.match(source, /MAX_PREVIEW_POINTS = 2200/);
-  assert.match(source, /function previewLine\(line\)/);
-  assert.match(source, /sourceLines\.map\(previewLine\)/);
+  assert.match(source, /hostedCatalog\.entryFor\(route\.id\)/);
+  assert.match(source, /hostedCatalog\.loadRoute\(route\.id\)/);
+  assert.doesNotMatch(source, /route\.geometryPath/);
   assert.doesNotMatch(source, /corridorCoverage/);
-});
-
-test("preload começa no startup e guarda a geometria já decodificada", () => {
-  const source = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
-  assert.match(source, /const preparedGeometry = new Map\(\)/);
-  assert.match(source, /function preloadAllGeometries\(\)/);
-  assert.match(source, /setTimeout\(\(\) => preloadAllGeometries\(\)\.catch/);
-  assert.match(source, /if \(ready\) \{\s*showPreparedCatalogRoute\(route, ready, card\);/);
-});
-
-test("toque começa a aquecer a rota antes do click", () => {
-  const source = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
-  assert.match(source, /addEventListener\("pointerdown", warmRouteFromEvent/);
-  assert.match(source, /addEventListener\("touchstart", warmRouteFromEvent/);
 });
 
 test("Minhas rotas continua entregue ao comportamento original", () => {
@@ -38,12 +25,14 @@ test("Minhas rotas continua entregue ao comportamento original", () => {
   assert.match(source, /activeSelection = null;/);
 });
 
-test("shell carrega a camada de catálogo na versão 0.13.15", () => {
+test("shell aguarda o bundle hospedado antes de iniciar as rotas icônicas", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
   const index = fs.readFileSync("index.html", "utf8");
   const iconic = fs.readFileSync("iconic-routes.js", "utf8");
-  assert.match(auth, /iconic-catalog-preview-hotfix\.js/);
-  assert.match(auth, /MINHAS_VIAGENS_APP_VERSION\|\|"0\.13\.15"/);
-  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.13\.15"/);
-  assert.match(iconic, /APP_VERSION = "0\.13\.15"/);
+  assert.match(auth, /iconic-route-catalog\.js/);
+  assert.match(auth, /MinhasViagensIconicRouteCatalogReady/);
+  assert.match(auth, /loading-iconic-catalog/);
+  assert.match(auth, /MINHAS_VIAGENS_APP_VERSION\|\|"0\.13\.16"/);
+  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.13\.16"/);
+  assert.match(iconic, /APP_VERSION = "0\.13\.16"/);
 });

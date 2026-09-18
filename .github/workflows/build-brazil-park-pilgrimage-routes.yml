@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/build_brazil_park_pilgrimage_routes.py'
       - 'scripts/apply_brazil_park_pilgrimage_routes.py'
+      - 'scripts/patch_brazil_route_builder.py'
       - '.github/workflows/build-brazil-park-pilgrimage-routes.yml'
   workflow_dispatch:
 
@@ -28,6 +29,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Tornar gerador resiliente a localidades rurais
+        run: python scripts/patch_brazil_route_builder.py
 
       - name: Aplicar cadastro sem duplicações
         run: python scripts/apply_brazil_park_pilgrimage_routes.py
@@ -79,7 +83,7 @@ jobs:
         run: |
           git config user.name "minhas-viagens-route-bot"
           git config user.email "route-bot@users.noreply.github.com"
-          git add iconic-routes-catalog.js tests/iconic-routes.test.js iconic-routes/v1 iconic-route-catalog/v1 index.html auth.js iconic-routes.js iconic-route-catalog.js iconic-catalog-preview-hotfix.js
+          git add scripts/build_brazil_park_pilgrimage_routes.py iconic-routes-catalog.js tests/iconic-routes.test.js iconic-routes/v1 iconic-route-catalog/v1 index.html auth.js iconic-routes.js iconic-route-catalog.js iconic-catalog-preview-hotfix.js
           if git diff --cached --quiet; then
             echo 'Sem mudanças a publicar'
             exit 0

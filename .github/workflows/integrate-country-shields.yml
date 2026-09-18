@@ -1,0 +1,76 @@
+name: Integrar escudos de países
+
+on:
+  push:
+    branches:
+      - feat/country-shields-pack
+    paths:
+      - 'tmp/SVG.rar'
+      - 'scripts/apply_country_shields_pack.py'
+      - '.github/workflows/integrate-country-shields.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+        with:
+          ref: feat/country-shields-pack
+          fetch-depth: 0
+
+      - name: Extrair pacote RAR
+        run: |
+          mkdir -p /tmp/minhas-viagens-shields
+          if ! command -v 7z >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq p7zip-full
+          fi
+          7z x -y tmp/SVG.rar -o/tmp/minhas-viagens-shields
+          find /tmp/minhas-viagens-shields -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Integrar assets e runtime
+        run: python scripts/apply_country_shields_pack.py
+
+      - name: Validar JavaScript
+        run: |
+          node --check international-road-shields.js
+          node --check auth.js
+
+      - name: Validar testes de escudos
+        run: |
+          node --test tests/international-road-shields-pack.test.js
+
+      - name: Rodar regressões de rodovias
+        run: |
+          node --test tests/*.test.js
+
+      - name: Conferir pacote final
+        run: |
+          test -f assets/road-shields/cri_national-default.svg
+          test -f assets/road-shields/mex_national-default.svg
+          test -f assets/road-shields/nic_national-default.svg
+          test -f assets/road-shields/pan_national-default.svg
+          test -f assets/road-shields/gua_national-default.svg
+          test -f assets/road-shields/usa_interstate-default.svg
+          test -f assets/road-shields/usa_national-default.svg
+          test -f assets/road-shields/generic-national-default.svg
+          grep -q 'const APP_VERSION = "0.13.19"' international-road-shields.js
+          grep -q 'window.MINHAS_VIAGENS_APP_VERSION = "0.13.19"' index.html
+
+      - name: Publicar integração na branch
+        run: |
+          git config user.name "minhas-viagens-shield-bot"
+          git config user.email "shield-bot@users.noreply.github.com"
+          git add assets/road-shields international-road-shields.js index.html auth.js tests/international-road-shields-pack.test.js
+          if git diff --cached --quiet; then
+            echo 'Sem mudanças a publicar'
+            exit 0
+          fi
+          git commit -m "feat: adicionar escudos nacionais e fallback genérico"
+          git push origin HEAD:feat/country-shields-pack

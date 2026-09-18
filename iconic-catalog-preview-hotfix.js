@@ -1,9 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.15";
-  const MAX_PREVIEW_POINTS = 2200;
-  const PRELOAD_CONCURRENCY = 4;
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.16";
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     silver: { color: "#aeb5ba", width: 5 }
@@ -19,89 +17,35 @@
   const waitForApp = () => {
     const iconic = window.MinhasViagensIconicRoutes;
     const catalog = window.MinhasViagensIconicCatalog;
-    const compact = window.MinhasViagensGeometryCompact;
-    if (!iconic?.routes?.length || !catalog?.routes?.length || !compact?.decodePolyline || !window.map || !window.L || !window.state?.iconicPreviewLayer || !window.els?.iconicOtherList) {
+    const hostedCatalog = window.MinhasViagensIconicRouteCatalog;
+    if (!iconic?.routes?.length || !catalog?.routes?.length || !hostedCatalog || !window.map || !window.L || !window.state?.iconicPreviewLayer || !window.els?.iconicOtherList) {
       setTimeout(waitForApp, 40);
       return;
     }
-    install(iconic, catalog, compact);
+    install(iconic, catalog, hostedCatalog);
   };
 
-  function install(iconic, catalog, compact) {
+  function install(iconic, catalog, hostedCatalog) {
     if (window.MinhasViagensIconicCatalogPreview?.installed) return;
 
-    const preparedGeometry = new Map();
-    const preparePromises = new Map();
     let activeSelection = null;
     let selectionGeneration = 0;
-    let preloadPromise = null;
 
     const routeStyle = kind => window.MinhasViagensRouteStyleLab?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
     const routeById = new Map(catalog.routes.map(route => [route.id, route]));
 
-    function decodeLines(values, precision) {
-      return (values || [])
-        .map(value => compact.decodePolyline(value, precision))
-        .filter(line => Array.isArray(line) && line.length > 1);
-    }
-
-    function previewLine(line) {
-      if (!Array.isArray(line) || line.length <= MAX_PREVIEW_POINTS) return line || [];
-      const last = line.length - 1;
-      const sampled = new Array(MAX_PREVIEW_POINTS);
-      for (let i = 0; i < MAX_PREVIEW_POINTS; i += 1) {
-        sampled[i] = line[Math.round(i * last / (MAX_PREVIEW_POINTS - 1))];
-      }
-      return sampled;
-    }
-
     function prepareGeometry(route) {
-      if (preparedGeometry.has(route.id)) return Promise.resolve(preparedGeometry.get(route.id));
-      if (preparePromises.has(route.id)) return preparePromises.get(route.id);
-
-      const coreVersion = iconic.version || VERSION;
-      const promise = fetch(`${route.geometryPath}?v=${coreVersion}`, { cache: "force-cache" })
-        .then(response => {
-          if (!response.ok) throw new Error(`Geometria ${response.status}`);
-          return response.json();
-        })
-        .then(payload => {
-          const precision = Number(payload.precision) || 5;
-          const sourceLines = decodeLines(payload.encodedLines, precision);
-          const sourceAlternateLines = decodeLines(payload.alternateEncodedLines, precision);
-          if (!sourceLines.length) throw new Error("Geometria da rota icônica vazia");
-          const geometry = {
-            lines: sourceLines.map(previewLine),
-            alternateLines: sourceAlternateLines.map(previewLine),
-            bounds: payload.bounds || null
-          };
-          preparedGeometry.set(route.id, geometry);
-          return geometry;
-        })
-        .finally(() => preparePromises.delete(route.id));
-
-      preparePromises.set(route.id, promise);
-      return promise;
+      const ready = hostedCatalog.entryFor(route.id);
+      if (ready) return Promise.resolve(ready);
+      return hostedCatalog.loadRoute(route.id).then(entry => {
+        if (!entry) throw new Error(`Geometria hospedada indisponível: ${route.id}`);
+        return entry;
+      });
     }
 
     async function preloadAllGeometries() {
-      if (preloadPromise) return preloadPromise;
-      const queue = [...catalog.routes].sort((a, b) => {
-        const score = route => Number(route.previewTraveledOnly === true) * 4 + Number(route.long === true) * 2 + Number(route.category === "Internacional");
-        return score(b) - score(a);
-      });
-      let cursor = 0;
-      const worker = async () => {
-        while (cursor < queue.length) {
-          const route = queue[cursor++];
-          await prepareGeometry(route).catch(() => null);
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      };
-      preloadPromise = Promise.all(Array.from({ length: PRELOAD_CONCURRENCY }, worker)).finally(() => {
-        preloadPromise = null;
-      });
-      return preloadPromise;
+      await window.MinhasViagensIconicRouteCatalogReady;
+      return hostedCatalog.decodedCount();
     }
 
     function addStyledLine(line, options) {
@@ -112,11 +56,11 @@
     function paintFullGeometry(geometry) {
       const common = routeStyle("common");
       const silver = routeStyle("silver");
-      for (const line of geometry.lines) {
+      for (const line of geometry.lines || []) {
         addStyledLine(line, { pane: "iconicRoutePreview", color: "#fff", weight: common.width + 4, opacity: .92 });
         addStyledLine(line, { pane: "iconicRoutePreview", color: common.color, weight: common.width, opacity: .82 });
       }
-      for (const line of geometry.alternateLines) {
+      for (const line of geometry.alternateLines || []) {
         addStyledLine(line, { pane: "iconicRoutePreview", color: "#fff", weight: silver.width + 4, opacity: .86 });
         addStyledLine(line, { pane: "iconicRoutePreview", color: silver.color, weight: silver.width, opacity: .78, dashArray: "7 7" });
       }
@@ -155,7 +99,7 @@
       if (route?.emblemKey !== "via-panam" || typeof L.marker !== "function" || typeof L.divIcon !== "function") return;
       const allowed = new Set(route.emblemCountries || []);
       const pointsByCountry = new Map();
-      for (const line of geometry.lines) {
+      for (const line of geometry.lines || []) {
         const stride = Math.max(1, Math.floor(line.length / 500));
         for (let index = 0; index < line.length; index += stride) {
           const point = line[index];
@@ -182,7 +126,7 @@
 
     function fullBounds(geometry) {
       if (Array.isArray(geometry.bounds) && geometry.bounds.length === 2) return L.latLngBounds(geometry.bounds);
-      const points = [...geometry.lines, ...geometry.alternateLines].flat();
+      const points = [...(geometry.lines || []), ...(geometry.alternateLines || [])].flat();
       return points.length ? L.latLngBounds(points) : null;
     }
 
@@ -203,7 +147,7 @@
 
     async function showFullCatalogRoute(route, card) {
       const generation = ++selectionGeneration;
-      const ready = preparedGeometry.get(route.id);
+      const ready = hostedCatalog.entryFor(route.id);
       if (ready) {
         showPreparedCatalogRoute(route, ready, card);
         return;
@@ -222,7 +166,7 @@
       const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
       if (!card || !els.iconicOtherList.contains(card)) return;
       const route = routeById.get(card.dataset.iconicRoute);
-      if (route) prepareGeometry(route).catch(() => {});
+      if (route && !hostedCatalog.has(route.id)) hostedCatalog.loadRoute(route.id).catch(() => {});
     }
 
     document.addEventListener("click", event => {
@@ -256,15 +200,13 @@
     window.MinhasViagensIconicCatalogPreview = {
       installed: true,
       version: VERSION,
+      hosted: true,
       prepareGeometry,
       preloadAllGeometries,
       showFullCatalogRoute,
-      preparedCount: () => preparedGeometry.size,
-      maxPreviewPoints: MAX_PREVIEW_POINTS
+      preparedCount: () => hostedCatalog.decodedCount(),
+      stats: hostedCatalog.stats
     };
-
-    // O preload começa no startup, antes de o usuário abrir a aba "Outras rotas".
-    setTimeout(() => preloadAllGeometries().catch(() => {}), 0);
 
     const brandCopy = document.querySelector(".brand p");
     if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${VERSION}`);

@@ -9,6 +9,7 @@ on:
       - 'scripts/apply_brazil_park_pilgrimage_routes.py'
       - 'scripts/patch_brazil_route_builder.py'
       - 'scripts/patch_brazil_route_builder_empty.py'
+      - 'scripts/patch_brazil_short_routes.py'
       - '.github/workflows/build-brazil-park-pilgrimage-routes.yml'
   workflow_dispatch:
 
@@ -35,6 +36,7 @@ jobs:
         run: |
           python scripts/patch_brazil_route_builder.py
           python scripts/patch_brazil_route_builder_empty.py
+          python scripts/patch_brazil_short_routes.py
 
       - name: Aplicar cadastro sem duplicações
         run: python scripts/apply_brazil_park_pilgrimage_routes.py

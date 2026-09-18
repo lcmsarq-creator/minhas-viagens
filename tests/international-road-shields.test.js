@@ -82,11 +82,11 @@ test("Chile usa exatamente o último SVG enviado", () => {
   assert.doesNotMatch(chile, /I REGI[ÓO]N/i);
 });
 
-test("v0.13.12 carrega escudos antes da reconstrução das rodovias", () => {
+test("v0.14.1 carrega escudos antes da reconstrução das rodovias", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
-  assert.match(auth, /APP_VERSION="0\.13\.12"/);
+  assert.match(auth, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.14\.1"/);
   assert.ok(auth.indexOf('"international-road-shields.js"') > auth.indexOf('"secondary-roads-hotfix.js"'));
   assert.ok(auth.indexOf('"international-road-shields.js"') < auth.indexOf('"road-marker-hotfix.js"'));
   const marker = fs.readFileSync("road-marker-hotfix.js", "utf8");
-  assert.match(marker, /road-badges-v5-americas-country-context/);
+  assert.match(marker, /road-badges-v6-north-america-country-context/);
 });

@@ -62,7 +62,7 @@ test("escudos específicos usam os SVGs enviados e numeração dinâmica", () =>
   const cases = [
     ["INT:MX:MEX:15D", "mex-national-default.svg", ">15D</text>"],
     ["INT:GT:CA:13", "gtm-national-default.svg", ">CA-13</text>"],
-    ["INT:NI:NIC:1", "nic-national-default-a.svg", ">NIC-1</text>"],
+    ["INT:NI:NIC:1", "nic-national-default.svg", ">NIC-1</text>"],
     ["INT:CR:N:32", "cri-national-default.svg", ">32</text>"],
     ["INT:PA:N:10", "pan-national-default.svg", ">10</text>"],
     ["INT:US:US:101", "usa-national-default.svg", ">101</text>"],
@@ -73,7 +73,6 @@ test("escudos específicos usam os SVGs enviados e numeração dinâmica", () =>
     assert.match(markup, new RegExp(asset.replace(".", "\\.")));
     assert.ok(markup.includes(text), `${label} deve conter ${text}`);
   }
-  assert.match(context.roadShieldMarkup("INT:NI:NIC:1", "map"), /nic-national-default-b\.svg/);
 });
 
 test("Interstate usa número branco e países sem asset usam o SVG genérico enviado", () => {
@@ -90,7 +89,7 @@ test("Interstate usa número branco e países sem asset usam o SVG genérico env
   assert.match(canada, />1<\/text>/);
 });
 
-test("escudos sul-americanos já carregados continuam delegados ao renderer anterior", () => {
+test("escudos sul-americanos já carregados e Brasil continuam delegados ao renderer anterior", () => {
   const context = fixture();
   assert.equal(context.roadShieldMarkup("INT:AR:RN:40", "map"), "base-shield:INT:AR:RN:40:map");
   assert.equal(context.roadShieldMarkup("INT:BR:BR:101", "map"), "base-shield:INT:BR:BR:101:map");
@@ -100,11 +99,11 @@ test("escudos sul-americanos já carregados continuam delegados ao renderer ante
   }
 });
 
-test("todos os novos templates mantêm área segura e base vetorial", () => {
+test("todos os novos templates mantêm área segura, base vetorial e número de amostra", () => {
   const regular = [
-    "mex-national-default.svg", "gtm-national-default.svg", "cri-national-default.svg",
-    "pan-national-default.svg", "usa-national-default.svg", "usa-interstate-default.svg",
-    "generic-national-default.svg"
+    "mex-national-default.svg", "gtm-national-default.svg", "nic-national-default.svg",
+    "cri-national-default.svg", "pan-national-default.svg", "usa-national-default.svg",
+    "usa-interstate-default.svg", "generic-national-default.svg"
   ];
   for (const filename of regular) {
     const svg = fs.readFileSync(`assets/road-shields/${filename}`, "utf8");
@@ -113,11 +112,6 @@ test("todos os novos templates mantêm área segura e base vetorial", () => {
     assert.match(svg, /id="shield-base"/, filename);
     assert.match(svg, /id="road-number-sample"/, filename);
   }
-  const nic = fs.readFileSync("assets/road-shields/nic-national-default.svg", "utf8");
-  assert.match(nic, /id="text-safe-area"/);
-  assert.match(nic, /id="shield-base"/);
-  assert.match(nic, /nic-national-default-a\.svg#shield-base-a/);
-  assert.match(nic, /nic-national-default-b\.svg#shield-base-b/);
 });
 
 test("suporte novo é carregado depois dos escudos existentes e antes dos marcadores", () => {

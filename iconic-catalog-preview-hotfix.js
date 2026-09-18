@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.17";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.18";
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     silver: { color: "#aeb5ba", width: 5 }

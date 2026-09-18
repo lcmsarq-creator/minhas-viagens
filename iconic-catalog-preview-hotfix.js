@@ -1,51 +1,53 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.16";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.17";
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },
     silver: { color: "#aeb5ba", width: 5 }
   };
-  const PANAM_EMBLEMS = Object.freeze({
-    CO: "COLÔMBIA",
-    EC: "ECUADOR",
-    PE: "PERU",
-    CL: "CHILE",
-    AR: "ARGENTINA"
-  });
 
   const waitForApp = () => {
     const iconic = window.MinhasViagensIconicRoutes;
     const catalog = window.MinhasViagensIconicCatalog;
     const hostedCatalog = window.MinhasViagensIconicRouteCatalog;
     if (!iconic?.routes?.length || !catalog?.routes?.length || !hostedCatalog || !window.map || !window.L || !window.state?.iconicPreviewLayer || !window.els?.iconicOtherList) {
-      setTimeout(waitForApp, 40);
+      setTimeout(waitForApp, 30);
       return;
     }
     install(iconic, catalog, hostedCatalog);
   };
 
   function install(iconic, catalog, hostedCatalog) {
-    if (window.MinhasViagensIconicCatalogPreview?.installed) return;
+    if (window.MinhasViagensIconicCatalogPreviewV2?.installed) return;
 
+    const routeById = new Map(catalog.routes.map(route => [String(route.id), route]));
     let activeSelection = null;
     let selectionGeneration = 0;
 
     const routeStyle = kind => window.MinhasViagensRouteStyleLab?.style?.(kind) || FALLBACK_STYLES[kind] || FALLBACK_STYLES.common;
-    const routeById = new Map(catalog.routes.map(route => [route.id, route]));
+    const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 
-    function prepareGeometry(route) {
-      const ready = hostedCatalog.entryFor(route.id);
-      if (ready) return Promise.resolve(ready);
-      return hostedCatalog.loadRoute(route.id).then(entry => {
-        if (!entry) throw new Error(`Geometria hospedada indisponível: ${route.id}`);
-        return entry;
-      });
-    }
-
-    async function preloadAllGeometries() {
-      await window.MinhasViagensIconicRouteCatalogReady;
-      return hostedCatalog.decodedCount();
+    function renderFastCatalog() {
+      const list = els.iconicOtherList;
+      if (!list || list.querySelector(".iconic-route-card[data-iconic-route]")) return;
+      list.innerHTML = "";
+      for (const route of catalog.routes) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.dataset.iconicRoute = route.id;
+        card.className = "achievement-card iconic-route-card hosted-iconic-route-card";
+        card.setAttribute("aria-label", `Mostrar o trajeto completo de ${route.name} no mapa`);
+        card.innerHTML = `
+          <span class="achievement-icon iconic-route-icon">★</span>
+          <div class="iconic-route-copy">
+            <strong>${escapeHtml(route.name)}</strong>
+            <small>${escapeHtml(route.category || "Rota icônica")} · ${escapeHtml(route.region || "")}</small>
+            <span class="iconic-source-label">Trajeto completo pronto</span>
+          </div>`;
+        list.appendChild(card);
+      }
+      if (!list.children.length) list.innerHTML = '<p class="empty">Nenhuma rota icônica disponível.</p>';
     }
 
     function addStyledLine(line, options) {
@@ -58,12 +60,18 @@
       const silver = routeStyle("silver");
       for (const line of geometry.lines || []) {
         addStyledLine(line, { pane: "iconicRoutePreview", color: "#fff", weight: common.width + 4, opacity: .92 });
-        addStyledLine(line, { pane: "iconicRoutePreview", color: common.color, weight: common.width, opacity: .82 });
+        addStyledLine(line, { pane: "iconicRoutePreview", color: common.color, weight: common.width, opacity: .84 });
       }
       for (const line of geometry.alternateLines || []) {
-        addStyledLine(line, { pane: "iconicRoutePreview", color: "#fff", weight: silver.width + 4, opacity: .86 });
-        addStyledLine(line, { pane: "iconicRoutePreview", color: silver.color, weight: silver.width, opacity: .78, dashArray: "7 7" });
+        addStyledLine(line, { pane: "iconicRoutePreview", color: "#fff", weight: silver.width + 4, opacity: .88 });
+        addStyledLine(line, { pane: "iconicRoutePreview", color: silver.color, weight: silver.width, opacity: .8, dashArray: "7 7" });
       }
+    }
+
+    function fullBounds(geometry) {
+      if (Array.isArray(geometry.bounds) && geometry.bounds.length === 2) return L.latLngBounds(geometry.bounds);
+      const points = [...(geometry.lines || []), ...(geometry.alternateLines || [])].flat();
+      return points.length ? L.latLngBounds(points) : null;
     }
 
     function setBackgroundSecondary(secondary) {
@@ -77,136 +85,77 @@
       }
     }
 
-    function panamCountryForPoint(point) {
-      const lat = Number(point?.[0]), lon = Number(point?.[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
-      if (lat >= .5 && lat <= 8.6 && lon >= -79.6 && lon <= -73.0) return "CO";
-      if (lat < 1 && lat >= -4.7 && lon >= -81.6 && lon <= -76.5) return "EC";
-      if (lat < -4 && lat >= -18.25 && lon >= -82.2 && lon <= -68) return "PE";
-      if (lat < -18.2 && lat >= -33.2 && lon <= -69.5 && lon >= -72.5) return "CL";
-      if (lat < -31.5 && lat >= -36 && lon > -70.3 && lon <= -57) return "AR";
-      return "";
-    }
-
-    function panamEmblemMarkup(code) {
-      const name = PANAM_EMBLEMS[code];
-      if (!name) return "";
-      const asset = `assets/iconic-routes/via-panam-base.svg?v=${VERSION}`;
-      return `<svg viewBox="0 0 1374 1145" preserveAspectRatio="xMidYMid meet" aria-label="${name}, Vía Panam" style="width:52px;height:44px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.28))"><use href="${asset}#shield-base"></use><text x="687" y="275" fill="#000" font-family="Arial, Helvetica, sans-serif" font-size="180" font-weight="700" text-anchor="middle" dominant-baseline="middle">${name}</text></svg>`;
-    }
-
-    function paintPanamFullEmblems(route, geometry) {
-      if (route?.emblemKey !== "via-panam" || typeof L.marker !== "function" || typeof L.divIcon !== "function") return;
-      const allowed = new Set(route.emblemCountries || []);
-      const pointsByCountry = new Map();
-      for (const line of geometry.lines || []) {
-        const stride = Math.max(1, Math.floor(line.length / 500));
-        for (let index = 0; index < line.length; index += stride) {
-          const point = line[index];
-          const code = panamCountryForPoint(point);
-          if (!code || !allowed.has(code) || !PANAM_EMBLEMS[code]) continue;
-          if (!pointsByCountry.has(code)) pointsByCountry.set(code, []);
-          pointsByCountry.get(code).push(point);
-        }
-      }
-      for (const [code, points] of pointsByCountry) {
-        const point = points[Math.floor(points.length / 2)];
-        L.marker(point, {
-          pane: "iconicRouteMain",
-          interactive: false,
-          icon: L.divIcon({
-            className: "iconic-panam-marker",
-            html: panamEmblemMarkup(code),
-            iconSize: [52, 44],
-            iconAnchor: [26, 22]
-          })
-        }).addTo(state.iconicPreviewLayer);
-      }
-    }
-
-    function fullBounds(geometry) {
-      if (Array.isArray(geometry.bounds) && geometry.bounds.length === 2) return L.latLngBounds(geometry.bounds);
-      const points = [...(geometry.lines || []), ...(geometry.alternateLines || [])].flat();
-      return points.length ? L.latLngBounds(points) : null;
-    }
-
-    function showPreparedCatalogRoute(route, geometry, card) {
+    function showPreparedRoute(route, geometry, card) {
       if (typeof closeFullHighway === "function") closeFullHighway();
       if (typeof closeTripRoadHighlight === "function") closeTripRoadHighlight();
       iconic.clearPreview?.();
       state.iconicPreviewLayer?.clearLayers();
       setBackgroundSecondary(true);
+      document.querySelectorAll(".iconic-route-card.active").forEach(item => item.classList.remove("active"));
       card?.classList.add("active");
       if (typeof setTripsSecondary === "function") setTripsSecondary(true);
       paintFullGeometry(geometry);
-      paintPanamFullEmblems(route, geometry);
       const bounds = fullBounds(geometry);
-      if (bounds) map.fitBounds(bounds.pad(.08), { maxZoom: 13, animate: false });
+      if (bounds?.isValid?.()) map.fitBounds(bounds.pad(.08), { maxZoom: 13, animate: false });
       activeSelection = { route, geometry, card };
     }
 
     async function showFullCatalogRoute(route, card) {
       const generation = ++selectionGeneration;
-      const ready = hostedCatalog.entryFor(route.id);
-      if (ready) {
-        showPreparedCatalogRoute(route, ready, card);
-        return;
-      }
-      card?.classList.add("loading");
-      try {
-        const geometry = await prepareGeometry(route);
-        if (generation !== selectionGeneration) return;
-        showPreparedCatalogRoute(route, geometry, card);
-      } finally {
+      let geometry = hostedCatalog.entryFor(route.id);
+      if (!geometry) {
+        card?.classList.add("loading");
+        geometry = await hostedCatalog.loadRoute(route.id);
         card?.classList.remove("loading");
       }
-    }
-
-    function warmRouteFromEvent(event) {
-      const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
-      if (!card || !els.iconicOtherList.contains(card)) return;
-      const route = routeById.get(card.dataset.iconicRoute);
-      if (route && !hostedCatalog.has(route.id)) hostedCatalog.loadRoute(route.id).catch(() => {});
+      if (generation !== selectionGeneration) return;
+      if (!geometry) throw new Error(`Geometria hospedada indisponível: ${route.id}`);
+      showPreparedRoute(route, geometry, card);
     }
 
     document.addEventListener("click", event => {
       const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
       if (!card) return;
-      if (!els.iconicOtherList.contains(card)) {
-        activeSelection = null;
-        return;
-      }
-      const route = routeById.get(card.dataset.iconicRoute);
+      const route = routeById.get(String(card.dataset.iconicRoute || ""));
       if (!route) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       showFullCatalogRoute(route, card).catch(error => console.warn("Não foi possível abrir a rota icônica completa", error));
     }, true);
 
-    document.addEventListener("pointerdown", warmRouteFromEvent, { capture: true, passive: true });
-    document.addEventListener("touchstart", warmRouteFromEvent, { capture: true, passive: true });
+    const warmFromEvent = event => {
+      const card = event.target?.closest?.(".iconic-route-card[data-iconic-route]");
+      if (!card) return;
+      const route = routeById.get(String(card.dataset.iconicRoute || ""));
+      if (route && !hostedCatalog.has(route.id)) hostedCatalog.loadRoute(route.id).catch(() => {});
+    };
+    document.addEventListener("pointerdown", warmFromEvent, { capture: true, passive: true });
+    document.addEventListener("touchstart", warmFromEvent, { capture: true, passive: true });
 
     els.iconicOtherTabBtn?.addEventListener("click", () => {
-      preloadAllGeometries().catch(() => {});
-    });
+      renderFastCatalog();
+      hostedCatalog.loadBundle().catch(() => false);
+    }, true);
 
     window.MinhasViagensRouteStyleLab?.subscribe?.(() => {
       if (!activeSelection) return;
       state.iconicPreviewLayer?.clearLayers();
       paintFullGeometry(activeSelection.geometry);
-      paintPanamFullEmblems(activeSelection.route, activeSelection.geometry);
     });
+
+    renderFastCatalog();
 
     window.MinhasViagensIconicCatalogPreview = {
       installed: true,
       version: VERSION,
       hosted: true,
-      prepareGeometry,
-      preloadAllGeometries,
+      allCardsUseFullGeometry: true,
       showFullCatalogRoute,
+      preloadAllGeometries: () => hostedCatalog.loadBundle(),
       preparedCount: () => hostedCatalog.decodedCount(),
       stats: hostedCatalog.stats
     };
+    window.MinhasViagensIconicCatalogPreviewV2 = window.MinhasViagensIconicCatalogPreview;
 
     const brandCopy = document.querySelector(".brand p");
     if (brandCopy) brandCopy.textContent = brandCopy.textContent.replace(/v\d+\.\d+\.\d+/, `v${VERSION}`);

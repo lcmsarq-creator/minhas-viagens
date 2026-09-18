@@ -32,5 +32,20 @@ test("preview usa apenas catálogo hospedado e não consulta geometryPath no cli
 test("trajeto completo faz fitBounds sem animação após o toque", () => {
   const source = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
   assert.match(source, /paintFullGeometry\(geometry\)/);
-  assert.match(source, /map\.fitBounds\(bounds\.pad\(\.08\), \{ maxZoom: 13, animate: false \}\)/);
+  assert.match(source, /appMap\.fitBounds\(bounds\.pad\(\.08\), \{ maxZoom: 13, animate: false \}\)/);
+});
+
+test("hotfix usa os bindings globais lexicais reais de script.js", () => {
+  const appSource = fs.readFileSync("script.js", "utf8");
+  const previewSource = fs.readFileSync("iconic-catalog-preview-hotfix.js", "utf8");
+  assert.match(appSource, /const state = \{/);
+  assert.match(appSource, /const map = L\.map/);
+  assert.match(appSource, /const els = \{/);
+  assert.match(previewSource, /typeof map !== "undefined" \? map : null/);
+  assert.match(previewSource, /typeof state !== "undefined" \? state : null/);
+  assert.match(previewSource, /typeof els !== "undefined" \? els : null/);
+  assert.doesNotMatch(previewSource, /!window\.map/);
+  assert.doesNotMatch(previewSource, /window\.state\?\.iconicPreviewLayer/);
+  assert.doesNotMatch(previewSource, /window\.els\?\.iconicOtherList/);
+  assert.match(previewSource, /runtimeScope: "global-lexical-bindings"/);
 });

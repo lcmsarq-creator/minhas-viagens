@@ -14,16 +14,16 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Download route sources
+      - name: Download final route sources
         shell: bash
         run: |
           set -u
           mkdir out
-          curl -A 'Mozilla/5.0' -Ls 'https://www.google.com/maps/d/kml?mid=1O8i88DP9OvSd4A-W6i9mBGjLc5C4eco&forcekml=1' -o out/caminhos-sao-tiago.kml || true
-          curl -A 'MinhasViagens/0.14.2 route-review' -Ls 'https://api.openstreetmap.org/api/0.6/map?bbox=-46.634,-20.427,-46.553,-20.375' -o out/canastra.osm || true
-          curl -Ls 'https://router.project-osrm.org/route/v1/driving/-36.49759445,-10.44154807;-36.46776551,-10.48157729?overview=full&geometries=geojson' -o out/brejo-grande-osrm.json || true
+          curl -Ls 'https://router.project-osrm.org/route/v1/driving/-44.57693,-22.32587;-44.59703,-22.32449?overview=full&geometries=geojson' -o out/maringa-maromba-osrm.json || true
+          curl -A 'MinhasViagens/0.14.2 route-review' -Ls 'https://api.openstreetmap.org/api/0.6/map?bbox=-51.54,-29.20,-51.42,-29.14' -o out/caminhos-pedra.osm || true
+          curl -A 'MinhasViagens/0.14.2 route-review' -Ls 'https://api.openstreetmap.org/api/0.6/map?bbox=-52.42,-22.58,-52.14,-22.47' -o out/morro-diabo.osm || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: route-data-v0142-3
+          name: route-data-v0142-final
           path: out

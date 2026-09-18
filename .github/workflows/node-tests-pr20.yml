@@ -1,0 +1,30 @@
+name: Testes Node PR 20
+
+on:
+  push:
+    branches:
+      - feat/central-north-america-road-shields
+    paths:
+      - ".github/workflows/node-tests-pr20.yml"
+      - "**/*.js"
+      - "**/*.svg"
+      - "**/*.html"
+
+permissions:
+  contents: read
+
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Executar suíte Node
+        run: node --test tests/*.test.js

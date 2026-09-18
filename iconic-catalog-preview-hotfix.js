@@ -7,18 +7,31 @@
     silver: { color: "#aeb5ba", width: 5 }
   };
 
+  function runtimeBindings() {
+    let appMap = null;
+    let appState = null;
+    let appEls = null;
+    try {
+      appMap = typeof map !== "undefined" ? map : null;
+      appState = typeof state !== "undefined" ? state : null;
+      appEls = typeof els !== "undefined" ? els : null;
+    } catch (_) {}
+    return { appMap, appState, appEls };
+  }
+
   const waitForApp = () => {
     const iconic = window.MinhasViagensIconicRoutes;
     const catalog = window.MinhasViagensIconicCatalog;
     const hostedCatalog = window.MinhasViagensIconicRouteCatalog;
-    if (!iconic?.routes?.length || !catalog?.routes?.length || !hostedCatalog || !window.map || !window.L || !window.state?.iconicPreviewLayer || !window.els?.iconicOtherList) {
+    const { appMap, appState, appEls } = runtimeBindings();
+    if (!iconic?.routes?.length || !catalog?.routes?.length || !hostedCatalog || !window.L || !appMap || !appState?.iconicPreviewLayer || !appEls?.iconicOtherList) {
       setTimeout(waitForApp, 30);
       return;
     }
-    install(iconic, catalog, hostedCatalog);
+    install(iconic, catalog, hostedCatalog, appMap, appState, appEls, window.L);
   };
 
-  function install(iconic, catalog, hostedCatalog) {
+  function install(iconic, catalog, hostedCatalog, appMap, appState, appEls, Leaflet) {
     if (window.MinhasViagensIconicCatalogPreviewV2?.installed) return;
 
     const routeById = new Map(catalog.routes.map(route => [String(route.id), route]));
@@ -29,7 +42,7 @@
     const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 
     function renderFastCatalog() {
-      const list = els.iconicOtherList;
+      const list = appEls.iconicOtherList;
       if (!list || list.querySelector(".iconic-route-card[data-iconic-route]")) return;
       list.innerHTML = "";
       for (const route of catalog.routes) {
@@ -52,7 +65,7 @@
 
     function addStyledLine(line, options) {
       if (!Array.isArray(line) || line.length < 2) return;
-      L.polyline(line, { interactive: false, smoothFactor: 3, ...options }).addTo(state.iconicPreviewLayer);
+      Leaflet.polyline(line, { interactive: false, smoothFactor: 3, ...options }).addTo(appState.iconicPreviewLayer);
     }
 
     function paintFullGeometry(geometry) {
@@ -69,13 +82,13 @@
     }
 
     function fullBounds(geometry) {
-      if (Array.isArray(geometry.bounds) && geometry.bounds.length === 2) return L.latLngBounds(geometry.bounds);
+      if (Array.isArray(geometry.bounds) && geometry.bounds.length === 2) return Leaflet.latLngBounds(geometry.bounds);
       const points = [...(geometry.lines || []), ...(geometry.alternateLines || [])].flat();
-      return points.length ? L.latLngBounds(points) : null;
+      return points.length ? Leaflet.latLngBounds(points) : null;
     }
 
     function setBackgroundSecondary(secondary) {
-      for (const layer of state.iconicRouteLayer?.getLayers?.() || []) {
+      for (const layer of appState.iconicRouteLayer?.getLayers?.() || []) {
         if (typeof layer?.setStyle !== "function") continue;
         if (!Number.isFinite(layer._iconicPrimaryOpacity)) {
           const opacity = Number(layer.options?.opacity);
@@ -89,14 +102,14 @@
       if (typeof closeFullHighway === "function") closeFullHighway();
       if (typeof closeTripRoadHighlight === "function") closeTripRoadHighlight();
       iconic.clearPreview?.();
-      state.iconicPreviewLayer?.clearLayers();
+      appState.iconicPreviewLayer?.clearLayers();
       setBackgroundSecondary(true);
       document.querySelectorAll(".iconic-route-card.active").forEach(item => item.classList.remove("active"));
       card?.classList.add("active");
       if (typeof setTripsSecondary === "function") setTripsSecondary(true);
       paintFullGeometry(geometry);
       const bounds = fullBounds(geometry);
-      if (bounds?.isValid?.()) map.fitBounds(bounds.pad(.08), { maxZoom: 13, animate: false });
+      if (bounds?.isValid?.()) appMap.fitBounds(bounds.pad(.08), { maxZoom: 13, animate: false });
       activeSelection = { route, geometry, card };
     }
 
@@ -132,14 +145,14 @@
     document.addEventListener("pointerdown", warmFromEvent, { capture: true, passive: true });
     document.addEventListener("touchstart", warmFromEvent, { capture: true, passive: true });
 
-    els.iconicOtherTabBtn?.addEventListener("click", () => {
+    appEls.iconicOtherTabBtn?.addEventListener("click", () => {
       renderFastCatalog();
       hostedCatalog.loadBundle().catch(() => false);
     }, true);
 
     window.MinhasViagensRouteStyleLab?.subscribe?.(() => {
       if (!activeSelection) return;
-      state.iconicPreviewLayer?.clearLayers();
+      appState.iconicPreviewLayer?.clearLayers();
       paintFullGeometry(activeSelection.geometry);
     });
 
@@ -149,6 +162,7 @@
       installed: true,
       version: VERSION,
       hosted: true,
+      runtimeScope: "global-lexical-bindings",
       allCardsUseFullGeometry: true,
       showFullCatalogRoute,
       preloadAllGeometries: () => hostedCatalog.loadBundle(),

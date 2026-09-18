@@ -55,6 +55,21 @@ jobs:
               path.write_text(text,encoding='utf-8')
           PY
 
+      - name: Atualizar expectativas dos testes para o catálogo ampliado
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['tests/iconic-route-catalog.test.js','tests/iconic-routes-ui.test.js']:
+              path=Path(name)
+              text=path.read_text(encoding='utf-8')
+              text=text.replace('44 rotas icônicas','86 rotas icônicas')
+              text=text.replace('44 recortes','86 recortes')
+              text=text.replace('routeCount, 44','routeCount, 86')
+              text=text.replace('routes.length, 44','routes.length, 86')
+              text=text.replace('cards.length, 44','cards.length, 86')
+              path.write_text(text,encoding='utf-8')
+          PY
+
       - name: Validar catálogo e geometrias
         run: |
           python - <<'PY'
@@ -86,7 +101,7 @@ jobs:
         run: |
           git config user.name "minhas-viagens-route-bot"
           git config user.email "route-bot@users.noreply.github.com"
-          git add scripts/build_brazil_park_pilgrimage_routes.py iconic-routes-catalog.js tests/iconic-routes.test.js iconic-routes/v1 iconic-route-catalog/v1 index.html auth.js iconic-routes.js iconic-route-catalog.js iconic-catalog-preview-hotfix.js
+          git add scripts/build_brazil_park_pilgrimage_routes.py iconic-routes-catalog.js tests/iconic-routes.test.js tests/iconic-route-catalog.test.js tests/iconic-routes-ui.test.js iconic-routes/v1 iconic-route-catalog/v1 index.html auth.js iconic-routes.js iconic-route-catalog.js iconic-catalog-preview-hotfix.js
           if git diff --cached --quiet; then
             echo 'Sem mudanças a publicar'
             exit 0

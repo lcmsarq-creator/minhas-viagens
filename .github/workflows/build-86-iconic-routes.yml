@@ -1,0 +1,20 @@
+name: Validate iconic routes expansion
+on:
+  push:
+    branches:
+      - feat/86-rotas-emblemas
+    paths:
+      - data/iconic-routes-expansion-source.json
+      - scripts/validate_iconic_routes_expansion.py
+      - .github/workflows/build-86-iconic-routes.yml
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/validate_iconic_routes_expansion.py

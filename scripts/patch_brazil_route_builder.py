@@ -4,7 +4,7 @@ from pathlib import Path
 path = Path('scripts/build_brazil_park_pilgrimage_routes.py')
 text = path.read_text(encoding='utf-8')
 
-old = '''def geocode(query: str):
+old_geocode = '''def geocode(query: str):
     global LAST_GEOCODE
     if query in GEOCODE_CACHE:
         return GEOCODE_CACHE[query]
@@ -28,7 +28,7 @@ old = '''def geocode(query: str):
     print(f"geocode: {query} -> {point[0]:.5f},{point[1]:.5f}")
     return point
 '''
-new = '''def geocode(query: str):
+new_geocode = '''def geocode(query: str):
     global LAST_GEOCODE
     if query in GEOCODE_CACHE:
         return GEOCODE_CACHE[query]
@@ -66,11 +66,12 @@ new = '''def geocode(query: str):
         return point
     raise RuntimeError(f"Nominatim sem resultado para: {query}")
 '''
-if old not in text:
+if old_geocode in text:
+    text = text.replace(old_geocode, new_geocode, 1)
+elif 'candidates = [query]' not in text:
     raise SystemExit('geocode block not found')
-text = text.replace(old, new, 1)
 
-old = '''def build_route(route_id, spec):
+old_build = '''def build_route(route_id, spec):
     waypoints = points(spec["waypoints"])
     road_paths = existing_road_paths(spec.get("roads", []))
     source_type = "vehicle-recut-official-checkpoints"
@@ -84,7 +85,7 @@ old = '''def build_route(route_id, spec):
     if lines is None:
         lines = helper.route_with_osrm(waypoints)
 '''
-new = '''def build_route(route_id, spec):
+new_build = '''def build_route(route_id, spec):
     road_paths = existing_road_paths(spec.get("roads", []))
     source_type = "vehicle-recut-official-checkpoints"
     lines = None
@@ -102,18 +103,30 @@ new = '''def build_route(route_id, spec):
         if lines is None:
             lines = helper.route_with_osrm(waypoints)
 '''
-if old not in text:
+if old_build in text:
+    text = text.replace(old_build, new_build, 1)
+elif 'if spec.get("wholeRoad") and road_paths:' not in text:
     raise SystemExit('build_route block not found')
-text = text.replace(old, new, 1)
 
+# A MT-370 completa contém outros trechos no catálogo; o parque é só o recorte
+# Poconé–Porto Cercado, portanto NÃO usamos a rodovia inteira.
 text = text.replace('''    "estrada-parque-pocone-porto-cercado": {
-        "roads": ["mt/370.json"],''', '''    "estrada-parque-pocone-porto-cercado": {
         "roads": ["mt/370.json"],
-        "wholeRoad": True,''', 1)
-text = text.replace('''    "estrada-parque-cachoeira-da-fumaca": {
+        "wholeRoad": True,''', '''    "estrada-parque-pocone-porto-cercado": {
+        "roads": ["mt/370.json"],''')
+
+# A MT-457 é oficialmente denominada Estrada Parque Cachoeira da Fumaça.
+if '"wholeRoad": True' not in text.split('"estrada-parque-cachoeira-da-fumaca": {',1)[1].split('},',1)[0]:
+    text = text.replace('''    "estrada-parque-cachoeira-da-fumaca": {
         "roads": ["mt/457.json"],''', '''    "estrada-parque-cachoeira-da-fumaca": {
         "roads": ["mt/457.json"],
         "wholeRoad": True,''', 1)
 
+# O Nominatim não resolve o nome do parque e cai no centro de Teodoro Sampaio,
+# gerando linha vazia. Estes pontos enquadram o trecho da SP-613 que atravessa o
+# Parque Estadual Morro do Diabo (aprox. 14 km), em vez de toda a rodovia.
+text = text.replace('''        "waypoints": ["Teodoro Sampaio, São Paulo", "Parque Estadual Morro do Diabo, Teodoro Sampaio, São Paulo"],''',
+                    '''        "waypoints": [[-22.4930, -52.2725], [-22.6045, -52.1355]],''')
+
 path.write_text(text, encoding='utf-8')
-print('builder patched for whole-road and rural geocoding fallbacks')
+print('builder patched/idempotent: rural fallbacks + corrected park recuts')

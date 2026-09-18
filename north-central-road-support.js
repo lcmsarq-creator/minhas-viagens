@@ -44,10 +44,7 @@
       prefixNetwork: true
     }),
     NI: Object.freeze({
-      uses: Object.freeze([
-        `assets/road-shields/nic-national-default-a.svg?v=${APP_VERSION}#shield-base-a`,
-        `assets/road-shields/nic-national-default-b.svg?v=${APP_VERSION}#shield-base-b`
-      ]),
+      asset: `assets/road-shields/nic-national-default.svg?v=${APP_VERSION}`,
       viewBox: "0 0 893.2065 866.042",
       safe: Object.freeze({ x: 149.1791, y: 384.6707, width: 594.8482, height: 294.9111 }),
       color: "#010101",
@@ -159,7 +156,6 @@
   }
 
   function usesFor(config) {
-    if (Array.isArray(config.uses)) return config.uses;
     return config.asset ? [`${config.asset}#shield-base`] : [];
   }
 
@@ -200,8 +196,8 @@
     const config = configFor(parsed);
     if (config) return svgShield(parsed, config, size);
 
-    // Países sul-americanos que já tinham SVG continuam usando exatamente o renderer anterior.
-    if (baseShieldApi.assets?.[parsed.countryCode]) {
+    // Brasil e países sul-americanos que já tinham SVG continuam usando exatamente o renderer anterior.
+    if (parsed.countryCode === "BR" || baseShieldApi.assets?.[parsed.countryCode]) {
       return baseRoadShieldMarkup ? baseRoadShieldMarkup(label, size) : "";
     }
 

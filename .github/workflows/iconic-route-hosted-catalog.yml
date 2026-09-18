@@ -46,7 +46,7 @@ jobs:
 
       - name: Publicar catálogo na branch
         run: |
-          if git diff --quiet -- iconic-route-catalog/v1; then exit 0; fi
+          if [ -z "$(git status --porcelain -- iconic-route-catalog/v1)" ]; then exit 0; fi
           git config user.name "minhas-viagens-route-bot"
           git config user.email "route-bot@users.noreply.github.com"
           git add iconic-route-catalog/v1

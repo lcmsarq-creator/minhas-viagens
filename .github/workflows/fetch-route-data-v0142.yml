@@ -1,0 +1,33 @@
+name: Fetch route data v0142
+
+on:
+  push:
+    branches:
+      - feat/iconic-road-interactions-v0142
+    paths:
+      - '.github/workflows/fetch-route-data-v0142.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download KML and local OSM networks
+        shell: bash
+        run: |
+          set -e
+          mkdir out
+          curl -A 'Mozilla/5.0' -fLs 'https://www.google.com/maps/d/kml?mid=1O8i88DP9OvSd4A-W6i9mBGjLc5C4eco&forcekml=1' -o out/caminhos-sao-tiago.kml
+          cat > /tmp/ceu.query <<'EOF'
+          [out:json][timeout:60];
+          way["highway"](-20.427,-46.634,-20.375,-46.553);
+          (._;>;);
+          out body;
+          EOF
+          curl -fLs --data-urlencode data@/tmp/ceu.query 'https://overpass-api.de/api/interpreter' -o out/canastra-network.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: route-data-v0142
+          path: out

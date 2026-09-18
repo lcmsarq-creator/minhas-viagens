@@ -5,15 +5,15 @@ const path = require("node:path");
 
 const ROOT = path.join("iconic-route-catalog", "v1");
 
-test("catálogo hospedado contém as 44 rotas icônicas", () => {
+test("catálogo hospedado contém as 86 rotas icônicas", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
   const bundle = JSON.parse(fs.readFileSync(path.join(ROOT, "bundle.json"), "utf8"));
   assert.equal(manifest.schema, "iconic-route-preview-manifest-v1");
   assert.equal(manifest.catalogSchema, "iconic-route-preview-polyline5-v1");
   assert.equal(bundle.schema, "iconic-route-preview-bundle-v1");
   assert.equal(bundle.catalogSchema, manifest.catalogSchema);
-  assert.equal(manifest.routeCount, 44);
-  assert.equal(bundle.routeCount, 44);
+  assert.equal(manifest.routeCount, 86);
+  assert.equal(bundle.routeCount, 86);
   assert.deepEqual(Object.keys(bundle.routes).sort(), Object.keys(manifest.routes).sort());
 });
 

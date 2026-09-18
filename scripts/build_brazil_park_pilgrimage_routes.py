@@ -31,25 +31,39 @@ def geocode(query: str):
     global LAST_GEOCODE
     if query in GEOCODE_CACHE:
         return GEOCODE_CACHE[query]
-    wait = 1.05 - (time.monotonic() - LAST_GEOCODE)
-    if wait > 0:
-        time.sleep(wait)
-    params = urllib.parse.urlencode({
-        "q": query,
-        "format": "jsonv2",
-        "limit": 1,
-        "countrycodes": "br",
-    })
-    request = urllib.request.Request(f"{NOMINATIM}?{params}", headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=45) as response:
-        payload = json.load(response)
-    LAST_GEOCODE = time.monotonic()
-    if not payload:
-        raise RuntimeError(f"Nominatim sem resultado para: {query}")
-    point = [float(payload[0]["lat"]), float(payload[0]["lon"])]
-    GEOCODE_CACHE[query] = point
-    print(f"geocode: {query} -> {point[0]:.5f},{point[1]:.5f}")
-    return point
+    parts = [part.strip() for part in query.split(",") if part.strip()]
+    candidates = [query]
+    # Localidades rurais nem sempre possuem objeto próprio no Nominatim. Nesse
+    # caso, recuamos para o município/UF mais específico disponível. A geometria
+    # continua sendo um recorte veicular e nunca inventa uma trilha pedestre.
+    for index in range(1, max(1, len(parts) - 1)):
+        fallback = ", ".join(parts[index:])
+        if fallback and fallback not in candidates:
+            candidates.append(fallback)
+    for candidate in candidates:
+        wait = 1.05 - (time.monotonic() - LAST_GEOCODE)
+        if wait > 0:
+            time.sleep(wait)
+        params = urllib.parse.urlencode({
+            "q": candidate,
+            "format": "jsonv2",
+            "limit": 1,
+            "countrycodes": "br",
+        })
+        request = urllib.request.Request(f"{NOMINATIM}?{params}", headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                payload = json.load(response)
+        finally:
+            LAST_GEOCODE = time.monotonic()
+        if not payload:
+            continue
+        point = [float(payload[0]["lat"]), float(payload[0]["lon"])]
+        GEOCODE_CACHE[query] = point
+        suffix = "" if candidate == query else f" (fallback: {candidate})"
+        print(f"geocode: {query} -> {point[0]:.5f},{point[1]:.5f}{suffix}")
+        return point
+    raise RuntimeError(f"Nominatim sem resultado para: {query}")
 
 
 def points(queries):
@@ -61,18 +75,25 @@ def existing_road_paths(paths):
 
 
 def build_route(route_id, spec):
-    waypoints = points(spec["waypoints"])
     road_paths = existing_road_paths(spec.get("roads", []))
     source_type = "vehicle-recut-official-checkpoints"
     lines = None
-    if road_paths:
-        try:
-            lines = helper.route_on_road_catalog(road_paths, waypoints)
-            source_type = "road-catalog"
-        except Exception as error:
-            print(f"warning: {route_id}: catálogo rodoviário falhou ({error}); usando OSRM")
-    if lines is None:
-        lines = helper.route_with_osrm(waypoints)
+    if spec.get("wholeRoad") and road_paths:
+        lines = helper.copy_whole_road(road_paths[0])
+        source_type = "road-catalog"
+    else:
+        waypoints = points(spec["waypoints"])
+        if road_paths:
+            try:
+                lines = helper.route_on_road_catalog(road_paths, waypoints)
+                source_type = "road-catalog"
+            except Exception as error:
+                print(f"warning: {route_id}: catálogo rodoviário falhou ({error}); usando OSRM")
+        if lines is not None and not any(len(line) > 1 for line in lines):
+            print(f"warning: {route_id}: catálogo rodoviário retornou geometria vazia; usando OSRM")
+            lines = None
+        if lines is None:
+            lines = helper.route_with_osrm(waypoints)
     extra = {
         "vehicleRoute": True,
         "sourceUrl": spec.get("sourceUrl", ""),
@@ -99,6 +120,7 @@ ROUTES = {
     },
     "estrada-parque-cachoeira-da-fumaca": {
         "roads": ["mt/457.json"],
+        "wholeRoad": True,
         "waypoints": ["Jaciara, Mato Grosso", "Cachoeira da Fumaça, Jaciara, Mato Grosso"],
         "sourceUrl": "https://www.sinfra.mt.gov.br/",
     },
@@ -173,7 +195,7 @@ ROUTES = {
     },
     "estrada-parque-morro-do-diabo": {
         "roads": ["sp/613.json"],
-        "waypoints": ["Teodoro Sampaio, São Paulo", "Parque Estadual Morro do Diabo, Teodoro Sampaio, São Paulo"],
+        "waypoints": [[-22.4930, -52.2725], [-22.6045, -52.1355]],
         "sourceUrl": "https://guiadeareasprotegidas.sp.gov.br/",
     },
     # Rio de Janeiro
@@ -217,6 +239,7 @@ ROUTES = {
     # Santa Catarina / Bahia / Sergipe
     "estrada-parque-brigadeiro-silva-paes": {
         "roads": ["sc/410.json"],
+        "wholeRoad": True,
         "waypoints": ["Tijucas, Santa Catarina", "Governador Celso Ramos, Santa Catarina"],
         "sourceUrl": "https://www.sie.sc.gov.br/",
     },
@@ -239,6 +262,7 @@ ROUTES = {
     },
     "estrada-parque-terra-vermelha-garatuba": {
         "roads": ["se/430.json"],
+        "wholeRoad": True,
         "waypoints": ["Terra Vermelha, Japoatã, Sergipe", "Garatuba, Japoatã, Sergipe"],
         "sourceUrl": "https://adema.se.gov.br/",
         "note": "Lote SE-430 da Estrada-Parque, aproximadamente 6,99 km.",

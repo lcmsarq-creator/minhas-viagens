@@ -6,11 +6,27 @@ const path = require("node:path");
 const core = require("../iconic-routes-core.js");
 const catalog = require("../iconic-routes-catalog.js");
 
-test("o catálogo expõe 41 famílias em 44 recortes", () => {
-  assert.equal(catalog.familyCount, 41);
-  assert.equal(catalog.routeCount, 44);
-  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 44);
+test("o catálogo expõe 83 famílias em 86 recortes", () => {
+  assert.equal(catalog.familyCount, 83);
+  assert.equal(catalog.routeCount, 86);
+  assert.equal(new Set(catalog.routes.map(route => route.id)).size, 86);
   assert.equal(catalog.routes.filter(route => route.family === "Estrada Real").length, 4);
+});
+
+test("as novas estradas-parque e caminhos veiculares fazem parte do catálogo sem duplicar as existentes", () => {
+  const ids = ["transpantaneira", "estrada-parque-pocone-porto-cercado", "estrada-parque-cachoeira-da-fumaca", "estrada-parque-cuiaba-chapada", "estrada-parque-santo-antonio-porto-de-fora", "estrada-parque-piraputanga", "estrada-parque-itaquirai", "estrada-parque-veadeiros-go239", "estrada-parque-go327", "estrada-parque-pireneus", "estrada-parque-terra-ronca", "estrada-parque-rota-ecologica", "estrada-parque-guajara-nova-mamore", "estrada-parque-romeiros", "estrada-parque-castelhanos", "estrada-parque-serra-guararu", "estrada-parque-morro-do-diabo", "estrada-parque-visconde-maua", "estrada-parque-maringa-maromba", "estrada-parque-paraty-cunha", "estrada-parque-caparao-es190", "estrada-parque-alcides-daniel-da-costa", "estrada-parque-passos-dos-fundadores", "estrada-parque-bispo-dom-helvecio", "estrada-parque-brigadeiro-silva-paes", "estrada-parque-da-cidadania", "estrada-parque-se100-litoral-norte", "estrada-parque-brejo-grande", "estrada-parque-terra-vermelha-garatuba", "caminhos-de-sao-tiago", "caminho-sao-miguel-arcanjo", "crer-caminho-religioso-estrada-real", "rota-da-luz-sp", "caminho-da-luz", "caminho-da-prece", "caminho-de-nha-chica", "caminhos-de-caravaggio", "caminhos-de-nossa-senhora", "caminhos-franciscanos", "caminhos-de-padre-liberio", "caminho-das-capelas", "caminho-de-sao-jose-patriarca"];
+  assert.equal(ids.length, 42);
+  for (const id of ids) assert.ok(catalog.routes.some(route => route.id === id), `${id} deve existir`);
+  assert.equal(catalog.routes.filter(route => route.id === "caminho-da-fe").length, 1);
+  assert.equal(catalog.routes.filter(route => route.id === "rota-das-missoes").length, 1);
+  assert.equal(catalog.routes.filter(route => route.id === "estrada-parque-pantanal").length, 1);
+  assert.equal(catalog.routes.filter(route => route.id === "serra-da-macaca").length, 1);
+  assert.equal(catalog.routes.filter(route => route.id === "estrada-da-graciosa").length, 1);
+  assert.equal(catalog.routes.filter(route => route.id === "estrada-parque-da-serra").length, 1);
+  assert.equal(catalog.routes.filter(route => route.family === "Estrada Real").length, 4);
+  assert.equal(catalog.routes.some(route => /peabiru|itupava/i.test(`${route.id} ${route.name}`)), false);
+  assert.equal(catalog.routes.find(route => route.id === "rota-das-missoes").name, "Caminho das Missões");
+  assert.equal(catalog.routes.find(route => route.id === "estrada-parque-bispo-dom-helvecio").roadRefs[0], "AMG-900");
 });
 
 test("cada recorte tem uma geometria estática válida", () => {

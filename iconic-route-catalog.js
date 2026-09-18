@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.13.18";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.0";
   const MANIFEST_SCHEMA = "iconic-route-preview-manifest-v1";
   const CATALOG_SCHEMA = "iconic-route-preview-polyline5-v1";
   const BUNDLE_SCHEMA = "iconic-route-preview-bundle-v1";

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.13.13";
+  const APP_VERSION = "0.14.0";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
     common: { color: "#2f6d50", width: 5 },

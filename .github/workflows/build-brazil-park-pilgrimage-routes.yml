@@ -1,0 +1,118 @@
+# Revalida o catálogo completo após integração da expansão latino-americana.
+name: Gerar estradas-parque e caminhos brasileiros
+
+on:
+  push:
+    branches:
+      - feat/brazil-estradas-parque-caminhos
+    paths:
+      - 'scripts/build_brazil_park_pilgrimage_routes.py'
+      - 'scripts/apply_brazil_park_pilgrimage_routes.py'
+      - 'scripts/patch_brazil_route_builder.py'
+      - 'scripts/patch_brazil_route_builder_empty.py'
+      - 'scripts/patch_brazil_short_routes.py'
+      - 'tests/iconic-routes.test.js'
+      - 'tests/iconic-routes-ui.test.js'
+      - 'tests/iconic-route-catalog.test.js'
+      - '.github/workflows/build-brazil-park-pilgrimage-routes.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+        with:
+          ref: feat/brazil-estradas-parque-caminhos
+          fetch-depth: 0
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Tornar gerador resiliente a localidades rurais
+        run: |
+          python scripts/patch_brazil_route_builder.py
+          python scripts/patch_brazil_route_builder_empty.py
+          python scripts/patch_brazil_short_routes.py
+
+      - name: Aplicar cadastro sem duplicações
+        run: python scripts/apply_brazil_park_pilgrimage_routes.py
+
+      - name: Gerar 42 novas geometrias veiculares
+        run: python scripts/build_brazil_park_pilgrimage_routes.py
+
+      - name: Reconstruir catálogo hospedado
+        run: python scripts/build_iconic_route_catalog.py
+
+      - name: Atualizar versão para v0.14.0
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['index.html','auth.js','iconic-routes.js','iconic-route-catalog.js','iconic-catalog-preview-hotfix.js']:
+              path=Path(name)
+              text=path.read_text(encoding='utf-8').replace('0.13.18','0.14.0')
+              path.write_text(text,encoding='utf-8')
+          PY
+
+      - name: Atualizar expectativas dos testes para o catálogo ampliado
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['tests/iconic-route-catalog.test.js','tests/iconic-routes-ui.test.js']:
+              path=Path(name)
+              text=path.read_text(encoding='utf-8')
+              text=text.replace('44 rotas icônicas','86 rotas icônicas')
+              text=text.replace('44 recortes','86 recortes')
+              text=text.replace('routeCount, 44','routeCount, 86')
+              text=text.replace('routes.length, 44','routes.length, 86')
+              text=text.replace('cards.length, 44','cards.length, 86')
+              text=text.replace('children.length !== 44','children.length !== 86')
+              text=text.replace('children.length, 44','children.length, 86')
+              path.write_text(text,encoding='utf-8')
+          PY
+
+      - name: Validar catálogo e geometrias
+        run: |
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          text=Path('iconic-routes-catalog.js').read_text(encoding='utf-8')
+          ids=re.findall(r'route\("([^"]+)"', text)
+          assert len(ids)==86, len(ids)
+          assert len(set(ids))==86
+          assert not any(x in ('caminho-do-peabiru','caminho-do-itupava') for x in ids)
+          manifest=json.loads(Path('iconic-route-catalog/v1/manifest.json').read_text())
+          bundle=json.loads(Path('iconic-route-catalog/v1/bundle.json').read_text())
+          assert manifest['routeCount']==86, manifest['routeCount']
+          assert bundle['routeCount']==86, bundle['routeCount']
+          assert set(ids) <= set(manifest['routes'])
+          print('86 rotas únicas; Peabiru e Itupava ausentes; bundle completo')
+          PY
+
+      - name: Validar JavaScript e testes
+        run: |
+          node --check iconic-routes-catalog.js
+          node --check iconic-routes.js
+          node --check iconic-route-catalog.js
+          node --check iconic-catalog-preview-hotfix.js
+          node --check auth.js
+          node --test tests/iconic-routes.test.js tests/iconic-routes-ui.test.js tests/iconic-route-catalog.test.js tests/iconic-catalog-preview-hotfix.test.js
+
+      - name: Publicar arquivos gerados na branch
+        run: |
+          git config user.name "minhas-viagens-route-bot"
+          git config user.email "route-bot@users.noreply.github.com"
+          git add scripts/build_brazil_park_pilgrimage_routes.py iconic-routes-catalog.js tests/iconic-routes.test.js tests/iconic-route-catalog.test.js tests/iconic-routes-ui.test.js iconic-routes/v1 iconic-route-catalog/v1 index.html auth.js iconic-routes.js iconic-route-catalog.js iconic-catalog-preview-hotfix.js
+          if git diff --cached --quiet; then
+            echo 'Sem mudanças a publicar'
+            exit 0
+          fi
+          git commit -m "feat: cadastrar estradas-parque e caminhos brasileiros"
+          git push origin HEAD:feat/brazil-estradas-parque-caminhos

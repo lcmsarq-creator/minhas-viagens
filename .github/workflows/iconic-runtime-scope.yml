@@ -1,0 +1,16 @@
+name: Validar runtime real do preview icônico
+
+on:
+  push:
+    branches:
+      - fix/iconic-preview-runtime-scope
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/iconic-preview-runtime-scope
+      - run: node --check iconic-catalog-preview-hotfix.js
+      - run: node --test tests/iconic-catalog-preview-hotfix.test.js tests/iconic-route-catalog.test.js tests/iconic-routes-ui.test.js

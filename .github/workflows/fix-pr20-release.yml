@@ -1,0 +1,141 @@
+name: Finalizar PR 20
+
+on:
+  push:
+    branches:
+      - feat/central-north-america-road-shields
+    paths:
+      - ".github/workflows/fix-pr20-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+        with:
+          ref: feat/central-north-america-road-shields
+          fetch-depth: 0
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Aplicar correções finais
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, text):
+              Path(path).write_text(text, encoding="utf-8")
+
+          def replace_required(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f"Trecho não encontrado para {label}: {old!r}")
+              return text.replace(old, new, 1)
+
+          # Release/cache bust: o auth mudou e precisa de uma URL nova para não reaproveitar 0.14.0 em cache.
+          index = read("index.html")
+          for old, new, label in [
+              ('style.css?v=0.13.12', 'style.css?v=0.14.1', 'CSS version'),
+              ('· v0.14.0', '· v0.14.1', 'brand version'),
+              ('MINHAS_VIAGENS_APP_VERSION = "0.14.0"', 'MINHAS_VIAGENS_APP_VERSION = "0.14.1"', 'global version'),
+              ('config.js?v=0.14.0', 'config.js?v=0.14.1', 'config version'),
+              ('auth.js?v=0.14.0', 'auth.js?v=0.14.1', 'auth version'),
+          ]:
+              index = replace_required(index, old, new, label)
+          write("index.html", index)
+
+          auth = read("auth.js")
+          auth = replace_required(auth, 'window.MINHAS_VIAGENS_APP_VERSION||"0.14.0"', 'window.MINHAS_VIAGENS_APP_VERSION||"0.14.1"', 'auth fallback')
+          write("auth.js", auth)
+
+          north = read("north-central-road-support.js")
+          north = replace_required(north, 'window.MINHAS_VIAGENS_APP_VERSION || "0.14.0"', 'window.MINHAS_VIAGENS_APP_VERSION || "0.14.1"', 'north-central fallback')
+          write("north-central-road-support.js", north)
+
+          marker = read("road-marker-hotfix.js")
+          marker = replace_required(marker, 'const APP_VERSION = "0.13.12";', 'const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.1";', 'marker version')
+          marker = replace_required(marker, 'const BADGE_LAYOUT_SCHEMA = "road-badges-v5-americas-country-context";', 'const BADGE_LAYOUT_SCHEMA = "road-badges-v6-north-america-country-context";', 'badge schema')
+          marker = replace_required(
+              marker,
+              'const TRANSIT_COUNTRIES = Object.freeze(["BR","UY","AR","PY","CL","BO","PE","EC","CO","VE","GY","SR","GF","PA","CR","NI","HN","SV","GT","BZ"]);',
+              'const TRANSIT_COUNTRIES = Object.freeze(["BR","UY","AR","PY","CL","BO","PE","EC","CO","VE","GY","SR","GF","PA","CR","NI","HN","SV","GT","BZ","MX","US","CA"]);',
+              'transit countries'
+          )
+          anchor = '  const VENEZUELA=Object.freeze([[12.3,-71.7],[11.4,-66.0],[10.6,-61.7],[8.4,-60.5],[5.5,-61.0],[1.0,-66.8],[4.0,-67.5],[7.0,-72.0],[9.0,-73.3]]);\n'
+          addition = '''  const MEXICO=Object.freeze([[32.72,-117.13],[32.55,-114.72],[31.33,-111.07],[31.78,-108.20],[31.33,-106.50],[31.76,-104.50],[29.78,-102.30],[28.96,-100.30],[26.00,-99.00],[25.84,-97.15],[22.00,-97.80],[18.00,-94.00],[18.20,-90.70],[21.50,-86.70],[18.20,-87.80],[14.50,-92.20],[16.00,-98.00],[17.50,-101.50],[20.00,-105.70],[23.00,-106.60],[23.00,-110.00],[28.00,-114.00],[32.00,-117.00]]);\n  const USA_LOWER48=Object.freeze([[49.00,-124.80],[49.00,-95.00],[48.00,-89.50],[46.50,-84.50],[45.00,-82.50],[42.00,-83.20],[41.70,-82.70],[42.00,-79.80],[43.60,-76.80],[44.80,-74.70],[47.50,-69.20],[45.00,-66.90],[40.00,-73.70],[35.00,-75.50],[30.00,-80.00],[25.00,-80.50],[24.40,-82.00],[29.00,-97.50],[25.80,-97.20],[29.80,-101.00],[31.80,-106.50],[32.50,-117.20],[42.00,-124.80]]);\n'''
+          marker = replace_required(marker, anchor, anchor + addition, 'north-america polygons')
+          checks_anchor = '    if(!Number.isFinite(lat)||!Number.isFinite(lng))return"";\n'
+          checks = '''    if(pointInPolygon(lat,lng,MEXICO))return"MX";\n    if(pointInPolygon(lat,lng,USA_LOWER48))return"US";\n    if(lat>=54.5&&lat<=71.6&&lng>=-170.0&&lng<=-141.0)return"US";\n    if(lat>=18.8&&lat<=22.4&&lng>=-160.6&&lng<=-154.5)return"US";\n    if(lat>=41.6&&lat<=83.2&&lng>=-141.1&&lng<=-52.6)return"CA";\n'''
+          marker = replace_required(marker, checks_anchor, checks_anchor + checks, 'north-america country checks')
+          old_line_km = '  function lineKm(line){let meters=0;for(let i=1;i<(line||[]).length;i+=1){const a=line[i-1],b=line[i];if(!Array.isArray(a)||!Array.isArray(b))continue;if(typeof map?.distance==="function"&&typeof L?.latLng==="function")meters+=map.distance(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));}return meters/1000;}\n'
+          new_line_km = '  function lineKm(line){if(typeof layout?.lineLengthKm==="function")return layout.lineLengthKm(line);let meters=0;if(typeof map==="undefined"||typeof L==="undefined"||typeof map.distance!=="function"||typeof L.latLng!=="function")return 0;for(let i=1;i<(line||[]).length;i+=1){const a=line[i-1],b=line[i];if(!Array.isArray(a)||!Array.isArray(b))continue;meters+=map.distance(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));}return meters/1000;}\n'
+          marker = replace_required(marker, old_line_km, new_line_km, 'lineKm fallback')
+          write("road-marker-hotfix.js", marker)
+
+          # Atualiza testes antigos para a release atual, sem esconder regressões de ordem/schema.
+          scope = read("tests/international-road-shields-country-scope.test.js")
+          scope = scope.replace('release v0.13.12 invalida o cache do shell e dos módulos', 'release v0.14.1 invalida o cache do shell e dos módulos')
+          scope = scope.replace('/APP_VERSION="0\\.13\\.12"/', '/APP_VERSION=window\\.MINHAS_VIAGENS_APP_VERSION\\|\\|"0\\.14\\.1"/')
+          scope = scope.replace('/MINHAS_VIAGENS_APP_VERSION = "0\\.13\\.12"/', '/MINHAS_VIAGENS_APP_VERSION = "0\\.14\\.1"/')
+          scope = scope.replace('/auth\\.js\\?v=0\\.13\\.12/', '/auth\\.js\\?v=0\\.14\\.1/')
+          # O módulo sul-americano mantém sua própria versão interna; o cache global é validado por auth/index.
+          write("tests/international-road-shields-country-scope.test.js", scope)
+
+          shields = read("tests/international-road-shields.test.js")
+          shields = shields.replace('v0.13.12 carrega escudos antes da reconstrução das rodovias', 'v0.14.1 carrega escudos antes da reconstrução das rodovias')
+          shields = shields.replace('/APP_VERSION="0\\.13\\.12"/', '/APP_VERSION=window\\.MINHAS_VIAGENS_APP_VERSION\\|\\|"0\\.14\\.1"/')
+          shields = shields.replace('/road-badges-v5-americas-country-context/', '/road-badges-v6-north-america-country-context/')
+          write("tests/international-road-shields.test.js", shields)
+
+          layout_test = read("tests/road-marker-layout.test.js")
+          layout_test = layout_test.replace('"road-badges-v2-country-context"', '"road-badges-v6-north-america-country-context"')
+          needle = '  vm.runInContext(fs.readFileSync("road-marker-hotfix.js", "utf8"), context);\n\n  const trip = {};\n'
+          extra = '''  vm.runInContext(fs.readFileSync("road-marker-hotfix.js", "utf8"), context);\n\n  const countryApi = context.MinhasViagensRoadCountry;\n  assert.equal(countryApi.countryHintFromPoint(19.4326, -99.1332), "MX", "Cidade do México deve ser MX");\n  assert.equal(countryApi.countryHintFromPoint(34.0522, -118.2437), "US", "Los Angeles deve ser US");\n  assert.equal(countryApi.countryHintFromPoint(43.6532, -79.3832), "CA", "Toronto deve ser CA");\n\n  const trip = {};\n'''
+          layout_test = replace_required(layout_test, needle, extra, 'country hint assertions')
+          write("tests/road-marker-layout.test.js", layout_test)
+
+          v3 = '''const assert = require("node:assert/strict");\nconst fs = require("node:fs");\nconst test = require("node:test");\n\ntest("road marker v6 força reconstrução e mantém países de trânsito", () => {\n  const source = fs.readFileSync("road-marker-hotfix.js", "utf8");\n  assert.match(source, /const APP_VERSION = window\\.MINHAS_VIAGENS_APP_VERSION \\|\\| "0\\.14\\.1"/);\n  assert.match(source, /road-badges-v6-north-america-country-context/);\n  for (const code of ["UY", "AR", "PY", "CL", "BO", "PE", "EC", "CO", "VE", "MX", "US", "CA"]) {\n    assert.match(source, new RegExp(`"${code}"`));\n  }\n  assert.match(source, /refreshTripRoadDataFromRoute/);\n  assert.match(source, /trip\\.roadLabels = extractRoadLabelsFromRoute/);\n  assert.match(source, /trip\\.conquests\\.roads = extractHighwaysFromRoute/);\n  assert.match(source, /extractRoadSegmentsFromRoute/);\n});\n\ntest("loader publica v0.14.1", () => {\n  const auth = fs.readFileSync("auth.js", "utf8");\n  const index = fs.readFileSync("index.html", "utf8");\n  assert.match(auth, /APP_VERSION=window\\.MINHAS_VIAGENS_APP_VERSION\\|\\|"0\\.14\\.1"/);\n  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\\.14\\.1"/);\n  assert.match(index, /auth\\.js\\?v=0\\.14\\.1/);\n});\n'''
+          write("tests/road-marker-v3-source.test.js", v3)
+          PY
+
+      - name: Executar suíte Node completa
+        id: node_tests
+        shell: bash
+        run: |
+          set +e
+          node --test tests/*.test.js > node-test-output.txt 2>&1
+          status=$?
+          cat node-test-output.txt
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Salvar relatório de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr20-final-node-tests
+          path: node-test-output.txt
+
+      - name: Interromper se houver falhas
+        if: steps.node_tests.outputs.exit_code != '0'
+        run: exit 1
+
+      - name: Commitar correções validadas e remover workflow temporário
+        if: steps.node_tests.outputs.exit_code == '0'
+        run: |
+          rm -f node-test-output.txt .github/workflows/fix-pr20-release.yml
+          git config user.name "minhas-viagens-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: concluir suporte rodoviário da América do Norte"
+          git push origin HEAD:feat/central-north-america-road-shields

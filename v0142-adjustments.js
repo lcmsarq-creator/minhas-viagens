@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.5";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.6";
   const CITY_SCAN_SCHEMA = "route-city-crossings-v2-tabs";
   const CITY_SCAN_MAX_BOX_KM = 140;
   const CITY_SCAN_PADDING_DEG = .045;

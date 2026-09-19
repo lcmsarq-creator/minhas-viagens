@@ -1,0 +1,36 @@
+name: validate AR UY transit city catalogs
+
+on:
+  push:
+    branches:
+      - feat/local-cities-ar-uy-v0148
+    paths:
+      - scripts/apply-v0148-transit.py
+      - .github/workflows/v0148-transit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply transit inference
+        run: python scripts/apply-v0148-transit.py
+      - name: Validate full candidate
+        run: |
+          node --check v0147-crossed-cities-local.js
+          node --test tests/*.test.js
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Commit hardened candidate
+        run: |
+          rm scripts/apply-v0148-transit.py
+          rm .github/workflows/v0148-transit.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: detectar Argentina e Uruguai também em trânsito'
+          git push origin HEAD:feat/local-cities-ar-uy-v0148

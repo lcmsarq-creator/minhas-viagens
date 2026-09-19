@@ -19,6 +19,7 @@
     "minhasViagens.v0.4", "minhasViagens.v0.3", "minhasViagens.v0.2", "minhasViagens.v0.1"
   ];
   const ROAD_CLOUD_PREFIX = "mvroad|";
+  const SYNC_BATCH_SIZE = 20;
 
   function serializeTripForCloud(trip) {
     return JSON.parse(JSON.stringify(trip, (key, value) => EXCLUDED_KEYS.has(key) ? undefined : value));
@@ -121,6 +122,12 @@
     return error?.code === "42P01" || /relation .*trips.* does not exist/i.test(error?.message || "");
   }
 
+  function syncErrorLabel(error) {
+    const code = String(error?.code || "").trim();
+    const message = String(error?.message || "").trim();
+    return [code, message].filter(Boolean).join(" · ").slice(0, 180);
+  }
+
   function reconcile(localTrips, remoteRows, tombstones) {
     const local = new Map((localTrips || []).map(trip => [String(trip.id), trip]));
     const remote = new Map((remoteRows || []).map(row => [String(row.trip_id), row]));
@@ -186,11 +193,11 @@
     const readJson = (key, fallback) => { try { return JSON.parse(win.localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
     const writeJson = (key, value) => { win.localStorage.setItem(key, JSON.stringify(value)); return true; };
     const tombstones = () => readJson(tombstoneKey, []);
-    const setStatus = (text, state = "") => {
+    const setStatus = (text, state = "", details = "") => {
       if (!statusEl) return;
       statusEl.textContent = text;
       statusEl.dataset.state = state;
-      statusEl.title = text;
+      statusEl.title = details || text;
     };
     const pendingStatus = () => setStatus(win.navigator.onLine ? "Alterações pendentes" : "Offline");
 
@@ -204,8 +211,11 @@
         client_updated_at: new Date(tripTimestamp(trip) || Date.now()).toISOString(),
         deleted_at: null
       }));
-      const { error } = await client.from("trips").upsert(rows, { onConflict: "user_id,trip_id" });
-      if (error) throw error;
+      for (let offset = 0; offset < rows.length; offset += SYNC_BATCH_SIZE) {
+        const batch = rows.slice(offset, offset + SYNC_BATCH_SIZE);
+        const { error } = await client.from("trips").upsert(batch, { onConflict: "user_id,trip_id" });
+        if (error) throw error;
+      }
       return now;
     }
 
@@ -257,9 +267,10 @@
         setStatus("Sincronizado", "synced");
       } catch (error) {
         console.error("Falha ao sincronizar viagens", error);
-        if (confirmedLegacyRetired) setStatus("Suas viagens já estão seguras na sua conta, mas não foi possível criar o cache local neste dispositivo.", "error");
-        else if (isMissingTable(error)) setStatus("A sincronização ainda não foi configurada no banco. Suas viagens continuam salvas neste dispositivo.", "error");
-        else setStatus("Erro ao sincronizar", "error");
+        const details = syncErrorLabel(error);
+        if (confirmedLegacyRetired) setStatus("Suas viagens já estão seguras na sua conta, mas não foi possível criar o cache local neste dispositivo.", "error", details);
+        else if (isMissingTable(error)) setStatus("A sincronização ainda não foi configurada no banco. Suas viagens continuam salvas neste dispositivo.", "error", details);
+        else setStatus("Erro ao sincronizar", "error", details);
       } finally {
         syncing = false;
         if (rerun) { rerun = false; schedule(100); }

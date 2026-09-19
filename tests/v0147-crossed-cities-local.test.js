@@ -83,7 +83,7 @@ test("resultado completo é persistido e agenda sincronização Supabase", () =>
   const trip = {id:"br-2",mode:"carro",updatedAt:"2026-09-19",routeGeometry:{encodedPolyline:"abc",pointCount:2},conquests:{}};
   const city = {city:"Teste",label:"Teste",region:"São Paulo",country:"Brasil",countryCode:"BR",lat:-20,lng:-49};
   api.persistTripResult(trip,{cities:[city],complete:true,source:"local-br"});
-  assert.equal(trip.routeCityScanVersion,"route-city-crossings-v8-local-south-america");
+  assert.equal(trip.routeCityScanVersion,"route-city-crossings-v9-local-americas");
   assert.equal(trip.routeCityScanComplete,true);
   assert.deepEqual(trip.routeCityConquests,[city]);
   assert.equal(stats().saves,1);

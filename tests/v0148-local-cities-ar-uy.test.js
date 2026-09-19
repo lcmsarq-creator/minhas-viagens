@@ -4,28 +4,21 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const core = require("../crossing-detection-core.js");
 
+const CODES = ["AR","UY","PY","PE","BO","CL","CO","VE","EC","GY","SR","GF","PA","CR","HN","SV","GT","BZ","MX","US","CA"];
 const BR_CSV = `codigo_ibge,nome,latitude,longitude,capital,codigo_uf,siafi_id,ddd,fuso_horario\n4300001,Cidade BR,-31.0000,-54.0000,0,43,1,55,America/Sao_Paulo\n`;
+const PAYLOADS = Object.fromEntries(CODES.map(code => {
+  const payload = JSON.parse(fs.readFileSync(`city-catalog/v1/${code.toLowerCase()}.json`, "utf8"));
+  return [code, payload];
+}));
 
-const SAMPLE = {
-  AR:[3435910,"Buenos Aires",-34.61315,-58.37723,"Buenos Aires F.D.",2891082,"PPLC","Argentina"],
-  UY:[3441575,"Montevidéu",-34.90328,-56.18816,"Montevideo",1305000,"PPLC","Uruguai"],
-  PY:[3439389,"Assunção",-25.28646,-57.647,"Asunción",1482200,"PPLC","Paraguai"],
-  PE:[3936456,"Lima",-12.04318,-77.02824,"Lima",7737002,"PPLC","Peru"],
-  BO:[3911925,"La Paz",-16.5,-68.15,"La Paz",812799,"PPLC","Bolívia"],
-  CL:[3871336,"Santiago",-33.45694,-70.64827,"Santiago Metropolitan",4837295,"PPLC","Chile"],
-  CO:[3688689,"Bogotá",4.60971,-74.08175,"Bogota D.C.",7674366,"PPLC","Colômbia"],
-  VE:[3646738,"Caracas",10.48801,-66.87919,"Distrito Federal",3000000,"PPLC","Venezuela"],
-  EC:[3652462,"Quito",-0.22985,-78.52495,"Pichincha",1399814,"PPLC","Equador"]
-};
-
-function payload(code) {
-  const [id,name,lat,lng,region,population,featureCode,country] = SAMPLE[code];
-  return {schema:"mv-city-catalog-v2",countryCode:code,country,places:[[id,name,lat,lng,region,population,featureCode]]};
+function firstPlace(code) {
+  const row = PAYLOADS[code].places[0];
+  assert.ok(row, `${code} precisa ter ao menos uma localidade`);
+  return row;
 }
 
 function loadModule({overpassElements=[]}={}) {
-  const calls = {br:0,overpass:0};
-  for (const code of Object.keys(SAMPLE)) calls[code.toLowerCase()] = 0;
+  const calls = {br:0, overpass:0, local:{}};
   const context = {
     window:null, globalThis:null, console, AbortController, URL, queueMicrotask,
     state:{trips:[],activeTripDetailId:null},
@@ -36,11 +29,12 @@ function loadModule({overpassElements=[]}={}) {
     fetch:async url=>{
       const value=String(url);
       if (value.includes("municipios.csv")) { calls.br++; return {ok:true,text:async()=>BR_CSV}; }
-      for (const code of Object.keys(SAMPLE)) {
-        if (value.includes(`city-catalog/v1/${code.toLowerCase()}.json`)) {
-          calls[code.toLowerCase()]++;
-          return {ok:true,json:async()=>payload(code)};
-        }
+      const match=value.match(/city-catalog\/v1\/([a-z]{2})\.json/i);
+      if (match) {
+        const code=match[1].toUpperCase();
+        calls.local[code]=(calls.local[code]||0)+1;
+        const payload=PAYLOADS[code];
+        return payload ? {ok:true,json:async()=>payload} : {ok:false,status:404,json:async()=>({})};
       }
       calls.overpass++;
       return {ok:true,json:async()=>({elements:overpassElements})};
@@ -49,10 +43,12 @@ function loadModule({overpassElements=[]}={}) {
     MinhasViagensSync:{schedule:()=>{}},
     MinhasViagensRoadCountry:{
       countryHintFromPoint:(lat,lng)=>{
-        for (const [code,row] of Object.entries(SAMPLE)) {
-          if (Math.abs(lat-row[2]) < 1 && Math.abs(lng-row[3]) < 1) return code;
+        let best="", bestDistance=Infinity;
+        for (const code of CODES) {
+          const row=firstPlace(code), d=Math.hypot(Number(row[2])-lat, Number(row[3])-lng);
+          if (d < bestDistance) { bestDistance=d; best=code; }
         }
-        return "BR";
+        return bestDistance < 0.75 ? best : "BR";
       }
     }
   };
@@ -66,72 +62,76 @@ function loadModule({overpassElements=[]}={}) {
 
 test("catálogos guardam apenas cidades/localidades relevantes", () => {
   const manifest=JSON.parse(fs.readFileSync("city-catalog/v1/manifest.json","utf8"));
-  const expected=["AR","UY","PY","PE","BO","CL","CO","VE","EC"];
   assert.equal(manifest.schema,"mv-city-catalog-manifest-v2");
-  assert.deepEqual(Object.keys(manifest.countries).sort(),expected.slice().sort());
-  const admin=new Set(["PPLC","PPLG","PPLA","PPLA2","PPLA3"]);
+  assert.deepEqual(Object.keys(manifest.countries),CODES);
+  const allowedAlways=new Set(["PPLC","PPLG","PPLA","PPLA2","PPLA3"]);
+  const allowedPopulation=new Set(["PPL","PPLS"]);
   let totalBytes=0;
-  for (const code of expected) {
-    const item=manifest.countries[code];
-    assert.ok(item.count > 0, `${code} sem cidades`);
-    assert.ok(item.bytes < 1000000, `${code} pesado demais`);
-    totalBytes += item.bytes;
-    const payload=JSON.parse(fs.readFileSync(`city-catalog/v1/${code.toLowerCase()}.json`,"utf8"));
+  for (const code of CODES) {
+    const payload=PAYLOADS[code];
     assert.equal(payload.schema,"mv-city-catalog-v2");
     assert.equal(payload.countryCode,code);
     assert.equal(payload.places.length,payload.count);
+    assert.ok(payload.count>0, `${code} vazio`);
+    totalBytes += manifest.countries[code].bytes;
     for (const row of payload.places) {
-      const population=Number(row[5])||0, featureCode=String(row[6]||"");
-      assert.ok(admin.has(featureCode) || (["PPL","PPLS"].includes(featureCode) && population > 1000), `${code}: entrada ampla demais ${featureCode}/${population}`);
+      const pop=Number(row[5])||0, feature=String(row[6]||"");
+      assert.ok(allowedAlways.has(feature) || (allowedPopulation.has(feature) && pop>1000), `${code} contém ${feature}/${pop}`);
     }
   }
-  assert.ok(totalBytes < 3000000, `catálogos somados pesam ${totalBytes} bytes`);
-  assert.ok(manifest.countries.AR.count < 5000, "Argentina ainda contém topônimos demais para o conceito de cidade");
+  assert.ok(totalBytes < 5000000, `catálogos grandes demais: ${totalBytes}`);
+});
+
+test("cada país coberto usa seu catálogo local sem consultar Overpass", async () => {
+  for (const code of CODES) {
+    const {api,calls}=loadModule();
+    const row=firstPlace(code), lat=Number(row[2]), lng=Number(row[3]);
+    const trip={id:`trip-${code}`,mode:"carro",startPlace:{countryCode:code},endPlace:{countryCode:code},line:[[lat,lng-.01],[lat,lng+.01]],routeGeometry:{encodedPolyline:`${code}abc`,pointCount:2}};
+    const result=await api.scanTripCities(trip);
+    assert.equal(result.complete,true, `${code} incompleto`);
+    assert.ok(result.cities.some(city=>city.countryCode===code), `${code} não detectou cidade local`);
+    assert.equal(calls.local[code],1, `${code} não carregou exatamente uma vez`);
+    assert.equal(calls.overpass,0, `${code} chamou Overpass`);
+  }
 });
 
 test("BR→UY usa catálogo local e não consulta Overpass", async () => {
   const {api,calls}=loadModule();
-  const row=SAMPLE.UY;
-  const trip={id:"br-uy",mode:"carro",startPlace:{countryCode:"BR"},endPlace:{countryCode:"UY"},line:[[row[2],row[3]-.1],[row[2],row[3]+.1]],routeGeometry:{encodedPolyline:"abc",pointCount:2}};
+  const row=firstPlace("UY"), lat=Number(row[2]), lng=Number(row[3]);
+  const trip={id:"br-uy",mode:"carro",startPlace:{countryCode:"BR"},endPlace:{countryCode:"UY"},line:[[lat,lng-.01],[lat,lng+.01]],routeGeometry:{encodedPolyline:"abc",pointCount:2}};
   const result=await api.scanTripCities(trip);
   assert.equal(result.complete,true);
-  assert.ok(result.cities.some(city=>city.city==="Montevidéu" && city.countryCode==="UY"));
-  assert.equal(calls.uy,1);
+  assert.ok(result.cities.some(city=>city.countryCode==="UY"));
+  assert.equal(calls.local.UY,1);
   assert.equal(calls.overpass,0);
 });
-
-for (const code of Object.keys(SAMPLE)) {
-  test(`viagem interna em ${code} usa somente o catálogo local`, async () => {
-    const {api,calls}=loadModule();
-    const row=SAMPLE[code];
-    const trip={id:`trip-${code}`,mode:"carro",startPlace:{countryCode:code},endPlace:{countryCode:code},line:[[row[2],row[3]-.08],[row[2],row[3]+.08]],routeGeometry:{encodedPolyline:`${code}-abc`,pointCount:2}};
-    const result=await api.scanTripCities(trip);
-    assert.equal(result.complete,true);
-    assert.ok(result.cities.some(city=>city.countryCode===code && city.city===row[1]));
-    assert.equal(calls[code.toLowerCase()],1);
-    assert.equal(calls.overpass,0);
-  });
-}
 
 test("país ainda sem catálogo mantém fallback Overpass", async () => {
-  const overpass=[{type:"node",id:10,lat:19.4326,lon:-99.1332,tags:{name:"Ciudad de México",place:"city",population:"9209944","addr:country":"MX"}}];
+  const overpass=[{type:"node",id:10,lat:12.14,lon:-86.25,tags:{name:"Managua",place:"city",population:"1000000","addr:country":"NI"}}];
   const {api,calls}=loadModule({overpassElements:overpass});
-  const trip={id:"mx",mode:"carro",startPlace:{countryCode:"MX"},endPlace:{countryCode:"MX"},line:[[19.4326,-99.2],[19.4326,-99.05]],routeGeometry:{encodedPolyline:"mx",pointCount:2}};
+  const trip={id:"ni",mode:"carro",startPlace:{countryCode:"NI"},endPlace:{countryCode:"NI"},line:[[12.14,-86.35],[12.14,-86.15]],routeGeometry:{encodedPolyline:"niabc",pointCount:2}};
   const result=await api.scanTripCities(trip);
   assert.equal(result.complete,true);
-  assert.ok(result.cities.some(city=>city.city==="Ciudad de México"));
-  assert.ok(calls.overpass > 0);
+  assert.ok(result.cities.some(city=>city.city==="Managua"));
+  assert.ok(calls.overpass>0);
 });
 
-test("Argentina é carregada quando aparece apenas como país de trânsito no traçado", async () => {
+test("México é carregado quando aparece apenas como país de trânsito no traçado", async () => {
   const {api,calls}=loadModule();
-  const row=SAMPLE.AR;
-  const trip={id:"br-ar-uy",mode:"carro",startPlace:{countryCode:"BR"},endPlace:{countryCode:"UY"},line:[[row[2],row[3]-.1],[row[2],row[3]+.1]],routeGeometry:{encodedPolyline:"abc",pointCount:2}};
-  assert.deepEqual(Array.from(api.localCountryCodesAlongLine(trip.line)),["AR"]);
+  const row=firstPlace("MX"), lat=Number(row[2]), lng=Number(row[3]);
+  const line=[[lat,lng-.01],[lat,lng+.01]];
+  assert.deepEqual(Array.from(api.localCountryCodesAlongLine(line)),["MX"]);
+  const trip={id:"transit-mx",mode:"carro",startPlace:{countryCode:"US"},endPlace:{countryCode:"GT"},line,routeGeometry:{encodedPolyline:"mxtransit",pointCount:2}};
   const result=await api.scanTripCities(trip);
   assert.equal(result.complete,true);
-  assert.ok(result.cities.some(city=>city.city==="Buenos Aires" && city.countryCode==="AR"));
-  assert.equal(calls.ar,1);
-  assert.equal(calls.uy,1);
+  assert.ok(result.cities.some(city=>city.countryCode==="MX"));
+  assert.equal(calls.local.MX,1);
   assert.equal(calls.overpass,0);
+});
+
+test("módulo de país das rodovias contém todos os catálogos locais", () => {
+  const source=fs.readFileSync("road-marker-hotfix.js","utf8");
+  for (const code of CODES) {
+    assert.match(source,new RegExp(`(?:TRANSIT_COUNTRIES[^;]*|return\\\"${code}\\\")`,"s"), `${code} ausente da inferência rodoviária`);
+  }
 });

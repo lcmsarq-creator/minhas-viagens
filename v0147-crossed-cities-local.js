@@ -3,7 +3,7 @@
 
   const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.8";
   const core = window.MinhasViagensCrossingDetection;
-  const SCHEMA = "route-city-crossings-v8-local-south-america";
+  const SCHEMA = "route-city-crossings-v9-local-americas";
   const V0145_SCHEMA = "route-city-crossings-v4-urban-place";
   const V0144_SCHEMA = "route-city-crossings-v3-admin";
   const LEGACY_SCHEMA = "route-city-crossings-v2-tabs";
@@ -17,7 +17,19 @@
     CL: { path:"city-catalog/v1/cl.json", country:"Chile" },
     CO: { path:"city-catalog/v1/co.json", country:"Colômbia" },
     VE: { path:"city-catalog/v1/ve.json", country:"Venezuela" },
-    EC: { path:"city-catalog/v1/ec.json", country:"Equador" }
+    EC: { path:"city-catalog/v1/ec.json", country:"Equador" },
+    GY: { path:"city-catalog/v1/gy.json", country:"Guiana" },
+    SR: { path:"city-catalog/v1/sr.json", country:"Suriname" },
+    GF: { path:"city-catalog/v1/gf.json", country:"Guiana Francesa" },
+    PA: { path:"city-catalog/v1/pa.json", country:"Panamá" },
+    CR: { path:"city-catalog/v1/cr.json", country:"Costa Rica" },
+    HN: { path:"city-catalog/v1/hn.json", country:"Honduras" },
+    SV: { path:"city-catalog/v1/sv.json", country:"El Salvador" },
+    GT: { path:"city-catalog/v1/gt.json", country:"Guatemala" },
+    BZ: { path:"city-catalog/v1/bz.json", country:"Belize" },
+    MX: { path:"city-catalog/v1/mx.json", country:"México" },
+    US: { path:"city-catalog/v1/us.json", country:"Estados Unidos" },
+    CA: { path:"city-catalog/v1/ca.json", country:"Canadá" }
   });
   const BRAZIL_PAD_DEG = .15;
   const RETRY_DELAYS = [15000, 60000, 180000, 600000, 1800000];
@@ -546,5 +558,5 @@
 
   suppressOldScanners();
   scheduleScan(180);
-  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogos locais sul-americanos habilitadas.`);
+  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogos locais das Américas habilitadas.`);
 })();

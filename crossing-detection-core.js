@@ -156,7 +156,7 @@
   function administrativeBoundaryReliable(element) {
     const tags = element?.tags || {};
     const level = Number(tags.admin_level);
-    if (tags.boundary !== "administrative" || ![7,8,9].includes(level) || !tags.name) return false;
+    if (tags.boundary !== "administrative" || level !== 8 || !tags.name) return false;
     const lines = relationOuterLines(element);
     return lines.length > 0 && lines.reduce((sum, line) => sum + line.length, 0) >= 4;
   }
@@ -235,7 +235,7 @@
     const countryA = String(a?.countryCode || "").toUpperCase(), countryB = String(b?.countryCode || "").toUpperCase();
     if (regionA && regionB && regionA !== regionB) return false;
     if (countryA && countryB && countryA !== countryB) return false;
-    if ((regionA && regionB) || (countryA && countryB)) return true;
+    if (regionA && regionB) return true;
     const pa = [Number(a?.lat), Number(a?.lng)], pb = [Number(b?.lat), Number(b?.lng)];
     return pa.every(Number.isFinite) && pb.every(Number.isFinite) ? haversineKm(pa,pb) <= 25 : false;
   }

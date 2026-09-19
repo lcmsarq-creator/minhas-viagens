@@ -116,7 +116,7 @@
       if (!box) continue;
       const [s,w,n,e] = box;
       const query = `[out:json][timeout:14];(` +
-        `relation["boundary"="administrative"]["admin_level"~"^(7|8|9)$"](${s},${w},${n},${e});` +
+        `relation["boundary"="administrative"]["admin_level"="8"](${s},${w},${n},${e});` +
         `node["place"~"^(city|town|village)$"](${s},${w},${n},${e});` +
         `way["place"~"^(city|town|village)$"](${s},${w},${n},${e});` +
         `relation["place"~"^(city|town|village)$"](${s},${w},${n},${e});` +

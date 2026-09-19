@@ -1,0 +1,58 @@
+name: v0143 engineering
+
+on:
+  push:
+    branches:
+      - feat/city-tabs-pilgrimage-routes-v0143
+    paths:
+      - '.github/workflows/v0143-engineering.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect route sources
+        shell: bash
+        run: |
+          set -u
+          mkdir -p source-data
+          python3 - <<'PY'
+          import requests, pathlib
+          urls={
+            'caminho-fe':'https://pt.wikiloc.com/trilhas-mountain-bike/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393',
+            'prece-1':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820',
+            'prece-2':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+            'caravaggio':'https://pt.wikiloc.com/trilhas-trekking/caminhos-de-caravaggio-57586267',
+            'capelas':'https://pt.wikiloc.com/trilhas-trekking/caminho-das-capelas-de-inconfidentes-mg-75559382',
+            'agonia':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-agonia-123850827',
+            'vale-europeu':'https://valeeuropeucatarinense.com.br/circuito-caminhante/',
+            'rota-luz':'https://goo.gl/maps/C6KCU1sVZP92',
+          }
+          h={'User-Agent':'Mozilla/5.0 MinhasViagens route review'}
+          for name,url in urls.items():
+              try:
+                  r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
+                  pathlib.Path(f'source-data/{name}.html').write_bytes(r.content)
+                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
+              except Exception as e:
+                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(repr(e),encoding='utf-8')
+          # Google My Maps - Caminho Nhá Chica
+          for suffix,url in {
+            'nha-chica-kml':'https://www.google.com/maps/d/kml?mid=15KU_ORnvmCQIg9lygaH6bcTWD2xxyDNq&forcekml=1',
+          }.items():
+              try:
+                  r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
+                  pathlib.Path(f'source-data/{suffix}.kml').write_bytes(r.content)
+                  pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
+              except Exception as e:
+                  pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(repr(e),encoding='utf-8')
+          PY
+          tar -czf source-data/repo.tgz --exclude='.git' --exclude='source-data' .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v0143-engineering
+          path: source-data

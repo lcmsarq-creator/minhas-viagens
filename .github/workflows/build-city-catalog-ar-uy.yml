@@ -1,0 +1,46 @@
+name: build AR UY city catalogs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/local-cities-ar-uy-v0148
+    paths:
+      - scripts/build-city-catalog.py
+      - .github/workflows/build-city-catalog-ar-uy.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build compact catalogs
+        run: |
+          python scripts/build-city-catalog.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('city-catalog/v1/manifest.json').read_text())
+          for code, item in m['countries'].items():
+              print(code, item)
+              if item['count'] < (100 if code == 'UY' else 1000):
+                  raise SystemExit(f'catálogo {code} pequeno demais')
+              if item['bytes'] > (400000 if code == 'UY' else 2500000):
+                  raise SystemExit(f'catálogo {code} maior que o limite')
+          PY
+      - name: Commit generated catalogs
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add city-catalog/v1
+          if git diff --cached --quiet; then
+            echo 'No catalog changes'
+            exit 0
+          fi
+          git commit -m 'data: gerar catálogos locais de Argentina e Uruguai'
+          git push origin HEAD:feat/local-cities-ar-uy-v0148

@@ -8,6 +8,7 @@ on:
     paths:
       - scripts/apply-v0148.py
       - tests/v0148-local-cities-ar-uy.test.js
+      - .github/workflows/v0148-integrate.yml
 
 permissions:
   contents: write

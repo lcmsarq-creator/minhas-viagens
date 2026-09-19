@@ -12,7 +12,7 @@ BASE = "https://download.geonames.org/export/dump"
 OUT = Path("city-catalog/v1")
 COUNTRIES = {
     "AR": {"file": "ar.json", "name": "Argentina"},
-    "UY": {"file": "uy.json", "name": "Uruguay"},
+    "UY": {"file": "uy.json", "name": "Uruguai"},
 }
 
 # Núcleos/localidades habitadas. Exclui PPLX (seções/bairros), PPLH/PPLQ/PPLW

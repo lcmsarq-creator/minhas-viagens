@@ -41,13 +41,3 @@
 
   console.info(`Minhas Viagens ${APP_VERSION}: Esc remove o destaque da rodovia antes de fechar a viagem.`);
 })();
-
-(() => {
-  "use strict";
-  if (document.querySelector('script[data-mv-v0144-bootstrap]')) return;
-  const script = document.createElement("script");
-  script.dataset.mvV0144Bootstrap = "true";
-  script.src = `v0144-bootstrap.js?v=${encodeURIComponent(window.MINHAS_VIAGENS_APP_VERSION || "0.14.4")}`;
-  script.async = false;
-  document.body.appendChild(script);
-})();

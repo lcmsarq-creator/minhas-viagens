@@ -23,30 +23,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Fetch exact route sources
+      - name: Load exact route sources from validated artifacts
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/v0143sources/vale
-          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
-          fetch() { curl -fL --retry 3 -A "$ua" "$1" -o "$2"; }
-          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/mountain-biking-trails/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393' /tmp/v0143sources/caminho-fe.html
-          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminhos-de-caravaggio-57586267' /tmp/v0143sources/caravaggio.html
-          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-das-capelas-de-inconfidentes-mg-75559382' /tmp/v0143sources/capelas.html
-          fetch 'https://proxy.nakarte.me/https/pt.wikiloc.com/trilhas-trekking/caminho-da-agonia-123850827' /tmp/v0143sources/agonia.html
-          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820' /tmp/v0143sources/prece1.html
-          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346' /tmp/v0143sources/prece2.html
-          fetch 'https://www.google.com/maps/d/kml?mid=1yAdAynVO9-ns_OYPDsM0TRFSr38&forcekml=1' /tmp/v0143sources/rota-luz.kml
-          fetch 'https://www.google.com/maps/d/kml?mid=15KU_ORnvmCQIg9lygaH6bcTWD2xxyDNq&forcekml=1' /tmp/v0143sources/nha-chica.kml
-          fetch 'https://drive.google.com/uc?export=download&id=17NGSsdoPgBWH7_0gYlj1GNf5SMS52sdJ' /tmp/v0143sources/vale/01.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1tqLoyjZitViphTKy6Du0nwXunI0VUyXn' /tmp/v0143sources/vale/02.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1Px5_ueSNi1gZuKep4_RtSs2ii4uIwXt8' /tmp/v0143sources/vale/03.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1YHVkyAv-zIhaEU8w3zUVbuR9UFZNTvDP' /tmp/v0143sources/vale/04.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1yTutr66yAVCVePWnc775wFtWQ436GIr2' /tmp/v0143sources/vale/05.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1BwsKfO0E0XZrihJgwu63YPkhtw1icJtI' /tmp/v0143sources/vale/06.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1FcelTkaSE4Ts1fFB1yH26cu28dJ2JjAi' /tmp/v0143sources/vale/07.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=17KI46lGgZzqRzBAYssnNxmjYO7dmOfMT' /tmp/v0143sources/vale/08.gpx
-          fetch 'https://drive.google.com/uc?export=download&id=1DJUpuy6tKPM2-enUzmL3dNgcIA5I-3D4' /tmp/v0143sources/vale/09.gpx
+          mkdir -p /tmp/v0143-artifacts/final /tmp/v0143-artifacts/alt /tmp/v0143-artifacts/prece /tmp/v0143sources/vale
+          get_artifact() { curl -fL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/lcmsarq-creator/minhas-viagens/actions/artifacts/$1/zip" -o "$2"; }
+          get_artifact 10575454298 /tmp/final.zip
+          get_artifact 10576265041 /tmp/alt.zip
+          get_artifact 10576545000 /tmp/prece.zip
+          unzip -q /tmp/final.zip -d /tmp/v0143-artifacts/final
+          unzip -q /tmp/alt.zip -d /tmp/v0143-artifacts/alt
+          unzip -q /tmp/prece.zip -d /tmp/v0143-artifacts/prece
+          cp /tmp/v0143-artifacts/alt/caminho-fe-alt0.html /tmp/v0143sources/caminho-fe.html
+          cp /tmp/v0143-artifacts/alt/caravaggio-alt0.html /tmp/v0143sources/caravaggio.html
+          cp /tmp/v0143-artifacts/alt/capelas-alt0.html /tmp/v0143sources/capelas.html
+          cp /tmp/v0143-artifacts/final/agonia-proxy.html /tmp/v0143sources/agonia.html
+          cp /tmp/v0143-artifacts/prece/prece-1-www.html /tmp/v0143sources/prece1.html
+          cp /tmp/v0143-artifacts/prece/prece-2-www.html /tmp/v0143sources/prece2.html
+          cp /tmp/v0143-artifacts/final/rota-luz-kml.kml /tmp/v0143sources/rota-luz.kml
+          cp /tmp/v0143-artifacts/final/nha-chica-kml.kml /tmp/v0143sources/nha-chica.kml
+          cp /tmp/v0143-artifacts/final/vale-gpx/*.gpx /tmp/v0143sources/vale/
           grep -q 'mapData =' /tmp/v0143sources/caminho-fe.html
           grep -q 'mapData =' /tmp/v0143sources/prece1.html
           grep -q 'mapData =' /tmp/v0143sources/prece2.html
@@ -72,7 +71,8 @@ jobs:
           vHv3zgrAPicut3wWNwBho221tatigguFyyMSYRvU86CWazTOei896rAZjc60ui+V7NMZs8OZgBNGqp31sE2rA8E08WJbA1hoAMYdxm0YpvzMEflzVprhKbD3
           Oo5cfwIPThBEI9cH2+LZhJkfSyyxCE6OhXMTeNY0w+Kh5wL7AhpSS6watDq4TN5Fx6BbUCLWgPX0N/orUphPxjrSjyVYTnPQLXUyCc+lBjdUST4MhZmYQduR
           nnpNaMV0YsHM/J2LZXQcnYWxBqFomfjQojFIa3isQWGgZXzkmgNfkyyVY9C7CCY9RQPToUaBn+6oLgvHOuFBEjnsFDIZyx6SyKsTP4gZahSCOKdDj42kb4oi
-          lF6gr9iXwIR2BkoFs3PBYV3nVOJPa3/QA3emYEYZgCkAzDDwLpCAHXPeAiAXMGSUaVlRpvV26jiFLORGaDBc6x2ruu7cWPikYGZQJ1ocxNT7eibQgeyw2E6r8CV4A/KcwC+LbK1XKLaBdCGNI5CM1suLSZuzqet47BVSrPUwHqXA30ReBotS3CJXIkCjMHup3I41wetzaNMGNnZtyWQp5ZyDS5sATEa90MY1V6MgTN4AGTbG
+          lF6gr9iXwIR2BkoFs3PBYV3nVOJPa3/QA3emYEYZgCkAzDDwLpCAHXPeAiAXMGSUaVlRpvV26jiFLORGaDBc6x2ruu7cWPikYGZQJ1ocxNT7eibQgeyw2E6r
+          8CV4A/KcwC+LbK1XKLaBdCGNI5CM1suLSZuzqet47BVSrPUwHqXA30ReBotS3CJXIkCjMHup3I41wetzaNMGNnZtyWQp5ZyDS5sATEa90MY1V6MgTN4AGTbG
           2mUqwSsLw5kGBmhJzQtvFSFulMxCDCkCf535PInYKeWO60rt1jkDY6YxJh/0ojoozjDqQuLgqLaWxGPznpazMYkKy9HDc8hzyoQ4LHNCcEU2IsMLknAWbY2Z
           Xc6FWiOehY15s7XdUcMaDoXFyTQwx8yaxjNPq7e2t5vNVmevY2w5NNoMRUTndDJxA4ViZ3fnXrfd3UUM4WYYQgYFsxq+u7Ozs9e5B5UPnQSbDAcw36Up/e3O
           vZ3mPahxt8CuW5uMR/tnLTW+vbPT7bTutZtifHvj8e1Mfrutnc5219iKwDVOveS9vcgtFYMRygQoC6A0A4IkxMwtf0pPIXCvHwlApgOOQeVQHARL1VguTtO4
@@ -81,7 +81,8 @@ jobs:
           cpKIByYMCD0WB+aOOXJhEJ0k8CcAheDv1IR/wfMh8ELL3IVWNoLUjNgzDwRCjiJ6/Uc6CoD3mE0i6kE1hGUzi67/w3dcCiUiDIY2cKAA/D65/j5ygx65/gec
           DYFf4mzkxz/8C3mYzgdrRmhP58OdpLyIhEGOhE2aPAQZpXYMkpoEwcRj5uwCRMVNNLuFrKAPVNLAnsZB9+uDb1r82795udfOcwFzg7SQ3i8FJvLsgjyDAUCR
           7yTeEiN1cgimcv3H638P8FcyoiAGTvRnwcQFZJwcRMl7yB2Cv5diFpzj8fUPRM/YNcoc5hQmXBd4xFCBOxbtn2IOccTOzrCsKiM2WwHq3nxLnQSK6wlqHRgN
-          /LE7YsiJOZuYWcCBiR4FLieAzpkGwo19ZAB+lrT7uxSf4PtJHiNhpWeE+AJqPSGYZ8DPSmkwM4soUBJO6Xp1Y70r+4UshNpHjaTRbMxd9o5FD2buyG7tfP3N6YtX/nx28JdPJnvexYR+1R06R79/1D4/v3j0/Ls7YzYb2q07EOvMdtsCq2/vddrb2+17e3udv2gfmNs7Vre922zt7GzviX+6d97DuhYIaXUJZxPcP0UBgS07
+          /LE7YsiJOZuYWcCBiR4FLieAzpkGwo19ZAB+lrT7uxSf4PtJHiNhpWeE+AJqPSGYZ8DPSmkwM4soUBJO6Xp1Y70r+4UshNpHjaTRbMxd9o5FD2buyG7tfP3N
+          6YtX/nx28JdPJnvexYR+1R06R79/1D4/v3j0/Ls7YzYb2q07EOvMdtsCq2/vddrb2+17e3udv2gfmNs7Vre922zt7GzviX+6d97DuhYIaXUJZxPcP0UBgS07
           bggrMgJmpqyqT+Y0coXJQFXFOOiNKvgRIzQM3ADEBaIG36MTNkOJ0xmsIB0vuf4TyH2FqDjKapH1wHzg4WMYTgmxmSbSTQJBuhlVGRBWewA3VfIVXIQfyfwz
           rMjQksWnCR5QH7gQLd34o7NlypoAmIIfH8unJU4zqzAAy/NgHkBIA45hFUKAPMhrbvSzmMD0ZbIkgsVkotXxqa4F47ELiDwTk9qCduxUkA5wBT4AFabwR2sY
           NRwlW1OygH7QkCQzwmLIPpx8+fKvSCBQS8fJ1HGQDcHmb2EecignUi8eHslKmbyC5CBAUEgEMzoUxeBekPlAeqo6zd5NWFvvcHGAK7cVhbWsh0YB5ESUOqcB

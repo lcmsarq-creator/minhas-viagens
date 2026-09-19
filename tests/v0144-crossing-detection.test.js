@@ -66,7 +66,7 @@ test("IBGE permite recuperar UF e país quando tags de endereço não existem", 
   assert.equal(meta.country,"Brasil");
 });
 
-test("v0.14.4 usa limites administrativos e deixa fallback explícito", () => {
+test("v0.14.5 usa limites administrativos e deixa fallback explícito", () => {
   const source = fs.readFileSync("v0144-crossing-fix.js","utf8");
   assert.match(source,/route-city-crossings-v3-admin/);
   assert.match(source,/boundary\"=\"administrative/);

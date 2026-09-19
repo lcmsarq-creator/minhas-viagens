@@ -250,6 +250,22 @@
       .filter(Boolean))];
   }
 
+  function localCountryCodesAlongLine(line) {
+    const api = window.MinhasViagensRoadCountry;
+    if (!api?.countryHintFromPoint || !Array.isArray(line) || !line.length) return [];
+    const found = new Set();
+    const step = Math.max(1, Math.floor(line.length / 200));
+    for (let i = 0; i < line.length; i += step) {
+      const point = line[i];
+      const code = String(api.countryHintFromPoint(Number(point?.[0]), Number(point?.[1])) || "").toUpperCase();
+      if (LOCAL_CATALOGS[code]) found.add(code);
+    }
+    const last = line[line.length - 1];
+    const lastCode = String(api.countryHintFromPoint(Number(last?.[0]), Number(last?.[1])) || "").toUpperCase();
+    if (LOCAL_CATALOGS[lastCode]) found.add(lastCode);
+    return [...found];
+  }
+
   function needsInternationalScan(trip, availableLocalCodes = []) {
     const codes = explicitCountryCodes(trip);
     const supported = new Set(["BR", ...(availableLocalCodes || [])]);
@@ -360,7 +376,9 @@
     const line = typeof tripLatLngs === "function" ? tripLatLngs(trip) : [];
     if (!Array.isArray(line) || line.length < 2) return {cities:[], complete:true, source:"no-route"};
 
-    const codes = explicitCountryCodes(trip);
+    const explicitCodes = explicitCountryCodes(trip);
+    const inferredLocalCodes = localCountryCodesAlongLine(line);
+    const codes = [...new Set([...explicitCodes, ...inferredLocalCodes])];
     const availableLocalCodes = [];
     const sourceParts = [];
     let cities = [];
@@ -509,6 +527,7 @@
     loadLocalCountryCatalog,
     scanLocalCountryCatalog,
     explicitCountryCodes,
+    localCountryCodesAlongLine,
     needsInternationalScan,
     overpassQueryForTile,
     scanTripCities,

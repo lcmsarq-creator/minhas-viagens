@@ -33,7 +33,14 @@ function loadModule({overpassElements=[]}={}) {
       return {ok:true,json:async()=>({elements:overpassElements})};
     },
     MinhasViagensApp:{replaceTrips:trips=>{context.state.trips=trips;}},
-    MinhasViagensSync:{schedule:()=>{}}
+    MinhasViagensSync:{schedule:()=>{}},
+    MinhasViagensRoadCountry:{
+      countryHintFromPoint:(lat,lng)=>{
+        if (lat < -34.0 && lng < -57.0) return "AR";
+        if (lat < -30.0 && lng >= -57.0) return "UY";
+        return "BR";
+      }
+    }
   };
   context.window=context; context.globalThis=context;
   context.MINHAS_VIAGENS_APP_VERSION="0.14.8";
@@ -106,4 +113,22 @@ test("país ainda sem catálogo mantém fallback Overpass", async () => {
   assert.ok(calls.overpass > 0);
   assert.equal(calls.ar,0);
   assert.equal(calls.uy,0);
+});
+
+
+test("Argentina é carregada quando aparece apenas como país de trânsito no traçado", async () => {
+  const {api,calls}=loadModule();
+  const trip={
+    id:"br-ar-uy",mode:"carro",
+    startPlace:{countryCode:"BR"},endPlace:{countryCode:"UY"},
+    line:[[-34.61,-58.48],[-34.61,-58.28]],
+    routeGeometry:{encodedPolyline:"abc",pointCount:2}
+  };
+  assert.deepEqual(Array.from(api.localCountryCodesAlongLine(trip.line)),["AR"]);
+  const result=await api.scanTripCities(trip);
+  assert.equal(result.complete,true);
+  assert.ok(result.cities.some(city=>city.city==="Buenos Aires" && city.countryCode==="AR"));
+  assert.equal(calls.ar,1);
+  assert.equal(calls.uy,1);
+  assert.equal(calls.overpass,0);
 });

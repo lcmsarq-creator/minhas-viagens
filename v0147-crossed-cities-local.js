@@ -1,13 +1,36 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.7";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.8";
   const core = window.MinhasViagensCrossingDetection;
-  const SCHEMA = "route-city-crossings-v6-local-catalog";
+  const SCHEMA = "route-city-crossings-v9-local-americas";
   const V0145_SCHEMA = "route-city-crossings-v4-urban-place";
   const V0144_SCHEMA = "route-city-crossings-v3-admin";
   const LEGACY_SCHEMA = "route-city-crossings-v2-tabs";
   const BRAZIL_CSV = "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv";
+  const LOCAL_CATALOGS = Object.freeze({
+    AR: { path:"city-catalog/v1/ar.json", country:"Argentina" },
+    UY: { path:"city-catalog/v1/uy.json", country:"Uruguai" },
+    PY: { path:"city-catalog/v1/py.json", country:"Paraguai" },
+    PE: { path:"city-catalog/v1/pe.json", country:"Peru" },
+    BO: { path:"city-catalog/v1/bo.json", country:"Bolívia" },
+    CL: { path:"city-catalog/v1/cl.json", country:"Chile" },
+    CO: { path:"city-catalog/v1/co.json", country:"Colômbia" },
+    VE: { path:"city-catalog/v1/ve.json", country:"Venezuela" },
+    EC: { path:"city-catalog/v1/ec.json", country:"Equador" },
+    GY: { path:"city-catalog/v1/gy.json", country:"Guiana" },
+    SR: { path:"city-catalog/v1/sr.json", country:"Suriname" },
+    GF: { path:"city-catalog/v1/gf.json", country:"Guiana Francesa" },
+    PA: { path:"city-catalog/v1/pa.json", country:"Panamá" },
+    CR: { path:"city-catalog/v1/cr.json", country:"Costa Rica" },
+    HN: { path:"city-catalog/v1/hn.json", country:"Honduras" },
+    SV: { path:"city-catalog/v1/sv.json", country:"El Salvador" },
+    GT: { path:"city-catalog/v1/gt.json", country:"Guatemala" },
+    BZ: { path:"city-catalog/v1/bz.json", country:"Belize" },
+    MX: { path:"city-catalog/v1/mx.json", country:"México" },
+    US: { path:"city-catalog/v1/us.json", country:"Estados Unidos" },
+    CA: { path:"city-catalog/v1/ca.json", country:"Canadá" }
+  });
   const BRAZIL_PAD_DEG = .15;
   const RETRY_DELAYS = [15000, 60000, 180000, 600000, 1800000];
   const TILE_DEG = 1;
@@ -32,6 +55,7 @@
   let retryTimer = null;
   let retryIndex = 0;
   const tileCache = new Map();
+  const localCatalogCache = new Map();
 
   function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -161,6 +185,83 @@
     return {cities:core.uniqueCities(found), available:true};
   }
 
+
+  function localCatalogRadiusKm(place = {}) {
+    const population = Number(place.population) || 0;
+    const featureCode = String(place.featureCode || "");
+    if (population >= 5000000) return 12;
+    if (population >= 1000000) return 8;
+    if (population >= 500000) return 6;
+    if (population >= 200000) return 5;
+    if (population >= 100000) return 4.5;
+    if (population >= 50000) return 3.8;
+    if (population >= 10000) return 2.8;
+    if (population >= 2000) return 2;
+    if (population > 0) return 1.2;
+    if (featureCode === "PPLC") return 8;
+    if (/^PPLA/.test(featureCode) || featureCode === "PPLG") return 3;
+    if (featureCode === "PPLL" || featureCode === "PPLF" || featureCode === "PPLR") return 1;
+    return 1.5;
+  }
+
+  async function loadLocalCountryCatalog(code) {
+    code = String(code || "").toUpperCase();
+    const meta = LOCAL_CATALOGS[code];
+    if (!meta) return { code, country:"", places:[], available:false };
+    if (localCatalogCache.has(code)) return localCatalogCache.get(code);
+    const promise = (async () => {
+      const response = await fetch(`${meta.path}?v=${VERSION}`, { cache:"force-cache" });
+      if (!response.ok) throw new Error(`Catálogo ${code} ${response.status}`);
+      const payload = await response.json();
+      if (payload?.schema !== "mv-city-catalog-v2" || payload?.countryCode !== code || !Array.isArray(payload?.places)) {
+        throw new Error(`Catálogo ${code} inválido`);
+      }
+      return { code, country:meta.country, places:payload.places, available:true };
+    })();
+    localCatalogCache.set(code, promise);
+    try { return await promise; }
+    catch (error) {
+      localCatalogCache.delete(code);
+      console.warn(`Cidades cruzadas: catálogo local ${code} indisponível`, error);
+      return { code, country:meta.country, places:[], available:false, error };
+    }
+  }
+
+  function localCatalogRecord(row, code, country) {
+    const [id,name,lat,lng,region,population,featureCode] = row || [];
+    return {
+      label:[name,region,country].filter(Boolean).join(", "),
+      city:name || "",
+      region:region || "",
+      country:country || "",
+      countryCode:code,
+      lat:Number(lat),
+      lng:Number(lng),
+      geonameId:id,
+      population:Number(population) || 0,
+      featureCode:featureCode || "",
+      source:`route-${String(code).toLowerCase()}-local-catalog`
+    };
+  }
+
+  async function scanLocalCountryCatalog(line, code) {
+    const catalog = await loadLocalCountryCatalog(code);
+    if (!catalog.available || !Array.isArray(line) || line.length < 2) return { cities:[], available:false, code };
+    const box = lineBounds(line);
+    if (!box) return { cities:[], available:true, code };
+    const found = [];
+    for (const row of catalog.places) {
+      const lat = Number(row?.[2]), lng = Number(row?.[3]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (lat < box.s - BRAZIL_PAD_DEG || lat > box.n + BRAZIL_PAD_DEG || lng < box.w - BRAZIL_PAD_DEG || lng > box.e + BRAZIL_PAD_DEG) continue;
+      const place = { population:Number(row?.[5]) || 0, featureCode:String(row?.[6] || "") };
+      if (minDistanceToLine([lat,lng], line) > localCatalogRadiusKm(place)) continue;
+      const record = localCatalogRecord(row, code, catalog.country);
+      if (record.city) found.push(record);
+    }
+    return { cities:core.uniqueCities(found), available:true, code };
+  }
+
   function explicitCountryCodes(trip) {
     return [...new Set([trip?.startPlace, ...(trip?.stopPlaces || []), trip?.endPlace]
       .filter(Boolean)
@@ -168,9 +269,26 @@
       .filter(Boolean))];
   }
 
-  function needsInternationalScan(trip) {
+  function localCountryCodesAlongLine(line) {
+    const api = window.MinhasViagensRoadCountry;
+    if (!api?.countryHintFromPoint || !Array.isArray(line) || !line.length) return [];
+    const found = new Set();
+    const step = Math.max(1, Math.floor(line.length / 200));
+    for (let i = 0; i < line.length; i += step) {
+      const point = line[i];
+      const code = String(api.countryHintFromPoint(Number(point?.[0]), Number(point?.[1])) || "").toUpperCase();
+      if (LOCAL_CATALOGS[code]) found.add(code);
+    }
+    const last = line[line.length - 1];
+    const lastCode = String(api.countryHintFromPoint(Number(last?.[0]), Number(last?.[1])) || "").toUpperCase();
+    if (LOCAL_CATALOGS[lastCode]) found.add(lastCode);
+    return [...found];
+  }
+
+  function needsInternationalScan(trip, availableLocalCodes = []) {
     const codes = explicitCountryCodes(trip);
-    return !codes.length || codes.some(code => code !== "BR");
+    const supported = new Set(["BR", ...(availableLocalCodes || [])]);
+    return !codes.length || codes.some(code => !supported.has(code));
   }
 
   function pointOf(element) {
@@ -277,18 +395,44 @@
     const line = typeof tripLatLngs === "function" ? tripLatLngs(trip) : [];
     if (!Array.isArray(line) || line.length < 2) return {cities:[], complete:true, source:"no-route"};
 
-    const brazil = await scanBrazilCatalog(line);
-    let cities = [...brazil.cities];
-    const internationalNeeded = needsInternationalScan(trip) || !brazil.available;
-    if (!internationalNeeded) return {cities:core.uniqueCities(cities), complete:true, source:"local-br"};
+    const explicitCodes = explicitCountryCodes(trip);
+    const inferredLocalCodes = localCountryCodesAlongLine(line);
+    const codes = [...new Set([...explicitCodes, ...inferredLocalCodes])];
+    const availableLocalCodes = [];
+    const sourceParts = [];
+    let cities = [];
+    let localFailure = false;
+
+    if (!codes.length || codes.includes("BR")) {
+      const brazil = await scanBrazilCatalog(line);
+      cities = core.uniqueCities([...cities, ...brazil.cities]);
+      if (brazil.available) {
+        availableLocalCodes.push("BR");
+        sourceParts.push("local-br");
+      } else localFailure = true;
+    }
+
+    for (const code of codes.filter(code => LOCAL_CATALOGS[code])) {
+      const local = await scanLocalCountryCatalog(line, code);
+      cities = core.uniqueCities([...cities, ...local.cities]);
+      if (local.available) {
+        availableLocalCodes.push(code);
+        sourceParts.push(`local-${code.toLowerCase()}`);
+      } else localFailure = true;
+    }
+
+    const internationalNeeded = localFailure || needsInternationalScan(trip, availableLocalCodes);
+    if (!internationalNeeded) {
+      return { cities:core.uniqueCities(cities), complete:true, source:sourceParts.join("+") || "local" };
+    }
 
     try {
       const international = await scanInternational(line);
       cities = core.uniqueCities([...cities, ...international]);
-      return {cities, complete:true, source:brazil.available ? "local-br+overpass" : "overpass"};
+      return { cities, complete:true, source:[...sourceParts,"overpass"].join("+") || "overpass" };
     } catch (error) {
       console.warn("Cidades cruzadas: complemento internacional ficará pendente", trip?.id, error);
-      return {cities:core.uniqueCities(cities), complete:false, source:brazil.available ? "local-br-partial" : "pending", error};
+      return { cities:core.uniqueCities(cities), complete:false, source:[...sourceParts,"partial"].join("+") || "pending", error };
     }
   }
 
@@ -398,7 +542,11 @@
     routeSignature,
     lineBounds,
     scanBrazilCatalog,
+    localCatalogRadiusKm,
+    loadLocalCountryCatalog,
+    scanLocalCountryCatalog,
     explicitCountryCodes,
+    localCountryCodesAlongLine,
     needsInternationalScan,
     overpassQueryForTile,
     scanTripCities,
@@ -410,5 +558,5 @@
 
   suppressOldScanners();
   scheduleScan(180);
-  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogo local brasileiro habilitadas.`);
+  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogos locais das Américas habilitadas.`);
 })();

@@ -151,10 +151,8 @@
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 14000);
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-          body: `data=${encodeURIComponent(query)}`,
+        const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
+          headers: {"Accept":"application/json"},
           signal: controller.signal
         });
         clearTimeout(timer);

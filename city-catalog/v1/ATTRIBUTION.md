@@ -1,3 +1,5 @@
 # City catalog attribution
 
-Argentina and Uruguay place data are derived from GeoNames (https://www.geonames.org/), licensed under Creative Commons Attribution 4.0 (CC BY 4.0).
+Place data for Argentina, Uruguai, Paraguai, Peru, Bolívia, Chile, Colômbia, Venezuela, Equador are derived from GeoNames (https://www.geonames.org/), licensed under Creative Commons Attribution 4.0 (CC BY 4.0).
+
+Runtime catalogs keep administrative seats and populated places above 1,000 inhabitants; neighbourhoods, tiny localities, farm/religious villages, historical, abandoned and destroyed places are excluded.

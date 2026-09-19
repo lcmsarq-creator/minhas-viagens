@@ -3,14 +3,21 @@
 
   const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.8";
   const core = window.MinhasViagensCrossingDetection;
-  const SCHEMA = "route-city-crossings-v7-local-ar-uy";
+  const SCHEMA = "route-city-crossings-v8-local-south-america";
   const V0145_SCHEMA = "route-city-crossings-v4-urban-place";
   const V0144_SCHEMA = "route-city-crossings-v3-admin";
   const LEGACY_SCHEMA = "route-city-crossings-v2-tabs";
   const BRAZIL_CSV = "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv";
   const LOCAL_CATALOGS = Object.freeze({
     AR: { path:"city-catalog/v1/ar.json", country:"Argentina" },
-    UY: { path:"city-catalog/v1/uy.json", country:"Uruguai" }
+    UY: { path:"city-catalog/v1/uy.json", country:"Uruguai" },
+    PY: { path:"city-catalog/v1/py.json", country:"Paraguai" },
+    PE: { path:"city-catalog/v1/pe.json", country:"Peru" },
+    BO: { path:"city-catalog/v1/bo.json", country:"Bolívia" },
+    CL: { path:"city-catalog/v1/cl.json", country:"Chile" },
+    CO: { path:"city-catalog/v1/co.json", country:"Colômbia" },
+    VE: { path:"city-catalog/v1/ve.json", country:"Venezuela" },
+    EC: { path:"city-catalog/v1/ec.json", country:"Equador" }
   });
   const BRAZIL_PAD_DEG = .15;
   const RETRY_DELAYS = [15000, 60000, 180000, 600000, 1800000];
@@ -194,7 +201,7 @@
       const response = await fetch(`${meta.path}?v=${VERSION}`, { cache:"force-cache" });
       if (!response.ok) throw new Error(`Catálogo ${code} ${response.status}`);
       const payload = await response.json();
-      if (payload?.schema !== "mv-city-catalog-v1" || payload?.countryCode !== code || !Array.isArray(payload?.places)) {
+      if (payload?.schema !== "mv-city-catalog-v2" || payload?.countryCode !== code || !Array.isArray(payload?.places)) {
         throw new Error(`Catálogo ${code} inválido`);
       }
       return { code, country:meta.country, places:payload.places, available:true };
@@ -539,5 +546,5 @@
 
   suppressOldScanners();
   scheduleScan(180);
-  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogo local brasileiro habilitadas.`);
+  console.info(`Minhas Viagens ${VERSION}: cidades cruzadas por catálogos locais sul-americanos habilitadas.`);
 })();

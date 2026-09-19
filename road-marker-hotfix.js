@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.6";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.7";
   const BADGE_LAYOUT_SCHEMA = "road-badges-v6-north-america-country-context";
   const TRANSIT_COUNTRIES = Object.freeze(["BR","UY","AR","PY","CL","BO","PE","EC","CO","VE","GY","SR","GF","PA","CR","NI","HN","SV","GT","BZ","MX","US","CA"]);
   const BRAZIL_FEDERAL_REF = /^BR-\d{1,4}[A-Z]?$/i;

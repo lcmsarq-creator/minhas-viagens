@@ -91,16 +91,19 @@ test("resultado completo é persistido e agenda sincronização Supabase", () =>
   assert.deepEqual(stats().syncDelays,[350]);
 });
 
-test("loader ativa v0.14.7 e não carrega o scanner v0.14.6", () => {
+test("loader seleciona v0.14.7 depois das camadas anteriores", () => {
   const auth = fs.readFileSync("auth.js","utf8");
   assert.match(auth,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"/);
-  assert.ok(auth.indexOf('"v0147-crossed-cities-local.js"') > auth.indexOf('"v0145-crossed-cities.js"'));
-  assert.equal(auth.includes('"v0146-crossed-cities-runtime.js"'),false);
+  const v146 = auth.indexOf('"v0146-crossed-cities-runtime.js"');
+  const v147 = auth.indexOf('"v0147-crossed-cities-local.js"');
+  assert.ok(v146 >= 0 && v147 > v146);
 });
 
 test("scanners antigos ficam inativos quando a geração v0147 está selecionada", () => {
   const v144 = fs.readFileSync("v0144-crossing-fix.js","utf8");
   const v145 = fs.readFileSync("v0145-crossed-cities.js","utf8");
+  const v146 = fs.readFileSync("v0146-crossed-cities-runtime.js","utf8");
   assert.match(v144,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);
   assert.match(v145,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);
+  assert.match(v146,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);
 });

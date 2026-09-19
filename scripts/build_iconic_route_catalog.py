@@ -143,6 +143,8 @@ def bounds_for(lines):
 
 def compact_payload(source_path):
     source = json.loads(source_path.read_text(encoding="utf-8"))
+    if source.get("disabled") is True:
+        return None
     route_id = str(source.get("id") or source_path.stem)
     precision = int(source.get("precision") or 5)
     encoded_lines = []
@@ -203,6 +205,8 @@ def main():
 
     for source_path in sources:
         payload = compact_payload(source_path)
+        if payload is None:
+            continue
         route_id = payload["id"]
         payload["generatedAt"] = generated_at
         out_path = OUTPUT / f"{route_id}.json"

@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.2";
-  const CITY_SCAN_SCHEMA = "route-city-crossings-v1";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.3";
+  const CITY_SCAN_SCHEMA = "route-city-crossings-v2-tabs";
   const CITY_SCAN_MAX_BOX_KM = 140;
   const CITY_SCAN_PADDING_DEG = .045;
   const OVERPASS_ENDPOINTS_V0142 = [
@@ -214,14 +214,12 @@
     const name = String(tags.name || tags["name:pt"] || "").trim();
     if (!name) return null;
     const point = elementPoint(element) || geometryPolygon(element)?.[0] || [];
-    const stateCode = String(tags["addr:state"] || tags["is_in:state_code"] || tags["ISO3166-2"] || "").split("-").at(-1) || "";
     const countryCode = String(tags["addr:country"] || tags["ISO3166-1"] || "").toUpperCase();
-    const region = String(tags["is_in:state"] || tags["addr:state"] || stateCode || "").trim();
     const country = String(tags["is_in:country"] || tags["addr:country"] || "").trim();
     return {
-      label: [name, stateCode].filter(Boolean).join(", "),
+      label: name,
       city: name,
-      region,
+      region: "",
       country,
       countryCode,
       lat: Number(point?.[0]),
@@ -300,7 +298,6 @@
       let changed = false;
       for (const trip of state.trips || []) {
         if (generation !== cityScanGeneration) return;
-        if (trip?.visible === false) continue;
         changed = (await enrichTripCities(trip)) || changed;
         await new Promise(resolve => setTimeout(resolve, 30));
       }
@@ -444,10 +441,96 @@
   }
 
   const baseRenderAchievements = typeof renderAchievements === "function" ? renderAchievements : null;
+
+  function cityIdentity(city) {
+    const lat = Number(city?.lat), lng = Number(city?.lng);
+    const coord = Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(3)}|${lng.toFixed(3)}` : "";
+    return `${normalizeSimple(city?.city || city?.label)}|${coord}`;
+  }
+
+  function destinationCityItems() {
+    const out = new Map();
+    for (const trip of [...(state.trips || [])].reverse()) {
+      for (const city of baseCityConquestsForTrip?.(trip) || []) {
+        const key = normalizeKey(city?.label || city?.city);
+        if (!key || out.has(key)) continue;
+        out.set(key, { ...city, tripName: trip.name, date: trip.date, kind: "destination" });
+      }
+    }
+    return [...out.values()];
+  }
+
+  function crossedCityItems(destinations) {
+    const destinationNames = new Set((destinations || []).map(city => normalizeSimple(city?.city || city?.label)));
+    const out = new Map();
+    for (const trip of [...(state.trips || [])].reverse()) {
+      for (const city of trip?.routeCityConquests || []) {
+        const nameKey = normalizeSimple(city?.city || city?.label);
+        if (!nameKey || destinationNames.has(nameKey)) continue;
+        const key = cityIdentity(city);
+        if (out.has(key)) continue;
+        out.set(key, { ...city, label: city.city || city.label, region: "", tripName: trip.name, date: trip.date, kind: "crossed" });
+      }
+    }
+    return [...out.values()];
+  }
+
+  function renderCitySubTabs() {
+    const view = els.cityAchievementsView;
+    if (!view || !els.cityAchievementHeader || !els.cityAchievementList) return;
+    state.cityAchievementMode ||= "destinations";
+    const destinations = destinationCityItems();
+    const crossed = crossedCityItems(destinations);
+    const tabs = document.createElement("div");
+    tabs.className = "city-conquest-subtabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.innerHTML = `<button type="button" data-city-mode="destinations" class="achievement-tab ${state.cityAchievementMode === "destinations" ? "active" : ""}">Destinos <span>${destinations.length}</span></button><button type="button" data-city-mode="crossed" class="achievement-tab ${state.cityAchievementMode === "crossed" ? "active" : ""}">Cruzadas <span>${crossed.length}</span></button>`;
+    tabs.querySelectorAll("[data-city-mode]").forEach(btn => btn.addEventListener("click", () => { state.cityAchievementMode = btn.dataset.cityMode; state.achievementStateKey = null; renderAchievements(); }));
+    view.insertBefore(tabs, els.cityAchievementHeader);
+
+    if (state.cityAchievementMode === "crossed") {
+      els.cityAchievementHeader.innerHTML = `<div class="achievement-browser-title"><h2>Cidades cruzadas</h2><span>${crossed.length} ${crossed.length === 1 ? "cidade" : "cidades"}</span></div>`;
+      els.cityAchievementList.classList.remove("state-achievement-grid");
+      els.cityAchievementList.innerHTML = "";
+      if (!crossed.length) { els.cityAchievementList.innerHTML = '<p class="empty">Nenhuma cidade cruzada por um trajeto ainda.</p>'; return; }
+      crossed.sort((a,b) => String(a.city || a.label).localeCompare(String(b.city || b.label), "pt-BR", { numeric: true })).forEach(item => {
+        const card = document.createElement("button");
+        card.type = "button"; card.className = "achievement-card";
+        card.innerHTML = `<span class="achievement-icon">●</span><div><strong>${escapeAttr(item.city || item.label)}</strong><small>${escapeAttr(item.tripName || "Trajeto cruzado")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small></div>`;
+        card.addEventListener("click", () => focusCityAchievement(item));
+        els.cityAchievementList.appendChild(card);
+      });
+      return;
+    }
+
+    // Re-render only destination cities using the existing state/country grouping browser.
+    const cityGroups = window.MinhasViagensAchievements?.groupCities(destinations) || [{ key: "ALL", uf: "BR", name: "Destinos", cities: destinations }];
+    const selectedGroup = cityGroups.find(group => group.key === state.achievementStateKey);
+    if (state.achievementStateKey && !selectedGroup) state.achievementStateKey = null;
+    els.cityAchievementHeader.innerHTML = "";
+    if (selectedGroup) {
+      const back = document.createElement("button"); back.type = "button"; back.className = "achievement-back-btn"; back.textContent = "← Voltar aos estados e países";
+      back.addEventListener("click", () => { state.achievementStateKey = null; renderAchievements(); }); els.cityAchievementHeader.appendChild(back);
+      const title = document.createElement("div"); title.className = "achievement-browser-title"; title.innerHTML = `<h2>${escapeAttr(selectedGroup.name)}</h2><span>${selectedGroup.cities.length} ${selectedGroup.cities.length === 1 ? "cidade" : "cidades"}</span>`; els.cityAchievementHeader.appendChild(title);
+      els.cityAchievementList.classList.remove("state-achievement-grid"); els.cityAchievementList.innerHTML = "";
+      selectedGroup.cities.sort((a,b)=>String(a.city||a.label).localeCompare(String(b.city||b.label),"pt-BR")).forEach(item => { const card=document.createElement("button"); card.type="button"; card.className="achievement-card"; card.innerHTML=`<span class="achievement-icon">●</span><div><strong>${escapeAttr(item.city || item.label)}</strong><small>${escapeAttr(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small></div>`; card.addEventListener("click",()=>focusCityAchievement(item)); els.cityAchievementList.appendChild(card); window.MinhasViagensCityFlags?.decorate(card.querySelector(".achievement-icon"), item); });
+    } else {
+      els.cityAchievementHeader.innerHTML = '<div class="achievement-browser-title"><h2>Destinos por estado e país</h2></div>'; els.cityAchievementList.innerHTML = ""; els.cityAchievementList.classList.add("state-achievement-grid");
+      if (!cityGroups.length) { els.cityAchievementList.classList.remove("state-achievement-grid"); els.cityAchievementList.innerHTML='<p class="empty">Nenhum destino conquistado ainda.</p>'; }
+      else cityGroups.forEach(group => { const card=document.createElement("button"); card.type="button"; card.className="state-achievement-card"; const flag=group.flagUrl?`<img src="${escapeAttr(group.flagUrl)}" alt="Bandeira de ${escapeAttr(group.name)}" loading="lazy"><span class="state-achievement-icon-fallback hidden">${escapeAttr(group.code||group.uf)}</span>`:`<span class="state-achievement-icon-fallback">${escapeAttr(group.code||group.uf)}</span>`; card.innerHTML=`<span class="state-achievement-icon">${flag}</span><strong>${escapeAttr(group.name)}</strong><small>${group.cities.length} ${group.cities.length===1?"cidade":"cidades"}</small>`; card.querySelector("img")?.addEventListener("error",()=>{card.querySelector("img")?.classList.add("hidden");card.querySelector(".state-achievement-icon-fallback")?.classList.remove("hidden");}); card.addEventListener("click",()=>{state.achievementStateKey=group.key;renderAchievements();}); els.cityAchievementList.appendChild(card); });
+    }
+  }
+
   if (baseRenderAchievements) {
-    renderAchievements = function renderAchievementsV0142() {
+    renderAchievements = function renderAchievementsV0143() {
       const result = baseRenderAchievements();
       sortRoadAchievementCards();
+      els.cityAchievementsView?.querySelector?.(".city-conquest-subtabs")?.remove();
+      renderCitySubTabs();
+      // Overall Cidades counter = unique destinations + crossed-only cities.
+      const destinations = destinationCityItems();
+      const crossed = crossedCityItems(destinations);
+      if (els.cityAchievementCount) els.cityAchievementCount.textContent = String(destinations.length + crossed.length);
       return result;
     };
   }

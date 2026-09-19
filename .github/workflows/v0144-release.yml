@@ -18,7 +18,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          for name in ['index.html','auth.js','v0142-adjustments.js','iconic-routes.js','iconic-catalog-preview-hotfix.js']:
+          for name in ['index.html','auth.js','road-marker-hotfix.js','v0142-adjustments.js','iconic-routes.js','iconic-catalog-preview-hotfix.js']:
               p=Path(name)
               text=p.read_text()
               p.write_text(text.replace('0.14.3','0.14.4'))
@@ -34,6 +34,7 @@ jobs:
           node --check crossing-detection-core.js
           node --check v0144-crossing-fix.js
           node --check auth.js
+          node --check road-marker-hotfix.js
           node --test tests/*.test.js
           python -m unittest discover -s tests -p 'test_*.py'
       - name: Commit final candidate

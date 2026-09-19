@@ -19,20 +19,17 @@ jobs:
         shell: bash
         run: |
           set -u
+          rm -rf source-data
           mkdir -p source-data
           python3 - <<'PY'
-          import requests, pathlib
+          import requests, pathlib, json, html as htmlmod, re
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
+          h={'User-Agent':UA,'accept-language':'en;q=0.9'}
+          # User-provided public pages / redirects.
           urls={
-            'caminho-fe':'https://pt.wikiloc.com/trilhas-mountain-bike/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393',
-            'prece-1':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820',
-            'prece-2':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
-            'caravaggio':'https://pt.wikiloc.com/trilhas-trekking/caminhos-de-caravaggio-57586267',
-            'capelas':'https://pt.wikiloc.com/trilhas-trekking/caminho-das-capelas-de-inconfidentes-mg-75559382',
-            'agonia':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-agonia-123850827',
             'vale-europeu':'https://valeeuropeucatarinense.com.br/circuito-caminhante/',
             'rota-luz':'https://goo.gl/maps/C6KCU1sVZP92',
           }
-          h={'User-Agent':'Mozilla/5.0 MinhasViagens route review'}
           for name,url in urls.items():
               try:
                   r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
@@ -40,19 +37,78 @@ jobs:
                   pathlib.Path(f'source-data/{name}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
               except Exception as e:
                   pathlib.Path(f'source-data/{name}.meta.txt').write_text(repr(e),encoding='utf-8')
-          # Google My Maps - Caminho Nhá Chica
-          for suffix,url in {
+
+          # Google My Maps KML sources.
+          kmls={
             'nha-chica-kml':'https://www.google.com/maps/d/kml?mid=15KU_ORnvmCQIg9lygaH6bcTWD2xxyDNq&forcekml=1',
-          }.items():
+            'rota-luz-kml':'https://www.google.com/maps/d/kml?mid=1yAdAynVO9-ns_OYPDsM0TRFSr38&forcekml=1',
+          }
+          for suffix,url in kmls.items():
               try:
                   r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
                   pathlib.Path(f'source-data/{suffix}.kml').write_bytes(r.content)
                   pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
               except Exception as e:
                   pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(repr(e),encoding='utf-8')
+
+          # Official Vale Europeu GPX folder.
+          try:
+              u='https://drive.google.com/embeddedfolderview?id=1JVs2fPeBzyaQ1ATWOSYyhmvQcFez3gDk#grid'
+              r=requests.get(u,headers=h,timeout=30,allow_redirects=True)
+              pathlib.Path('source-data/vale-europeu-drive.html').write_bytes(r.content)
+              pathlib.Path('source-data/vale-europeu-drive.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
+          except Exception as e:
+              pathlib.Path('source-data/vale-europeu-drive.meta.txt').write_text(repr(e),encoding='utf-8')
+
+          # Wikiloc map pages: use the same map-search referer flow used by the public map.
+          targets={
+            'caminho-fe':(144001393,(-22.02,-46.82,-21.86,-46.63)),
+            'prece-1':(255631820,(-22.38,-46.69,-22.20,-46.50)),
+            'prece-2':(14715346,(-22.39,-46.39,-22.25,-46.25)),
+            'caravaggio':(57586267,(-29.45,-50.92,-29.25,-50.70)),
+            'capelas':(75559382,(-22.39,-46.39,-22.25,-46.25)),
+            'agonia':(123850827,(-22.30,-45.36,-22.13,-45.18)),
+          }
+          s=requests.Session()
+          s.headers.update({'user-agent':UA,'accept-language':'en;q=0.9'})
+          for name,(trail_id,(south,west,north,east)) in targets.items():
+              find_url=f'https://www.wikiloc.com/wikiloc/find.do?event=map&to=100&sw={south},{west}&ne={north},{east}'
+              try:
+                  fr=s.get(find_url,headers={'referer':find_url},timeout=30)
+                  pathlib.Path(f'source-data/{name}-find.json').write_bytes(fr.content)
+                  meta=[f'find_status={fr.status_code}',f'find_url={fr.url}']
+                  pretty=None
+                  if fr.ok:
+                      try:
+                          payload=fr.json()
+                          trails=payload.get('trails') or payload.get('data') or []
+                          for item in trails:
+                              iid=item.get('id') or item.get('spaId') or item.get('spa_id')
+                              if str(iid)==str(trail_id):
+                                  pretty=item.get('prettyURL') or item.get('prettyUrl') or item.get('url')
+                                  break
+                      except Exception as e:
+                          meta.append('find_json_error='+repr(e))
+                  if not pretty:
+                      # Known localized paths still work through www when the map referer is set.
+                      pretty={
+                        'caminho-fe':'/trails/mountain-biking/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393',
+                        'prece-1':'/trails/hiking/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820',
+                        'prece-2':'/trails/hiking/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+                        'caravaggio':'/trails/hiking/caminhos-de-caravaggio-57586267',
+                        'capelas':'/trails/hiking/caminho-das-capelas-de-inconfidentes-mg-75559382',
+                        'agonia':'/trails/hiking/caminho-da-agonia-123850827',
+                      }[name]
+                  page_url='https://www.wikiloc.com'+pretty
+                  pr=s.get(page_url,headers={'referer':find_url,'user-agent':UA,'accept-language':'en;q=0.9'},timeout=30,allow_redirects=True)
+                  pathlib.Path(f'source-data/{name}-www.html').write_bytes(pr.content)
+                  meta += [f'page_status={pr.status_code}',f'page_final={pr.url}',f'pretty={pretty}',f'mapData={"mapData" in pr.text}']
+                  pathlib.Path(f'source-data/{name}-www.meta.txt').write_text('\n'.join(meta)+'\n',encoding='utf-8')
+              except Exception as e:
+                  pathlib.Path(f'source-data/{name}-www.meta.txt').write_text(repr(e),encoding='utf-8')
           PY
           tar -czf source-data/repo.tgz --exclude='.git' --exclude='source-data' .
       - uses: actions/upload-artifact@v4
         with:
-          name: v0143-engineering
+          name: v0143-engineering-2
           path: source-data

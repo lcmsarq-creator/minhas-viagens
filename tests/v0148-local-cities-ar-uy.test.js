@@ -18,12 +18,12 @@ const AR = {
 function loadModule({overpassElements=[]}={}) {
   const calls = {br:0,uy:0,ar:0,overpass:0};
   const context = {
-    window:null, globalThis:null, console, AbortController, URL,
+    window:null, globalThis:null, console, AbortController, URL, queueMicrotask,
     state:{trips:[],activeTripDetailId:null},
     tripLatLngs:trip=>trip.line || [],
     cityConquestsForTrip:()=>[], saveTrips:()=>true,
     renderAchievements:()=>{}, renderTripDetail:()=>{},
-    setTimeout:()=>1, clearTimeout:()=>{},
+    setTimeout:(fn,ms)=>{ if (ms <= 150) queueMicrotask(fn); return 1; }, clearTimeout:()=>{},
     fetch:async url=>{
       const value=String(url);
       if (value.includes("municipios.csv")) { calls.br++; return {ok:true,text:async()=>BR_CSV}; }

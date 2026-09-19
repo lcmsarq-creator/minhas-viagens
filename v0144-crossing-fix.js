@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.6";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.7";
   const core = window.MinhasViagensCrossingDetection;
   const CITY_SCAN_SCHEMA = "route-city-crossings-v3-admin";
   const LEGACY_SCHEMA = "route-city-crossings-v2-tabs";
@@ -192,6 +192,7 @@
   }
 
   function scheduleScans() {
+    if (window.MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147") return;
     clearTimeout(scanTimer);
     const generation = ++scanGeneration;
     scanTimer = setTimeout(async () => {
@@ -379,5 +380,5 @@
     destinationItems,
     crossedItems
   });
-  console.info(`Minhas Viagens ${VERSION}: cruzamentos administrativos e icônicos v0.14.6 habilitados.`);
+  console.info(`Minhas Viagens ${VERSION}: cruzamentos administrativos e icônicos v0.14.7 habilitados.`);
 })();

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.6";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.7";
   const core = window.MinhasViagensCrossingDetection;
   const SCHEMA = "route-city-crossings-v4-urban-place";
   const V0144_SCHEMA = "route-city-crossings-v3-admin";
@@ -220,6 +220,7 @@
   }
 
   function scheduleScans(delay = 900) {
+    if (window.MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147") return;
     clearTimeout(scanTimer);
     const current = ++generation;
     suppressV0144Scanner();

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.5";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.6";
   const core = window.MinhasViagensCrossingDetection;
   const CITY_SCAN_SCHEMA = "route-city-crossings-v3-admin";
   const LEGACY_SCHEMA = "route-city-crossings-v2-tabs";
@@ -379,5 +379,5 @@
     destinationItems,
     crossedItems
   });
-  console.info(`Minhas Viagens ${VERSION}: cruzamentos administrativos e icônicos v0.14.5 habilitados.`);
+  console.info(`Minhas Viagens ${VERSION}: cruzamentos administrativos e icônicos v0.14.6 habilitados.`);
 })();

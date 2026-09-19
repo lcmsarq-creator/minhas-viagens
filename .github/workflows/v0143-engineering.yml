@@ -14,7 +14,7 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
-      - name: Try alternate Wikiloc public URLs
+      - name: Try Caminho da Prece geometries
         shell: bash
         run: |
           set -u
@@ -23,26 +23,25 @@ jobs:
           import requests,pathlib
           UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
           h={'User-Agent':UA,'Referer':'https://nakarte.me/','accept-language':'en;q=0.9'}
-          items={
-            'caminho-fe':(144001393,'mountain-biking-trails/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393'),
-            'prece-1':(255631820,'hiking-trails/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820'),
-            'prece-2':(14715346,'hiking-trails/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346'),
-            'caravaggio':(57586267,'hiking-trails/caminhos-de-caravaggio-57586267'),
-            'capelas':(75559382,'hiking-trails/caminho-das-capelas-de-inconfidentes-mg-75559382'),
+          targets={
+            'prece-1-www':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
+            'prece-1-es':'https://es.wikiloc.com/rutas-senderismo/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
+            'prece-1-gl':'https://gl.wikiloc.com/rutas-sendeirismo/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
+            'prece-2-www':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+            'prece-2-es':'https://es.wikiloc.com/rutas-senderismo/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+            'prece-2-gl':'https://gl.wikiloc.com/rutas-sendeirismo/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+            'prece-full':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-jacutinga-a-borda-da-mata-31838436',
+            'prece-car':'https://www.wikiloc.com/car-trails/caminho-da-prece-jacutinga-x-borda-da-mata-92201180',
           }
-          for name,(tid,path) in items.items():
-              urls=[f'https://www.wikiloc.com/{path}',f'https://www.wikiloc.com/wikiloc/spatialArtifacts.do?event=setCurrentSpatialArtifact&id={tid}']
-              lines=[]
-              for idx,target in enumerate(urls):
-                  proxy='https://proxy.nakarte.me/'+target.replace('://','/',1)
-                  try:
-                      r=requests.get(proxy,headers=h,timeout=60,allow_redirects=True)
-                      pathlib.Path(f'source-data/{name}-alt{idx}.html').write_bytes(r.content)
-                      lines.append(f'{idx}\t{r.status_code}\t{len(r.content)}\tmapData={"mapData" in r.text}\t{r.url}')
-                  except Exception as e: lines.append(f'{idx}\t{repr(e)}')
-              pathlib.Path(f'source-data/{name}.meta.txt').write_text('\n'.join(lines),encoding='utf-8')
+          for name,target in targets.items():
+              proxy='https://proxy.nakarte.me/'+target.replace('://','/',1)
+              try:
+                  r=requests.get(proxy,headers=h,timeout=60,allow_redirects=True)
+                  pathlib.Path(f'source-data/{name}.html').write_bytes(r.content)
+                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(f'{r.status_code}\t{len(r.content)}\tmapData={"mapData" in r.text}\t{r.url}',encoding='utf-8')
+              except Exception as e: pathlib.Path(f'source-data/{name}.meta.txt').write_text(repr(e),encoding='utf-8')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: v0143-wikiloc-alternatives
+          name: v0143-prece-geometries
           path: source-data

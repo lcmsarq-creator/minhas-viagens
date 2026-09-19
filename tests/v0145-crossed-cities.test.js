@@ -38,7 +38,7 @@ function loadModule(elements) {
   };
   context.window = context;
   context.globalThis = context;
-  context.MINHAS_VIAGENS_APP_VERSION = "0.14.7";
+  context.MINHAS_VIAGENS_APP_VERSION = "0.14.8";
   context.MinhasViagensCrossingDetection = core;
   context.MinhasViagensApp = {};
   vm.createContext(context);
@@ -84,7 +84,7 @@ test("polígono urbano tem prioridade sobre distância ao ponto central", () => 
   assert.equal(api.placeCrossesRoute(route,urban),true);
 });
 
-test("v0.14.7 é carregada depois da correção v0.14.4", () => {
+test("v0.14.8 é carregada depois da correção v0.14.4", () => {
   const auth = fs.readFileSync("auth.js","utf8");
   const oldIndex = auth.indexOf('"v0144-crossing-fix.js"');
   const newIndex = auth.indexOf('"v0145-crossed-cities.js"');

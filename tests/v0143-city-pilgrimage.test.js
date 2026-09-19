@@ -10,7 +10,7 @@ function close(actual, expected, tolerance, label) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} fora de ${expected} ± ${tolerance}`);
 }
 
-test("v0.14.7 separa cidades Destinos e Cruzadas sem agrupar cruzadas por estado", () => {
+test("v0.14.8 separa cidades Destinos e Cruzadas sem agrupar cruzadas por estado", () => {
   const source = fs.readFileSync("v0142-adjustments.js", "utf8");
   assert.match(source, /route-city-crossings-v2-tabs/);
   assert.match(source, /data-city-mode="destinations"/);

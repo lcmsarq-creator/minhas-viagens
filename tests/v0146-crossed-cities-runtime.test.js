@@ -36,7 +36,7 @@ function loadModule(elements = []) {
   };
   context.window = context;
   context.globalThis = context;
-  context.MINHAS_VIAGENS_APP_VERSION = "0.14.7";
+  context.MINHAS_VIAGENS_APP_VERSION = "0.14.8";
   context.MinhasViagensCrossingDetection = core;
   context.MinhasViagensSync = {schedule:delay=>syncDelays.push(delay)};
   vm.createContext(context);
@@ -92,7 +92,7 @@ test("cada viagem concluída é salva, renderizada e agenda sincronização imed
   assert.deepEqual(stats().syncDelays,[1200]);
 });
 
-test("v0.14.7 fica depois das camadas v0.14.4 e v0.14.7 no loader", () => {
+test("v0.14.8 fica depois das camadas v0.14.4 e v0.14.8 no loader", () => {
   const auth = fs.readFileSync("auth.js","utf8");
   const a = auth.indexOf('"v0144-crossing-fix.js"');
   const b = auth.indexOf('"v0145-crossed-cities.js"');

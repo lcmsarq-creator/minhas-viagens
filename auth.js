@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const gate=document.getElementById("authGate"),loading=document.getElementById("authLoading"),panel=document.getElementById("authPanel"),form=document.getElementById("authForm"),emailInput=document.getElementById("authEmail"),submit=document.getElementById("authSubmit"),status=document.getElementById("authStatus"),application=document.getElementById("application"),accountEmail=document.getElementById("accountEmail"),signOut=document.getElementById("signOutBtn"),config=window.MINHAS_VIAGENS_CONFIG||{};
-  const APP_VERSION=window.MINHAS_VIAGENS_APP_VERSION||"0.14.7"; let client=null,currentSession=null,appLoaded=false;
+  const APP_VERSION=window.MINHAS_VIAGENS_APP_VERSION||"0.14.8"; let client=null,currentSession=null,appLoaded=false;
   window.MinhasViagensAuth={getClient:()=>client,getSession:()=>currentSession,getUser:()=>currentSession?.user||null};
   function configured(){return /^https:\/\/.+\.supabase\.co\/?$/i.test(config.supabaseUrl||"")&&Boolean(config.supabaseAnonKey)&&!/\.\.\.|placeholder|service_role/i.test(config.supabaseAnonKey);}
   function setStatus(message,type=""){status.textContent=message;status.className=`auth-status ${type}`.trim();}

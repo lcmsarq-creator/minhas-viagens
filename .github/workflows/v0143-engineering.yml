@@ -15,31 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Collect route sources
+      - name: Collect final route sources
         shell: bash
         run: |
           set -u
           rm -rf source-data
-          mkdir -p source-data
+          mkdir -p source-data/vale-gpx
           python3 - <<'PY'
           import requests, pathlib, re
           UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
-          h={'User-Agent':UA,'accept-language':'en;q=0.9'}
+          h={'User-Agent':UA,'accept-language':'pt-BR,pt;q=0.9,en;q=0.8','Referer':'https://nakarte.me/'}
 
-          # User-provided public pages / redirects.
-          urls={
-            'vale-europeu':'https://valeeuropeucatarinense.com.br/circuito-caminhante/',
-            'rota-luz':'https://goo.gl/maps/C6KCU1sVZP92',
-          }
-          for name,url in urls.items():
-              try:
-                  r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
-                  pathlib.Path(f'source-data/{name}.html').write_bytes(r.content)
-                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
-              except Exception as e:
-                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(repr(e),encoding='utf-8')
-
-          # Google My Maps KML sources.
+          # Exact public Google My Maps geometries.
           for suffix,url in {
             'nha-chica-kml':'https://www.google.com/maps/d/kml?mid=15KU_ORnvmCQIg9lygaH6bcTWD2xxyDNq&forcekml=1',
             'rota-luz-kml':'https://www.google.com/maps/d/kml?mid=1yAdAynVO9-ns_OYPDsM0TRFSr38&forcekml=1',
@@ -48,40 +35,55 @@ jobs:
                   r=requests.get(url,headers=h,timeout=30,allow_redirects=True)
                   pathlib.Path(f'source-data/{suffix}.kml').write_bytes(r.content)
                   pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
-              except Exception as e:
-                  pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(repr(e),encoding='utf-8')
+              except Exception as e: pathlib.Path(f'source-data/{suffix}.meta.txt').write_text(repr(e),encoding='utf-8')
 
-          # Official Vale Europeu GPX folder.
+          # Official Vale Europeu page + all nine walking GPX files exposed in its public Drive folder.
+          folder='https://drive.google.com/embeddedfolderview?id=1JVs2fPeBzyaQ1ATWOSYyhmvQcFez3gDk#grid'
           try:
-              u='https://drive.google.com/embeddedfolderview?id=1JVs2fPeBzyaQ1ATWOSYyhmvQcFez3gDk#grid'
-              r=requests.get(u,headers=h,timeout=30,allow_redirects=True)
-              pathlib.Path('source-data/vale-europeu-drive.html').write_bytes(r.content)
-              pathlib.Path('source-data/vale-europeu-drive.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\n',encoding='utf-8')
-          except Exception as e:
-              pathlib.Path('source-data/vale-europeu-drive.meta.txt').write_text(repr(e),encoding='utf-8')
+              fr=requests.get(folder,headers=h,timeout=30)
+              pathlib.Path('source-data/vale-europeu-drive.html').write_bytes(fr.content)
+              pairs=re.findall(r'https://drive\.google\.com/file/d/([^/]+)/view[^\"\']*[\"\'][^>]*>.*?<div[^>]*>(Etapa\s+\d+\s+Caminhante\.gpx)</div>',fr.text,re.I|re.S)
+              if not pairs:
+                  ids=re.findall(r'https://drive\.google\.com/file/d/([^/]+)/view',fr.text)
+                  names=re.findall(r'(Etapa\s+\d+\s+Caminhante\.gpx)',fr.text,re.I)
+                  pairs=list(zip(ids,names))
+              report=[]
+              for fid,name in pairs:
+                  out=pathlib.Path('source-data/vale-gpx')/name.replace(' ','_')
+                  u=f'https://drive.google.com/uc?export=download&id={fid}'
+                  r=requests.get(u,headers=h,timeout=30,allow_redirects=True)
+                  out.write_bytes(r.content)
+                  report.append(f'{name}\t{fid}\t{r.status_code}\t{len(r.content)}\t{r.headers.get("content-type")}')
+              pathlib.Path('source-data/vale-europeu-gpx-report.txt').write_text('\n'.join(report),encoding='utf-8')
+          except Exception as e: pathlib.Path('source-data/vale-europeu-gpx-report.txt').write_text(repr(e),encoding='utf-8')
 
-          # Third-party open-source Wikiloc Earth service: returns public trail geometry as KML.
-          # BBoxes are intentionally tight around each trail's start so the requested trail is among returned results.
-          service='https://wikiloc-earth-layer.jonamat.cloud/api/v1/updates'
-          bboxes={
-            'caminho-fe':(-46.77,-21.98,-46.68,-21.91),
-            'prece-1':(-46.64,-22.32,-46.57,-22.26),
-            'prece-2':(-46.36,-22.34,-46.29,-22.28),
-            'caravaggio':(-50.86,-29.39,-50.78,-29.33),
-            'capelas':(-46.36,-22.34,-46.29,-22.28),
-            'agonia':(-45.30,-22.25,-45.22,-22.18),
+          # Caminho das Missões reference supplied by the user.
+          try:
+              u='https://www.portaldasmissoes.com.br/uploads/noticias/3946/0109862_regular_0109857_regular_revista-missoes-rs-6.png'
+              r=requests.get(u,headers=h,timeout=30)
+              pathlib.Path('source-data/caminho-missoes-reference.png').write_bytes(r.content)
+              pathlib.Path('source-data/caminho-missoes-reference.meta.txt').write_text(f'{r.status_code}\n{len(r.content)}\n{r.headers.get("content-type")}',encoding='utf-8')
+          except Exception as e: pathlib.Path('source-data/caminho-missoes-reference.meta.txt').write_text(repr(e),encoding='utf-8')
+
+          # Wikiloc pages through Nakarte's public CORS proxy. Nakarte uses this exact mechanism to import Wikiloc mapData.
+          paths={
+            'caminho-fe':'https://pt.wikiloc.com/trilhas-mountain-bike/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393',
+            'prece-1':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820',
+            'prece-2':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
+            'caravaggio':'https://pt.wikiloc.com/trilhas-trekking/caminhos-de-caravaggio-57586267',
+            'capelas':'https://pt.wikiloc.com/trilhas-trekking/caminho-das-capelas-de-inconfidentes-mg-75559382',
+            'agonia':'https://pt.wikiloc.com/trilhas-trekking/caminho-da-agonia-123850827',
           }
-          for name,(west,south,east,north) in bboxes.items():
-              url=f'{service}?view={west},{south},{east},{north}'
+          for name,target in paths.items():
+              proxy='https://proxy.nakarte.me/'+target.replace('://','/',1)
               try:
-                  r=requests.get(url,headers=h,timeout=90,allow_redirects=True)
-                  pathlib.Path(f'source-data/{name}-earth.kml').write_bytes(r.content)
-                  pathlib.Path(f'source-data/{name}-earth.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\ncontent_type={r.headers.get("content-type")}\nbytes={len(r.content)}\n',encoding='utf-8')
-              except Exception as e:
-                  pathlib.Path(f'source-data/{name}-earth.meta.txt').write_text(repr(e),encoding='utf-8')
+                  r=requests.get(proxy,headers=h,timeout=60,allow_redirects=True)
+                  pathlib.Path(f'source-data/{name}-proxy.html').write_bytes(r.content)
+                  pathlib.Path(f'source-data/{name}-proxy.meta.txt').write_text(f'status={r.status_code}\nfinal={r.url}\nbytes={len(r.content)}\ncontent_type={r.headers.get("content-type")}\nmapData={"mapData" in r.text}\n',encoding='utf-8')
+              except Exception as e: pathlib.Path(f'source-data/{name}-proxy.meta.txt').write_text(repr(e),encoding='utf-8')
           PY
           tar -czf source-data/repo.tgz --exclude='.git' --exclude='source-data' .
       - uses: actions/upload-artifact@v4
         with:
-          name: v0143-engineering-3
+          name: v0143-engineering-final
           path: source-data

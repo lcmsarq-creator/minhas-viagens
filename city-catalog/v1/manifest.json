@@ -1,0 +1,1 @@
+{"schema":"mv-city-catalog-manifest-v1","license":"CC BY 4.0","source":"GeoNames","countries":{"AR":{"path":"city-catalog/v1/ar.json","count":14582,"bytes":960713},"UY":{"path":"city-catalog/v1/uy.json","count":1028,"bytes":72458}}}

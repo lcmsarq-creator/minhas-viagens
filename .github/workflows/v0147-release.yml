@@ -1,0 +1,100 @@
+name: prepare v0147 crossed cities release
+on:
+  push:
+    branches:
+      - fix/crossed-cities-v0147
+    paths:
+      - '.github/workflows/v0147-release.yml'
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Integrate local city scanner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('auth.js')
+          text = p.read_text()
+          needle = 'markStartup("loading-application");const sources='
+          replacement = 'markStartup("loading-application");window.MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147";const sources='
+          if needle not in text and 'MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"' not in text:
+              raise SystemExit('auth generation insertion point not found')
+          text = text.replace(needle, replacement, 1)
+          needle = '"v0146-crossed-cities-runtime.js"]'
+          replacement = '"v0146-crossed-cities-runtime.js","v0147-crossed-cities-local.js"]'
+          if needle not in text and '"v0147-crossed-cities-local.js"' not in text:
+              raise SystemExit('auth loader insertion point not found')
+          text = text.replace(needle, replacement, 1)
+          p.write_text(text)
+
+          guards = {
+              'v0144-crossing-fix.js': r'(function scheduleScans\(\) \{\n)(\s*)',
+              'v0145-crossed-cities.js': r'(function scheduleScans\(delay = 900\) \{\n)(\s*)',
+              'v0146-crossed-cities-runtime.js': r'(function scheduleScan\(delay = 500\) \{\n)(\s*)',
+          }
+          for filename, pattern in guards.items():
+              p = Path(filename)
+              text = p.read_text()
+              guard = 'if (window.MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147") return;'
+              if guard not in text:
+                  text, count = re.subn(pattern, lambda m: m.group(1) + m.group(2) + guard + '\n' + m.group(2), text, count=1)
+                  if count != 1:
+                      raise SystemExit(f'guard insertion failed: {filename}')
+              p.write_text(text)
+
+          p = Path('tests/v0147-crossed-cities-local.test.js')
+          text = p.read_text()
+          old = '''test("loader ativa v0.14.7 e não carrega o scanner v0.14.6", () => {
+            const auth = fs.readFileSync("auth.js","utf8");
+            assert.match(auth,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"/);
+            assert.ok(auth.indexOf('"v0147-crossed-cities-local.js"') > auth.indexOf('"v0145-crossed-cities.js"'));
+            assert.equal(auth.includes('"v0146-crossed-cities-runtime.js"'),false);
+          });'''
+          new = '''test("loader seleciona v0.14.7 depois das camadas anteriores", () => {
+            const auth = fs.readFileSync("auth.js","utf8");
+            assert.match(auth,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"/);
+            const v146 = auth.indexOf('"v0146-crossed-cities-runtime.js"');
+            const v147 = auth.indexOf('"v0147-crossed-cities-local.js"');
+            assert.ok(v146 >= 0 && v147 > v146);
+          });'''
+          if old not in text:
+              raise SystemExit('v0147 loader test block not found')
+          text = text.replace(old, new)
+          text = text.replace(
+              'const v145 = fs.readFileSync("v0145-crossed-cities.js","utf8");\n  assert.match(v144,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);\n  assert.match(v145,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);',
+              'const v145 = fs.readFileSync("v0145-crossed-cities.js","utf8");\n  const v146 = fs.readFileSync("v0146-crossed-cities-runtime.js","utf8");\n  assert.match(v144,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);\n  assert.match(v145,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);\n  assert.match(v146,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION === "v0147"/);'
+          )
+          p.write_text(text)
+
+          roots = list(Path('.').glob('*.js')) + [Path('index.html')] + list(Path('tests').glob('*.test.js'))
+          for p in roots:
+              if not p.exists():
+                  continue
+              text = p.read_text()
+              text = text.replace('0.14.6','0.14.7').replace('0\\.14\\.6','0\\.14\\.7')
+              p.write_text(text)
+          PY
+      - name: Validate final candidate
+        run: |
+          node --check v0147-crossed-cities-local.js
+          node --check v0146-crossed-cities-runtime.js
+          node --check v0145-crossed-cities.js
+          node --check v0144-crossing-fix.js
+          node --check auth.js
+          node --test tests/*.test.js
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Commit final candidate
+        run: |
+          rm .github/workflows/v0147-release.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'release: preparar v0.14.7 com catálogo local de cidades'
+          git push origin HEAD:fix/crossed-cities-v0147

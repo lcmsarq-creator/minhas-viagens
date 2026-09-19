@@ -1,4 +1,4 @@
-name: v0143 engineering
+name: publish v0143 candidate
 
 on:
   push:
@@ -8,40 +8,175 @@ on:
       - '.github/workflows/v0143-engineering.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  collect:
+  build-test-commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Try Caminho da Prece geometries
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fetch exact route sources
         shell: bash
         run: |
-          set -u
-          mkdir -p source-data
-          python3 - <<'PY'
-          import requests,pathlib
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
-          h={'User-Agent':UA,'Referer':'https://nakarte.me/','accept-language':'en;q=0.9'}
-          targets={
-            'prece-1-www':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
-            'prece-1-es':'https://es.wikiloc.com/rutas-senderismo/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
-            'prece-1-gl':'https://gl.wikiloc.com/rutas-sendeirismo/caminho-da-prece-jacutinga-a-borda-da-mata-mg-255631820',
-            'prece-2-www':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
-            'prece-2-es':'https://es.wikiloc.com/rutas-senderismo/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
-            'prece-2-gl':'https://gl.wikiloc.com/rutas-sendeirismo/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346',
-            'prece-full':'https://www.wikiloc.com/hiking-trails/caminho-da-prece-jacutinga-a-borda-da-mata-31838436',
-            'prece-car':'https://www.wikiloc.com/car-trails/caminho-da-prece-jacutinga-x-borda-da-mata-92201180',
-          }
-          for name,target in targets.items():
-              proxy='https://proxy.nakarte.me/'+target.replace('://','/',1)
-              try:
-                  r=requests.get(proxy,headers=h,timeout=60,allow_redirects=True)
-                  pathlib.Path(f'source-data/{name}.html').write_bytes(r.content)
-                  pathlib.Path(f'source-data/{name}.meta.txt').write_text(f'{r.status_code}\t{len(r.content)}\tmapData={"mapData" in r.text}\t{r.url}',encoding='utf-8')
-              except Exception as e: pathlib.Path(f'source-data/{name}.meta.txt').write_text(repr(e),encoding='utf-8')
-          PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: v0143-prece-geometries
-          path: source-data
+          set -euo pipefail
+          mkdir -p /tmp/v0143sources/vale
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36'
+          fetch() { curl -fL --retry 3 -A "$ua" "$1" -o "$2"; }
+          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/mountain-biking-trails/caminho-da-fe-percurso-completo-5-dias-aguas-da-prata-a-aparecida-via-pedrinhas-144001393' /tmp/v0143sources/caminho-fe.html
+          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminhos-de-caravaggio-57586267' /tmp/v0143sources/caravaggio.html
+          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-das-capelas-de-inconfidentes-mg-75559382' /tmp/v0143sources/capelas.html
+          fetch 'https://proxy.nakarte.me/https/pt.wikiloc.com/trilhas-trekking/caminho-da-agonia-123850827' /tmp/v0143sources/agonia.html
+          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-da-prece-1o-dia-jacutinga-a-inconfidentes-mg-255631820' /tmp/v0143sources/prece1.html
+          fetch 'https://proxy.nakarte.me/https/www.wikiloc.com/hiking-trails/caminho-da-prece-2-dia-inconfidentes-mg-x-borda-da-mata-mg-14715346' /tmp/v0143sources/prece2.html
+          fetch 'https://www.google.com/maps/d/kml?mid=1yAdAynVO9-ns_OYPDsM0TRFSr38&forcekml=1' /tmp/v0143sources/rota-luz.kml
+          fetch 'https://www.google.com/maps/d/kml?mid=15KU_ORnvmCQIg9lygaH6bcTWD2xxyDNq&forcekml=1' /tmp/v0143sources/nha-chica.kml
+          fetch 'https://drive.google.com/uc?export=download&id=17NGSsdoPgBWH7_0gYlj1GNf5SMS52sdJ' /tmp/v0143sources/vale/01.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1tqLoyjZitViphTKy6Du0nwXunI0VUyXn' /tmp/v0143sources/vale/02.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1Px5_ueSNi1gZuKep4_RtSs2ii4uIwXt8' /tmp/v0143sources/vale/03.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1YHVkyAv-zIhaEU8w3zUVbuR9UFZNTvDP' /tmp/v0143sources/vale/04.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1yTutr66yAVCVePWnc775wFtWQ436GIr2' /tmp/v0143sources/vale/05.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1BwsKfO0E0XZrihJgwu63YPkhtw1icJtI' /tmp/v0143sources/vale/06.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1FcelTkaSE4Ts1fFB1yH26cu28dJ2JjAi' /tmp/v0143sources/vale/07.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=17KI46lGgZzqRzBAYssnNxmjYO7dmOfMT' /tmp/v0143sources/vale/08.gpx
+          fetch 'https://drive.google.com/uc?export=download&id=1DJUpuy6tKPM2-enUzmL3dNgcIA5I-3D4' /tmp/v0143sources/vale/09.gpx
+          grep -q 'mapData =' /tmp/v0143sources/caminho-fe.html
+          grep -q 'mapData =' /tmp/v0143sources/prece1.html
+          grep -q 'mapData =' /tmp/v0143sources/prece2.html
+      - name: Apply exact validated candidate
+        shell: bash
+        run: |
+          cat > /tmp/apply_v0143.b64 <<'PAYLOAD'
+          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
+          PAYLOAD
+          tr -d '\n ' < /tmp/apply_v0143.b64 | base64 -d | gzip -d > /tmp/apply_v0143.py
+          python3 /tmp/apply_v0143.py
+      - name: Build hosted iconic catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/build_iconic_route_catalog.py
+          mkdir -p /tmp/v0143-preview
+          for f in bundle.json manifest.json caminho-da-agonia.json caminho-da-fe.json caminho-da-prece.json caminho-das-capelas.json caminho-de-nha-chica.json caminhos-de-caravaggio.json rota-da-luz-sp.json vale-europeu.json; do cp "iconic-route-catalog/v1/$f" "/tmp/v0143-preview/$f"; done
+          git checkout HEAD -- iconic-route-catalog/v1
+          cp /tmp/v0143-preview/* iconic-route-catalog/v1/
+          rm -f iconic-route-catalog/v1/rota-do-vinho-sao-roque.json
+      - name: Syntax and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check v0142-adjustments.js
+          node --check iconic-routes-catalog.js
+          node --check iconic-route-catalog.js
+          node --check auth.js
+          node --check road-marker-hotfix.js
+          node --test tests/*.test.js
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Commit validated candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf scripts/__pycache__ tests/__pycache__
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/v0143-engineering.yml
+          git add -A
+          git commit -m 'feat: cidades separadas e rotas de peregrinação v0.14.3'
+          git push origin HEAD:feat/city-tabs-pilgrimage-routes-v0143

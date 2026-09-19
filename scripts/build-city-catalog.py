@@ -21,6 +21,18 @@ COUNTRIES = {
     "CO": {"file": "co.json", "name": "Colômbia"},
     "VE": {"file": "ve.json", "name": "Venezuela"},
     "EC": {"file": "ec.json", "name": "Equador"},
+    "GY": {"file": "gy.json", "name": "Guiana"},
+    "SR": {"file": "sr.json", "name": "Suriname"},
+    "GF": {"file": "gf.json", "name": "Guiana Francesa"},
+    "PA": {"file": "pa.json", "name": "Panamá"},
+    "CR": {"file": "cr.json", "name": "Costa Rica"},
+    "HN": {"file": "hn.json", "name": "Honduras"},
+    "SV": {"file": "sv.json", "name": "El Salvador"},
+    "GT": {"file": "gt.json", "name": "Guatemala"},
+    "BZ": {"file": "bz.json", "name": "Belize"},
+    "MX": {"file": "mx.json", "name": "México"},
+    "US": {"file": "us.json", "name": "Estados Unidos"},
+    "CA": {"file": "ca.json", "name": "Canadá"},
 }
 
 # Para "Cidades Cruzadas" não queremos todo topônimo habitado do GeoNames.
@@ -34,7 +46,7 @@ POPULATED_CODES = {"PPL", "PPLS"}
 
 def fetch_bytes(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "minhas-viagens-catalog/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as response:
+    with urllib.request.urlopen(req, timeout=90) as response:
         return response.read()
 
 
@@ -90,7 +102,6 @@ def build_country(code: str, admin1: dict[str, str]) -> dict:
         if not relevant_place(feature_class, feature_code, pop):
             continue
         region = admin1.get(f"{code}.{admin_code}", "")
-        # Array compacto: id, nome, lat, lng, região, população, featureCode.
         rows.append([int(geoname_id), name, lat_value, lng_value, region, pop, feature_code])
 
     rows.sort(key=lambda row: (str(row[4]), str(row[1]).casefold(), row[0]))

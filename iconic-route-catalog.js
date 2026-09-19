@@ -187,7 +187,8 @@
     return promise;
   }
 
-  const ready = loadBundle();
+  const ready = Promise.resolve(true);
+  loadManifest().catch(() => null);
 
   window.MinhasViagensIconicRouteCatalog = Object.freeze({
     version: VERSION,
@@ -198,6 +199,10 @@
     stats,
     loadBundle,
     loadManifest,
+    metadataFor: async routeId => {
+      const manifest = await loadManifest();
+      return manifest?.routes?.[String(routeId)] || null;
+    },
     entryFor,
     loadRoute,
     has: routeId => entries.has(String(routeId)),

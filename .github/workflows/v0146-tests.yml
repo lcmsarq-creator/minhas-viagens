@@ -28,10 +28,8 @@ jobs:
             try {
               const controller = new AbortController();
               const timer = setTimeout(() => controller.abort(), 20000);
-              const response = await fetch(endpoint, {
-                method:'POST',
-                headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-                body:`data=${encodeURIComponent(q)}`,
+              const response = await fetch(`${endpoint}?data=${encodeURIComponent(q)}`, {
+                headers:{'Accept':'application/json','User-Agent':'minhas-viagens-ci/0.14.6'},
                 signal:controller.signal
               });
               clearTimeout(timer);

@@ -23,8 +23,10 @@ jobs:
               if not p.exists():
                   continue
               text = p.read_text()
-              if '0.14.4' in text:
-                  p.write_text(text.replace('0.14.4','0.14.5'))
+              text = text.replace('0.14.4','0.14.5').replace('0\\.14\\.4','0\\.14\\.5')
+              if p.name == 'v0145-crossed-cities.test.js':
+                  text = text.replace('v0.14.5 é carregada depois da correção v0.14.5','v0.14.5 é carregada depois da correção v0.14.4')
+              p.write_text(text)
           PY
           rm -f .github/workflows/v0145-crossed-cities-tests.yml
           rm .github/workflows/v0145-release.yml

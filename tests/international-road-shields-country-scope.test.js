@@ -35,12 +35,12 @@ test("Colômbia aceita ref nacional numérica e América Central aceita redes na
   assert.equal(api.internationalRoadRef("2", { countries:["CR"], hint:"CR" }), "INT:CR:N:2");
 });
 
-test("release v0.14.4 invalida o cache do shell e dos módulos", () => {
+test("release v0.14.5 invalida o cache do shell e dos módulos", () => {
   const moduleSource = fs.readFileSync("international-road-shields.js", "utf8");
   const authSource = fs.readFileSync("auth.js", "utf8");
   const indexSource = fs.readFileSync("index.html", "utf8");
   assert.match(moduleSource, /APP_VERSION = "0\.13\.12"/);
-  assert.match(authSource, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.14\.4"/);
-  assert.match(indexSource, /MINHAS_VIAGENS_APP_VERSION = "0\.14\.4"/);
-  assert.match(indexSource, /auth\.js\?v=0\.14\.4/);
+  assert.match(authSource, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.14\.5"/);
+  assert.match(indexSource, /MINHAS_VIAGENS_APP_VERSION = "0\.14\.5"/);
+  assert.match(indexSource, /auth\.js\?v=0\.14\.5/);
 });

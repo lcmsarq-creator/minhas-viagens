@@ -10,17 +10,26 @@ from pathlib import Path
 
 BASE = "https://download.geonames.org/export/dump"
 OUT = Path("city-catalog/v1")
+MIN_POPULATION = 1000
 COUNTRIES = {
     "AR": {"file": "ar.json", "name": "Argentina"},
     "UY": {"file": "uy.json", "name": "Uruguai"},
+    "PY": {"file": "py.json", "name": "Paraguai"},
+    "PE": {"file": "pe.json", "name": "Peru"},
+    "BO": {"file": "bo.json", "name": "Bolívia"},
+    "CL": {"file": "cl.json", "name": "Chile"},
+    "CO": {"file": "co.json", "name": "Colômbia"},
+    "VE": {"file": "ve.json", "name": "Venezuela"},
+    "EC": {"file": "ec.json", "name": "Equador"},
 }
 
-# Núcleos/localidades habitadas. Exclui PPLX (seções/bairros), PPLH/PPLQ/PPLW
-# (históricas, abandonadas ou destruídas) e capitais históricas.
-ACCEPTED_CODES = {
-    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC",
-    "PPLF", "PPLL", "PPLR", "PPLS", "PPLG",
-}
+# Para "Cidades Cruzadas" não queremos todo topônimo habitado do GeoNames.
+# Mantemos sedes administrativas relevantes mesmo sem população cadastrada e,
+# entre localidades comuns, apenas PPL/PPLS com população acima de 1.000.
+# Isso segue a ideia do filtro cities1000, mas evita PPLL, PPLF, PPLR e PPLX,
+# que representam localidades muito pequenas/específicas ou partes de cidades.
+ADMIN_SEAT_CODES = {"PPLC", "PPLG", "PPLA", "PPLA2", "PPLA3"}
+POPULATED_CODES = {"PPL", "PPLS"}
 
 
 def fetch_bytes(url: str) -> bytes:
@@ -48,6 +57,14 @@ def compact_number(value: str):
     return int(rounded) if rounded.is_integer() else rounded
 
 
+def relevant_place(feature_class: str, feature_code: str, population: int) -> bool:
+    if feature_class != "P":
+        return False
+    if feature_code in ADMIN_SEAT_CODES:
+        return True
+    return feature_code in POPULATED_CODES and population > MIN_POPULATION
+
+
 def build_country(code: str, admin1: dict[str, str]) -> dict:
     archive = fetch_bytes(f"{BASE}/{code}.zip")
     with zipfile.ZipFile(io.BytesIO(archive)) as zf:
@@ -62,7 +79,7 @@ def build_country(code: str, admin1: dict[str, str]) -> dict:
         geoname_id, name, _ascii, _alts, lat, lng, feature_class, feature_code, country = cols[:9]
         admin_code = cols[10]
         population = cols[14]
-        if country != code or feature_class != "P" or feature_code not in ACCEPTED_CODES:
+        if country != code:
             continue
         try:
             pop = int(population or 0)
@@ -70,18 +87,25 @@ def build_country(code: str, admin1: dict[str, str]) -> dict:
             lng_value = compact_number(lng)
         except ValueError:
             continue
+        if not relevant_place(feature_class, feature_code, pop):
+            continue
         region = admin1.get(f"{code}.{admin_code}", "")
         # Array compacto: id, nome, lat, lng, região, população, featureCode.
         rows.append([int(geoname_id), name, lat_value, lng_value, region, pop, feature_code])
 
     rows.sort(key=lambda row: (str(row[4]), str(row[1]).casefold(), row[0]))
     return {
-        "schema": "mv-city-catalog-v1",
+        "schema": "mv-city-catalog-v2",
         "countryCode": code,
         "country": COUNTRIES[code]["name"],
         "license": "CC BY 4.0",
         "source": "GeoNames",
         "sourceUrl": "https://www.geonames.org/",
+        "filter": {
+            "populationGreaterThan": MIN_POPULATION,
+            "populatedCodes": sorted(POPULATED_CODES),
+            "alwaysIncludeCodes": sorted(ADMIN_SEAT_CODES),
+        },
         "fields": ["id", "name", "lat", "lng", "region", "population", "featureCode"],
         "count": len(rows),
         "places": rows,
@@ -92,9 +116,14 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     admin1 = admin1_names()
     manifest = {
-        "schema": "mv-city-catalog-manifest-v1",
+        "schema": "mv-city-catalog-manifest-v2",
         "license": "CC BY 4.0",
         "source": "GeoNames",
+        "filter": {
+            "populationGreaterThan": MIN_POPULATION,
+            "populatedCodes": sorted(POPULATED_CODES),
+            "alwaysIncludeCodes": sorted(ADMIN_SEAT_CODES),
+        },
         "countries": {},
     }
 
@@ -108,16 +137,19 @@ def main() -> int:
             "count": payload["count"],
             "bytes": len(content.encode("utf-8")),
         }
-        print(f"{code}: {payload['count']} localidades, {manifest['countries'][code]['bytes']} bytes")
+        print(f"{code}: {payload['count']} cidades/localidades relevantes, {manifest['countries'][code]['bytes']} bytes")
 
     (OUT / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
+    countries = ", ".join(meta["name"] for meta in COUNTRIES.values())
     (OUT / "ATTRIBUTION.md").write_text(
         "# City catalog attribution\n\n"
-        "Argentina and Uruguay place data are derived from GeoNames (https://www.geonames.org/), "
-        "licensed under Creative Commons Attribution 4.0 (CC BY 4.0).\n",
+        f"Place data for {countries} are derived from GeoNames (https://www.geonames.org/), "
+        "licensed under Creative Commons Attribution 4.0 (CC BY 4.0).\n\n"
+        "Runtime catalogs keep administrative seats and populated places above 1,000 inhabitants; "
+        "neighbourhoods, tiny localities, farm/religious villages, historical, abandoned and destroyed places are excluded.\n",
         encoding="utf-8",
     )
     return 0

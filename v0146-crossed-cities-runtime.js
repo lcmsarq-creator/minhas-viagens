@@ -311,6 +311,7 @@
     overpassQueryForTile,
     placeCrossesRoute,
     scanTripCities,
+    persistTripResult,
     tripNeedsScan,
     scheduleScan
   });

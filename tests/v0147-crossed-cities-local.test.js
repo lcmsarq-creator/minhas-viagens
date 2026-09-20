@@ -38,7 +38,7 @@ function loadModule() {
   };
   context.window = context;
   context.globalThis = context;
-  context.MINHAS_VIAGENS_APP_VERSION = "0.14.8";
+  context.MINHAS_VIAGENS_APP_VERSION = "0.14.9";
   context.MINHAS_VIAGENS_CITY_SCANNER_GENERATION = "v0147";
   context.MinhasViagensCrossingDetection = core;
   context.MinhasViagensSync = {schedule:delay=>syncDelays.push(delay)};
@@ -78,7 +78,7 @@ test("rota compactada participa da assinatura e força novo scan quando muda", (
   assert.notEqual(api.routeSignature(a),api.routeSignature(b));
 });
 
-test("resultado completo é persistido e agenda sincronização Supabase", () => {
+test("resultado completo é persistido uma vez; saveTrips agenda a sincronização", () => {
   const {api,stats} = loadModule();
   const trip = {id:"br-2",mode:"carro",updatedAt:"2026-09-19",routeGeometry:{encodedPolyline:"abc",pointCount:2},conquests:{}};
   const city = {city:"Teste",label:"Teste",region:"São Paulo",country:"Brasil",countryCode:"BR",lat:-20,lng:-49};
@@ -88,10 +88,23 @@ test("resultado completo é persistido e agenda sincronização Supabase", () =>
   assert.deepEqual(trip.routeCityConquests,[city]);
   assert.equal(stats().saves,1);
   assert.equal(stats().renders,1);
-  assert.deepEqual(stats().syncDelays,[350]);
+  assert.deepEqual(stats().syncDelays,[]);
 });
 
-test("loader seleciona v0.14.8 depois das camadas anteriores", () => {
+test("resultados de um lote podem ser persistidos com uma única gravação", () => {
+  const {api,stats} = loadModule();
+  const city = {city:"Teste",label:"Teste",region:"São Paulo",country:"Brasil",countryCode:"BR",lat:-20,lng:-49};
+  for (const id of ["a","b","c"]) {
+    const trip = {id,mode:"carro",updatedAt:"2026-09-19",routeGeometry:{encodedPolyline:id,pointCount:2},conquests:{}};
+    assert.equal(api.persistTripResult(trip,{cities:[city],complete:true,source:"local-br"},{defer:true}),true);
+  }
+  assert.equal(stats().saves,0);
+  api.commitPersistedResults();
+  assert.equal(stats().saves,1);
+  assert.equal(stats().renders,1);
+});
+
+test("loader seleciona v0.14.9 depois das camadas anteriores", () => {
   const auth = fs.readFileSync("auth.js","utf8");
   assert.match(auth,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"/);
   const v146 = auth.indexOf('"v0146-crossed-cities-runtime.js"');

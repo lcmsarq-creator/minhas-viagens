@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.8";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.9";
   const core = window.MinhasViagensCrossingDetection;
   const SCHEMA = "route-city-crossings-v9-local-americas";
   const V0145_SCHEMA = "route-city-crossings-v4-urban-place";
@@ -458,7 +458,21 @@
     return mergedTripCities(trip);
   };
 
-  function persistTripResult(trip, result) {
+  function commitPersistedResults() {
+    saveTrips();
+    renderAchievements();
+    if (state.activeTripDetailId) renderTripDetail();
+  }
+
+  function persistTripResult(trip, result, options = {}) {
+    const before = JSON.stringify({
+      routeCityConquests:trip.routeCityConquests,
+      routeCityLocalSignature:trip.routeCityLocalSignature,
+      routeCityScanVersion:trip.routeCityScanVersion,
+      routeCityScanComplete:trip.routeCityScanComplete,
+      routeCityScanSource:trip.routeCityScanSource,
+      cities:trip.conquests?.cities
+    });
     const complete = Boolean(result?.complete);
     const incoming = Array.isArray(result?.cities) ? result.cities : [];
     trip.routeCityConquests = complete ? core.uniqueCities(incoming) : core.uniqueCities([...(trip.routeCityConquests || []), ...incoming]);
@@ -471,10 +485,17 @@
     trip.routeCityScanSignature = oldRouteSignature(trip, LEGACY_SCHEMA);
     trip.conquests ||= {};
     trip.conquests.cities = mergedTripCities(trip);
-    saveTrips();
-    renderAchievements();
-    if (state.activeTripDetailId) renderTripDetail();
-    window.MinhasViagensSync?.schedule?.(350);
+    const after = JSON.stringify({
+      routeCityConquests:trip.routeCityConquests,
+      routeCityLocalSignature:trip.routeCityLocalSignature,
+      routeCityScanVersion:trip.routeCityScanVersion,
+      routeCityScanComplete:trip.routeCityScanComplete,
+      routeCityScanSource:trip.routeCityScanSource,
+      cities:trip.conquests?.cities
+    });
+    const changed = before !== after;
+    if (changed && !options.defer) commitPersistedResults();
+    return changed;
   }
 
   function tripNeedsScan(trip) {
@@ -491,19 +512,20 @@
     let completed = 0;
     try {
       const pending = (state.trips || []).filter(tripNeedsScan);
+      let changed = false;
       for (const trip of pending) {
         const result = await scanTripCities(trip);
-        persistTripResult(trip, result);
+        changed = persistTripResult(trip, result, {defer:true}) || changed;
         if (result.complete) completed += 1;
         else partials += 1;
         await sleep(40);
       }
+      if (changed) commitPersistedResults();
     } finally {
       running = false;
       suppressOldScanners();
     }
 
-    if (completed || partials) window.MinhasViagensSync?.schedule?.(250);
     if (rerunRequested) {
       rerunRequested = false;
       scheduleScan(200);
@@ -551,6 +573,7 @@
     overpassQueryForTile,
     scanTripCities,
     persistTripResult,
+    commitPersistedResults,
     tripNeedsScan,
     scheduleScan,
     catalogReady: brazilCatalogPromise

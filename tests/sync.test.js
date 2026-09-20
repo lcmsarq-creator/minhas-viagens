@@ -48,6 +48,106 @@ test("falha Supabase e tabela inexistente são distintas", () => {
 test("conta A e conta B no mesmo navegador", () => {
   assert.notEqual(sync.userStorageKeys("A").trips, sync.userStorageKeys("B").trips);
   assert.notEqual(sync.userStorageKeys("A").tombstones, sync.userStorageKeys("B").tombstones);
+  assert.notEqual(sync.userStorageKeys("A").syncState, sync.userStorageKeys("B").syncState);
+});
+
+test("sincronização incremental não transfere payload quando nada mudou", () => {
+  const local = trip("a", "2026-01-01");
+  const remote = row(local, {serverUpdatedAt:"2026-01-02"});
+  const state = sync.createSyncState([local], [remote]);
+  const metadata = [{trip_id:"a",client_updated_at:"2026-01-01",server_updated_at:"2026-01-02",deleted_at:null}];
+  const plan = sync.planIncrementalSync([local], metadata, [], state);
+  assert.deepEqual(plan.uploadIds, []);
+  assert.deepEqual(plan.downloadIds, []);
+});
+
+test("alteração local detectada por conteúdo é enviada mesmo sem mudar updatedAt", () => {
+  const original = trip("a", "2026-01-01", "original");
+  const remote = row(original, {serverUpdatedAt:"2026-01-02"});
+  const state = sync.createSyncState([original], [remote]);
+  const changed = trip("a", "2026-01-01", "alterada");
+  const metadata = [{trip_id:"a",client_updated_at:"2026-01-01",server_updated_at:"2026-01-02",deleted_at:null}];
+  assert.deepEqual(sync.planIncrementalSync([changed], metadata, [], state).uploadIds, ["a"]);
+});
+
+test("payload remoto só é solicitado para viagem nova ou alterada", () => {
+  const local = trip("a", "2026-01-01");
+  const previous = row(local, {serverUpdatedAt:"2026-01-02"});
+  const state = sync.createSyncState([local], [previous]);
+  const metadata = [
+    {trip_id:"a",client_updated_at:"2026-01-03",server_updated_at:"2026-01-03",deleted_at:null},
+    {trip_id:"b",client_updated_at:"2026-01-01",server_updated_at:"2026-01-01",deleted_at:null}
+  ];
+  assert.deepEqual(sync.planIncrementalSync([local], metadata, [], state).downloadIds.sort(), ["a","b"]);
+});
+
+test("exclusão local vence relógio desalinhado quando o remoto não mudou", () => {
+  const local = trip("a", "2026-01-01");
+  const remote = row(local, {serverUpdatedAt:"2026-02-01"});
+  const state = sync.createSyncState([local], [remote]);
+  const metadata = [{trip_id:"a",client_updated_at:"2026-01-01",server_updated_at:"2026-02-01",deleted_at:null}];
+  const plan = sync.planIncrementalSync([], metadata, [{trip_id:"a",deleted_at:"2026-01-15"}], state);
+  assert.deepEqual(plan.remoteDeletes,[{trip_id:"a",deleted_at:"2026-01-15"}]);
+  assert.deepEqual(plan.downloadIds,[]);
+});
+
+test("fonte usa consulta leve e não carrega cache rodoviário da nuvem", () => {
+  const fs = require("node:fs");
+  const source = fs.readFileSync("sync.js", "utf8");
+  const auth = fs.readFileSync("auth.js", "utf8");
+  assert.match(source, /select\("trip_id,client_updated_at,server_updated_at,deleted_at"\)/);
+  assert.match(source, /\.in\("trip_id", batch\)/);
+  assert.doesNotMatch(auth, /"road-cloud-hotfix\.js"/);
+  assert.match(auth, /"road-catalog-hotfix\.js"/);
+});
+
+test("runtime com estado válido faz somente a consulta de metadados", async () => {
+  const local = trip("a", "2026-01-01");
+  const remote = row(local, {serverUpdatedAt:"2026-01-02"});
+  const storage = memoryStorage({
+    [sync.userStorageKeys("user-1").syncState]: JSON.stringify(sync.createSyncState([local], [remote]))
+  });
+  const selects = [];
+  const client = {
+    from() {
+      return {
+        select(columns) { selects.push(columns); return this; },
+        eq() { return this; },
+        not() {
+          return Promise.resolve({data:[{
+            trip_id:"a", client_updated_at:"2026-01-01",
+            server_updated_at:"2026-01-02", deleted_at:null
+          }],error:null});
+        }
+      };
+    }
+  };
+  let replacements = 0;
+  const status = {textContent:"",dataset:{},title:""};
+  const win = {
+    MinhasViagensAuth:{
+      getSession:()=>({user:{id:"user-1"}}),
+      getClient:()=>client
+    },
+    MinhasViagensApp:{
+      getTrips:()=>[local],
+      replaceTrips:()=>{ replacements += 1; },
+      storageKey:"trips"
+    },
+    localStorage:storage,
+    navigator:{onLine:true},
+    document:{getElementById:id=>id === "syncStatus" ? status : null},
+    addEventListener:()=>{}
+  };
+  sync.start(win);
+  for (let attempt = 0; attempt < 10 && !win.MinhasViagensSyncStats.lastSyncAt; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.deepEqual(selects,["trip_id,client_updated_at,server_updated_at,deleted_at"]);
+  assert.equal(win.MinhasViagensSyncStats.fullSyncs,0);
+  assert.equal(win.MinhasViagensSyncStats.incrementalSyncs,1);
+  assert.equal(win.MinhasViagensSyncStats.payloadRowsDownloaded,0);
+  assert.equal(replacements,0);
 });
 test("importação JSON remove somente caches pesados", () => {
   const imported = { ...trip("a", "2026-01-01"), notes: "texto", roadSegments: { huge: [1] }, overpassCache: [2] };

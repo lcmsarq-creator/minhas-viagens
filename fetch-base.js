@@ -16,7 +16,7 @@
     const script = document.createElement("script");
     script.setAttribute(`data-${datasetKey}`, "true");
     script.async = true;
-    script.src = `${src}?v=${encodeURIComponent(window.MINHAS_VIAGENS_APP_VERSION || "0.14.8")}`;
+    script.src = `${src}?v=${encodeURIComponent(window.MINHAS_VIAGENS_APP_VERSION || "0.14.9")}`;
     document.head.appendChild(script);
   };
 

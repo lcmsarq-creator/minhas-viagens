@@ -129,12 +129,12 @@ function fixture({ withMarker = false } = {}) {
   };
 }
 
-test("loader 0.14.8 carrega a camada de ajustes por último", () => {
+test("loader 0.14.9 carrega a camada de ajustes por último", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
   const index = fs.readFileSync("index.html", "utf8");
-  assert.match(auth, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.14\.8"/);
+  assert.match(auth, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.14\.9"/);
   assert.ok(auth.indexOf('"v0142-adjustments.js"') > auth.indexOf('"iconic-catalog-preview-hotfix.js"'));
-  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.14\.8"/);
+  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.14\.9"/);
 });
 
 test("rodovias de uma viagem preservam a sequência das placas ao longo do trajeto", () => {

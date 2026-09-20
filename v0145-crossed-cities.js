@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.8";
+  const VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.9";
   const core = window.MinhasViagensCrossingDetection;
   const SCHEMA = "route-city-crossings-v4-urban-place";
   const V0144_SCHEMA = "route-city-crossings-v3-admin";

@@ -20,6 +20,7 @@
   ];
   const ROAD_CLOUD_PREFIX = "mvroad|";
   const SYNC_BATCH_SIZE = 20;
+  const SYNC_STATE_SCHEMA = "trip-sync-state-v2-metadata";
 
   function serializeTripForCloud(trip) {
     return JSON.parse(JSON.stringify(trip, (key, value) => EXCLUDED_KEYS.has(key) ? undefined : value));
@@ -55,7 +56,8 @@
     return {
       trips: `minhasViagens.trips.${userId}.v1`,
       tombstones: `minhasViagens.tombstones.${userId}.v1`,
-      migration: `minhasViagens.migration.${userId}.v1`
+      migration: `minhasViagens.migration.${userId}.v1`,
+      syncState: `minhasViagens.sync.${userId}.v2`
     };
   }
 
@@ -128,6 +130,97 @@
     return [code, message].filter(Boolean).join(" · ").slice(0, 180);
   }
 
+  function byteSize(value) {
+    try { return new TextEncoder().encode(JSON.stringify(value)).byteLength; }
+    catch { return JSON.stringify(value || null).length; }
+  }
+
+  function remoteRevision(row) {
+    return String(row?.server_updated_at || row?.client_updated_at || row?.deleted_at || "");
+  }
+
+  function validSyncState(value) {
+    return value?.schema === SYNC_STATE_SCHEMA && value.rows && typeof value.rows === "object";
+  }
+
+  function createSyncState(trips, remoteRows) {
+    const remote = new Map((remoteRows || []).map(row => [String(row.trip_id), row]));
+    const rows = {};
+    for (const trip of trips || []) {
+      const id = String(trip.id);
+      const row = remote.get(id);
+      if (!row || row.deleted_at) continue;
+      rows[id] = {
+        fingerprint: fingerprint(trip),
+        serverUpdatedAt: remoteRevision(row),
+        deletedAt: null
+      };
+    }
+    return { schema: SYNC_STATE_SCHEMA, updatedAt: new Date().toISOString(), rows };
+  }
+
+  function planIncrementalSync(localTrips, remoteRows, tombstones, previousState) {
+    const local = new Map((localTrips || []).map(trip => [String(trip.id), trip]));
+    const remote = new Map((remoteRows || []).map(row => [String(row.trip_id), row]));
+    const deleted = new Map((tombstones || []).map(item => [String(item.trip_id), item]));
+    const previous = validSyncState(previousState) ? previousState.rows : {};
+    const ids = new Set([...local.keys(), ...remote.keys(), ...deleted.keys()]);
+    const uploadIds = [], downloadIds = [], deleteLocalIds = [], remoteDeletes = [];
+
+    for (const id of ids) {
+      const localTrip = local.get(id);
+      const remoteRow = remote.get(id);
+      const tombstone = deleted.get(id);
+      const old = previous[id];
+      const localChanged = Boolean(localTrip) && (!old || old.fingerprint !== fingerprint(localTrip));
+      const remoteChanged = Boolean(remoteRow) && (!old || old.serverUpdatedAt !== remoteRevision(remoteRow) ||
+        String(old.deletedAt || "") !== String(remoteRow.deleted_at || ""));
+
+      if (tombstone) {
+        const deletedAt = String(tombstone.deleted_at || "");
+        const remoteTime = timestamp(remoteRow?.deleted_at || remoteRow?.client_updated_at || remoteRow?.server_updated_at);
+        if (!remoteRow || !remoteChanged || timestamp(deletedAt) > remoteTime) {
+          remoteDeletes.push({ trip_id: id, deleted_at: deletedAt });
+        } else if (!remoteRow.deleted_at) {
+          downloadIds.push(id);
+        }
+        if (localTrip) deleteLocalIds.push(id);
+        continue;
+      }
+
+      if (remoteRow?.deleted_at) {
+        if (localTrip && localChanged && tripTimestamp(localTrip) > timestamp(remoteRow.deleted_at)) uploadIds.push(id);
+        else if (localTrip) deleteLocalIds.push(id);
+        continue;
+      }
+
+      if (localTrip && !remoteRow) {
+        uploadIds.push(id);
+        continue;
+      }
+      if (!localTrip && remoteRow) {
+        downloadIds.push(id);
+        continue;
+      }
+      if (!localTrip || !remoteRow) continue;
+
+      if (localChanged && remoteChanged) {
+        const localTime = tripTimestamp(localTrip);
+        const remoteTime = timestamp(remoteRow.client_updated_at || remoteRow.server_updated_at);
+        if (localTime > remoteTime) uploadIds.push(id);
+        else downloadIds.push(id);
+      } else if (localChanged) uploadIds.push(id);
+      else if (remoteChanged) downloadIds.push(id);
+    }
+
+    return {
+      uploadIds: [...new Set(uploadIds)],
+      downloadIds: [...new Set(downloadIds)],
+      deleteLocalIds: [...new Set(deleteLocalIds)],
+      remoteDeletes
+    };
+  }
+
   function reconcile(localTrips, remoteRows, tombstones) {
     const local = new Map((localTrips || []).map(trip => [String(trip.id), trip]));
     const remote = new Map((remoteRows || []).map(row => [String(row.trip_id), row]));
@@ -187,8 +280,21 @@
     const keys = userStorageKeys(userId);
     const tombstoneKey = keys.tombstones;
     const migrationKey = keys.migration;
+    const syncStateKey = keys.syncState;
     const statusEl = win.document.getElementById("syncStatus");
-    let timer = null, syncing = false, rerun = false, initialized = false;
+    let timer = null, syncing = false, rerun = false, initialized = false, suppressSchedule = false;
+    const stats = win.MinhasViagensSyncStats = {
+      version: "0.14.9",
+      requests: 0,
+      metadataRowsDownloaded: 0,
+      payloadRowsDownloaded: 0,
+      estimatedBytesDownloaded: 0,
+      rowsUploaded: 0,
+      estimatedBytesUploaded: 0,
+      fullSyncs: 0,
+      incrementalSyncs: 0,
+      lastSyncAt: null
+    };
 
     const readJson = (key, fallback) => { try { return JSON.parse(win.localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
     const writeJson = (key, value) => { win.localStorage.setItem(key, JSON.stringify(value)); return true; };
@@ -200,6 +306,17 @@
       statusEl.title = details || text;
     };
     const pendingStatus = () => setStatus(win.navigator.onLine ? "Alterações pendentes" : "Offline");
+    const recordDownload = (value, kind) => {
+      stats.requests += 1;
+      stats.estimatedBytesDownloaded += byteSize(value);
+      if (kind === "metadata") stats.metadataRowsDownloaded += value?.length || 0;
+      else stats.payloadRowsDownloaded += value?.length || 0;
+    };
+    const recordUpload = value => {
+      stats.requests += 1;
+      stats.rowsUploaded += value?.length || 0;
+      stats.estimatedBytesUploaded += byteSize(value);
+    };
 
     async function uploadTrips(trips) {
       if (!trips.length) return;
@@ -215,17 +332,20 @@
         const batch = rows.slice(offset, offset + SYNC_BATCH_SIZE);
         const { error } = await client.from("trips").upsert(batch, { onConflict: "user_id,trip_id" });
         if (error) throw error;
+        recordUpload(batch);
       }
       return now;
     }
 
     async function uploadDeletes(items) {
-      for (const item of items) {
-        const { error } = await client.from("trips").upsert({
+      for (let offset = 0; offset < items.length; offset += SYNC_BATCH_SIZE) {
+        const batch = items.slice(offset, offset + SYNC_BATCH_SIZE).map(item => ({
           user_id: userId, trip_id: String(item.trip_id), payload: {},
           client_updated_at: item.deleted_at, deleted_at: item.deleted_at
-        }, { onConflict: "user_id,trip_id" });
+        }));
+        const { error } = await client.from("trips").upsert(batch, { onConflict: "user_id,trip_id" });
         if (error) throw error;
+        recordUpload(batch);
       }
     }
 
@@ -236,7 +356,96 @@
         .eq("user_id", userId)
         .not("trip_id", "like", `${ROAD_CLOUD_PREFIX}%`);
       if (error) throw error;
-      return (data || []).filter(row => !String(row.trip_id || "").startsWith(ROAD_CLOUD_PREFIX));
+      const rows = (data || []).filter(row => !String(row.trip_id || "").startsWith(ROAD_CLOUD_PREFIX));
+      recordDownload(rows, "payload");
+      return rows;
+    }
+
+    async function fetchRemoteTripMetadata() {
+      const { data, error } = await client
+        .from("trips")
+        .select("trip_id,client_updated_at,server_updated_at,deleted_at")
+        .eq("user_id", userId)
+        .not("trip_id", "like", `${ROAD_CLOUD_PREFIX}%`);
+      if (error) throw error;
+      const rows = (data || []).filter(row => !String(row.trip_id || "").startsWith(ROAD_CLOUD_PREFIX));
+      recordDownload(rows, "metadata");
+      return rows;
+    }
+
+    async function fetchRemoteTripsByIds(ids) {
+      const rows = [];
+      for (let offset = 0; offset < ids.length; offset += SYNC_BATCH_SIZE) {
+        const batch = ids.slice(offset, offset + SYNC_BATCH_SIZE);
+        const { data, error } = await client
+          .from("trips")
+          .select("trip_id,payload,client_updated_at,server_updated_at,deleted_at")
+          .eq("user_id", userId)
+          .in("trip_id", batch);
+        if (error) throw error;
+        const received = (data || []).filter(row => !String(row.trip_id || "").startsWith(ROAD_CLOUD_PREFIX));
+        recordDownload(received, "payload");
+        rows.push(...received);
+      }
+      return rows;
+    }
+
+    function replaceTripsWithoutScheduling(trips) {
+      suppressSchedule = true;
+      try { app.replaceTrips(trips); }
+      finally { suppressSchedule = false; }
+    }
+
+    async function bootstrapSync() {
+      stats.fullSyncs += 1;
+      const data = await fetchRemoteTrips();
+      const legacyEntries = app.getTrips().length ? [] : findLegacyTrips(win.localStorage);
+      const allLegacy = uniqueLegacyTrips(legacyEntries);
+      const retiredKeys = allLegacy.length && verifyTripsAreRemote(allLegacy, data)
+        ? retireVerifiedLegacyStorage(win.localStorage, legacyEntries, data) : [];
+      const result = reconcile(app.getTrips(), data, tombstones());
+      await uploadTrips(result.uploads);
+      await uploadDeletes(result.remoteDeletes);
+      writeJson(tombstoneKey, []);
+      if (fingerprint({ trips: app.getTrips() }) !== fingerprint({ trips: result.trips })) {
+        if (retiredKeys.length) {
+          writeJson(keys.trips, result.trips.map(serializeTripForCloud));
+          win.localStorage.setItem(migrationKey, new Date().toISOString());
+        }
+        replaceTripsWithoutScheduling(result.trips);
+      }
+      const metadata = (result.uploads.length || result.remoteDeletes.length)
+        ? await fetchRemoteTripMetadata()
+        : data;
+      writeJson(syncStateKey, createSyncState(result.trips, metadata));
+      return retiredKeys.length > 0;
+    }
+
+    async function incrementalSync(previousState) {
+      stats.incrementalSyncs += 1;
+      const metadata = await fetchRemoteTripMetadata();
+      const currentTrips = app.getTrips();
+      const plan = planIncrementalSync(currentTrips, metadata, tombstones(), previousState);
+      const downloaded = await fetchRemoteTripsByIds(plan.downloadIds);
+      const merged = new Map(currentTrips.map(trip => [String(trip.id), trip]));
+      for (const id of plan.deleteLocalIds) merged.delete(String(id));
+      for (const row of downloaded) {
+        const id = String(row.trip_id);
+        if (row.deleted_at) merged.delete(id);
+        else merged.set(id, normalizeTripFromCloud(row.payload, id));
+      }
+      const uploads = plan.uploadIds.map(id => merged.get(String(id))).filter(Boolean);
+      await uploadTrips(uploads);
+      await uploadDeletes(plan.remoteDeletes);
+      writeJson(tombstoneKey, []);
+      const resultTrips = [...merged.values()];
+      if (fingerprint({ trips: currentTrips }) !== fingerprint({ trips: resultTrips })) {
+        replaceTripsWithoutScheduling(resultTrips);
+      }
+      const finalMetadata = (uploads.length || plan.remoteDeletes.length)
+        ? await fetchRemoteTripMetadata()
+        : metadata;
+      writeJson(syncStateKey, createSyncState(resultTrips, finalMetadata));
     }
 
     async function syncNow() {
@@ -246,24 +455,11 @@
       setStatus("Sincronizando…");
       let confirmedLegacyRetired = false;
       try {
-        const data = await fetchRemoteTrips();
-        const legacyEntries = app.getTrips().length ? [] : findLegacyTrips(win.localStorage);
-        const allLegacy = uniqueLegacyTrips(legacyEntries);
-        const retiredKeys = allLegacy.length && verifyTripsAreRemote(allLegacy, data)
-          ? retireVerifiedLegacyStorage(win.localStorage, legacyEntries, data) : [];
-        confirmedLegacyRetired = retiredKeys.length > 0;
-        const result = reconcile(app.getTrips(), data, tombstones());
-        await uploadTrips(result.uploads);
-        await uploadDeletes(result.remoteDeletes);
-        writeJson(tombstoneKey, result.tombstones);
-        if (fingerprint({ trips: app.getTrips() }) !== fingerprint({ trips: result.trips })) {
-          if (retiredKeys.length) {
-            writeJson(keys.trips, result.trips.map(serializeTripForCloud));
-            win.localStorage.setItem(migrationKey, new Date().toISOString());
-          }
-          app.replaceTrips(result.trips);
-        }
+        const savedState = readJson(syncStateKey, null);
+        if (validSyncState(savedState)) await incrementalSync(savedState);
+        else confirmedLegacyRetired = await bootstrapSync();
         initialized = true;
+        stats.lastSyncAt = new Date().toISOString();
         setStatus("Sincronizado", "synced");
       } catch (error) {
         console.error("Falha ao sincronizar viagens", error);
@@ -278,6 +474,7 @@
     }
 
     function schedule(delay = 900) {
+      if (suppressSchedule) return;
       pendingStatus();
       clearTimeout(timer);
       timer = setTimeout(syncNow, delay);
@@ -314,7 +511,9 @@
             cacheKey: app.storageKey,
             migrationKey
           });
-          app.replaceTrips(result.trips);
+          replaceTripsWithoutScheduling(result.trips);
+          const metadata = await fetchRemoteTripMetadata();
+          writeJson(syncStateKey, createSyncState(result.trips, metadata));
           dialog.close();
           setStatus("Sincronizado", "synced");
         } catch (error) {
@@ -328,7 +527,7 @@
       dialog.showModal();
     }
 
-    win.MinhasViagensSync = { schedule, syncNow, recordDeletion, serializeTripForCloud };
+    win.MinhasViagensSync = { schedule, syncNow, recordDeletion, serializeTripForCloud, stats };
     win.document.getElementById("syncNowBtn")?.addEventListener("click", syncNow);
     win.addEventListener("offline", () => setStatus("Offline"));
     win.addEventListener("online", () => schedule(100));
@@ -340,5 +539,6 @@
   }
 
   return { serializeTripForCloud, normalizeTripFromCloud, tripTimestamp, fingerprint, userStorageKeys, isMissingTable,
-    findLegacyTrips, verifyTripsAreRemote, retireVerifiedLegacyStorage, completeLegacyMigration, reconcile, start };
+    findLegacyTrips, verifyTripsAreRemote, retireVerifiedLegacyStorage, completeLegacyMigration, reconcile,
+    byteSize, remoteRevision, validSyncState, createSyncState, planIncrementalSync, start };
 });

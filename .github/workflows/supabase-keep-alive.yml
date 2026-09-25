@@ -1,0 +1,48 @@
+name: Manter Supabase ativo
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 9 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
+
+      - name: Consultar banco do Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SUPABASE_URL="$(sed -n 's/.*supabaseUrl: "\([^"]*\)".*/\1/p' config.js | head -n 1)"
+          SUPABASE_KEY="$(sed -n 's/.*supabaseAnonKey: "\([^"]*\)".*/\1/p' config.js | head -n 1)"
+
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
+            echo "Não foi possível ler a configuração pública do Supabase em config.js."
+            exit 1
+          fi
+
+          RESPONSE="$(curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --retry-delay 10 \
+            --request POST \
+            --header "apikey: $SUPABASE_KEY" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "$SUPABASE_URL/rest/v1/rpc/keep_alive")"
+
+          echo "Keep-alive concluído: $RESPONSE"

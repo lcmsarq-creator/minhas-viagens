@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "23 9 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-keep-alive.yml"
 
 permissions:
   contents: read

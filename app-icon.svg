@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Minhas Viagens">
+  <rect width="512" height="512" rx="112" fill="#21140f"/>
+  <path d="M102 354c45-74 88-112 129-112 39 0 64 35 99 35 24 0 48-18 80-62" fill="none" stroke="#ff6a21" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="142" cy="164" r="39" fill="#ff6a21"/>
+  <circle cx="372" cy="350" r="39" fill="#ffb06a"/>
+  <text x="256" y="286" text-anchor="middle" font-family="Arial Narrow, Helvetica, Arial, sans-serif" font-size="128" font-weight="900" fill="#fff7ec">MV</text>
+</svg>

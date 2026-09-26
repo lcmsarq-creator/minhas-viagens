@@ -282,7 +282,7 @@
         const titleText = isStateDetail ? nativeTitle : "Cidades";
         const countText = isStateDetail ? nativeCount.replace(/\D+/g, "") || nativeCount : (document.getElementById("cityAchievementCount")?.textContent || "0");
         const signature = [isStateDetail ? "state" : "states", titleText, countText].join("|");
-        if (cityHeader.dataset.mobileSignature === signature) return;
+        if (cityHeader.dataset.mobileSignature === signature && cityHeader.querySelector(".mobile-city-screen-header")) return;
         cityHeader.dataset.mobileSignature = signature;
         cityHeader.querySelectorAll(".mobile-city-screen-header, .mobile-city-toggle, .mobile-section-kicker").forEach(node => node.remove());
         const head = document.createElement("div");

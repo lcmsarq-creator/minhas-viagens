@@ -1,4 +1,4 @@
-/* v0.15.2 - mobile interface direction */
+/* v0.15.5 - mobile clean map screen */
 :root {
   --bg: #f2e3d1;
   --panel: #fff7ec;
@@ -232,6 +232,7 @@ textarea:focus {
 .mobile-sheet-toggle,
 .mobile-sheet-fab,
 .mobile-sheet-scrim,
+.mobile-profile-fab,
 .mobile-home-menu,
 .mobile-back-menu {
   display: none;
@@ -310,46 +311,74 @@ textarea:focus {
     pointer-events: none;
   }
 
-  .mobile-sheet-fab {
+  .mobile-profile-fab {
     position: fixed;
-    left: 14px;
-    top: calc(14px + env(safe-area-inset-top));
+    left: 16px;
+    top: calc(16px + env(safe-area-inset-top));
     z-index: 1200;
     display: grid;
-    grid-template-columns: auto auto;
-    gap: 9px;
-    align-items: center;
-    justify-content: center;
-    min-width: 82px;
-    height: 50px;
-    padding: 0 13px;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    place-items: center;
+    border: 2px solid rgba(33, 20, 15, .78);
     border-radius: 16px;
-    background: var(--surface);
-    color: var(--panel);
-    box-shadow: 0 14px 32px rgba(0, 0, 0, .28);
-    border: 1px solid rgba(255, 176, 106, .28);
+    background: rgba(255, 247, 236, .88);
+    color: var(--surface);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .18);
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-profile-avatar {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--panel);
+    color: var(--surface);
+    font-family: var(--display-font);
+    font-size: .82rem;
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .mobile-profile-avatar.has-image {
+    background-position: center;
+    background-size: cover;
+    color: transparent;
+  }
+
+  .mobile-sheet-fab {
+    position: fixed;
+    right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 1200;
+    display: grid;
+    width: 60px;
+    height: 60px;
+    padding: 0;
+    place-items: center;
+    border-radius: 18px;
+    background: var(--accent);
+    color: var(--surface);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, .24);
+    border: 1px solid rgba(21, 16, 12, .18);
     transition: background .2s ease, color .2s ease, transform .2s ease;
   }
 
-  .mobile-sheet-fab:active {
+  .mobile-sheet-fab:active,
+  .mobile-profile-fab:active {
     transform: scale(.96);
-  }
-
-  .mobile-sheet-fab::before {
-    content: "MV";
-    display: block;
-    font-family: var(--display-font);
-    font-size: 1.02rem;
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: .02em;
   }
 
   .mobile-sheet-fab-icon::before {
     content: "↗";
     display: block;
     font-family: var(--display-font);
-    font-size: 1.48rem;
+    font-size: 2rem;
     font-weight: 900;
     line-height: 1;
   }
@@ -378,6 +407,10 @@ textarea:focus {
   .mobile-sheet-toggle:checked ~ .mobile-sheet-fab {
     background: var(--surface);
     color: var(--accent-light);
+  }
+
+  .mobile-sheet-toggle:checked ~ .mobile-profile-fab {
+    opacity: .42;
   }
 
   .mobile-sheet-toggle:checked ~ .mobile-sheet-fab .mobile-sheet-fab-icon::before {

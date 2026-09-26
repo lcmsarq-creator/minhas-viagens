@@ -813,6 +813,7 @@ function focusCityAchievement(city) {
   closeTripRoadHighlight();
   if (window.matchMedia("(max-width: 820px)").matches) document.getElementById("map")?.scrollIntoView({ behavior: "smooth", block: "center" });
   map.flyTo([lat, lng], 12, { duration: .8 });
+  liftMobileMapCenter();
   if (state.cityHighlight) map.removeLayer(state.cityHighlight);
   clearTimeout(state.cityHighlightTimer);
   state.cityHighlight = L.circleMarker([lat, lng], {
@@ -822,6 +823,45 @@ function focusCityAchievement(city) {
     if (state.cityHighlight) map.removeLayer(state.cityHighlight);
     state.cityHighlight = null;
   }, 4500);
+}
+
+function mobileSheetVisibleHeight() {
+  if (!window.matchMedia("(max-width: 820px)").matches) return 0;
+  const sheet = document.querySelector(".sidebar");
+  const height = sheet?.getBoundingClientRect?.().height;
+  return Number.isFinite(height) && height > 0 ? height : window.innerHeight * .5;
+}
+
+function mobileMapFitOptions(maxZoom = 8) {
+  const sheetHeight = mobileSheetVisibleHeight();
+  if (!sheetHeight) return { padding: [28, 28], maxZoom };
+  return {
+    paddingTopLeft: [24, 24],
+    paddingBottomRight: [24, Math.round(sheetHeight + 24)],
+    maxZoom
+  };
+}
+
+function liftMobileMapCenter() {
+  const sheetHeight = mobileSheetVisibleHeight();
+  if (!sheetHeight) return;
+  setTimeout(() => map.panBy([0, Math.round(sheetHeight / 2)], { animate: true, duration: .45 }), 280);
+}
+
+function focusAchievementGroup(group) {
+  const points = (group?.cities || [])
+    .map(city => [Number(city.lat), Number(city.lng)])
+    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+  if (!points.length) return;
+  closeFullHighway();
+  closeTripRoadHighlight();
+  window.MinhasViagensIconicRoutes?.clearPreview?.();
+  if (points.length === 1) {
+    map.flyTo(points[0], 8, { duration: .8 });
+    liftMobileMapCenter();
+    return;
+  }
+  map.fitBounds(L.latLngBounds(points).pad(.18), mobileMapFitOptions(8));
 }
 
 function overpassRoadDescriptor(item) {
@@ -1343,6 +1383,7 @@ function renderAchievements() {
           card.querySelector(".state-achievement-icon-fallback")?.classList.remove("hidden");
         });
         card.addEventListener("click", () => {
+          focusAchievementGroup(group);
           state.achievementStateKey = group.key;
           renderAchievements();
         });

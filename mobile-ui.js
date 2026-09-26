@@ -32,22 +32,30 @@
     function setMode(mode) {
       app.classList.toggle("mobile-panel-home", mode === "home");
       app.classList.toggle("mobile-panel-detail", mode === "detail");
+      syncFabLabel();
     }
 
     function openSheet() {
       toggle.checked = true;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
+      window.dispatchEvent(new Event("resize"));
     }
 
     function closeSheet() {
       toggle.checked = false;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
+      window.dispatchEvent(new Event("resize"));
     }
 
     function syncFabLabel() {
       const expanded = toggle.checked;
+      const detailMode = app.classList.contains("mobile-panel-detail");
+      const state = !expanded ? "closed" : detailMode ? "detail" : "home";
       toggle.setAttribute("aria-expanded", String(expanded));
-      if (fab) fab.setAttribute("aria-label", expanded ? "Fechar menu principal" : "Abrir menu principal");
+      if (fab) {
+        fab.dataset.mobileState = state;
+        fab.setAttribute("aria-label", !expanded ? "Abrir menu principal" : detailMode ? "Voltar ao menu principal" : "Recolher menu principal");
+      }
     }
 
     function openTrips() {
@@ -84,6 +92,21 @@
     toggle.addEventListener("change", () => {
       syncFabLabel();
       if (toggle.checked && !app.classList.contains("mobile-panel-detail")) setMode("home");
+    });
+
+    fab?.addEventListener("click", event => {
+      event.preventDefault();
+      if (!toggle.checked) {
+        setMode("home");
+        openSheet();
+        return;
+      }
+      if (app.classList.contains("mobile-panel-detail")) {
+        setMode("home");
+        openSheet();
+        return;
+      }
+      closeSheet();
     });
 
     mobileTrips?.addEventListener("click", openTrips);

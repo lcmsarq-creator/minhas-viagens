@@ -6,7 +6,7 @@
   <title>Minhas Viagens</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
   <link rel="stylesheet" href="style.css?v=0.14.9" />
-  <link rel="stylesheet" href="mobile-ui.css?v=0.15.0" />
+  <link rel="stylesheet" href="mobile-ui.css?v=0.15.1" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -38,7 +38,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.0</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.1</p>
         </div>
       </div>
 
@@ -47,6 +47,26 @@
         <button id="syncNowBtn" class="account-signout" type="button">Sincronizar agora</button>
         <button id="signOutBtn" class="account-signout" type="button">Sair</button>
       </div>
+
+      <div class="mobile-home-menu" aria-label="Menu principal mobile">
+        <button id="mobileOpenTripsBtn" class="mobile-menu-tile" type="button">
+          <span>Mapa + lista</span>
+          <strong>Viagens</strong>
+          <small><b id="mobileTripCount">0</b> cadastradas</small>
+        </button>
+        <button id="mobileOpenAchievementsBtn" class="mobile-menu-tile" type="button">
+          <span>Progresso</span>
+          <strong>Conquistas</strong>
+          <small><b id="mobileAchievementCount">0</b> registros</small>
+        </button>
+        <button id="mobileNewTripBtn" class="mobile-menu-tile" type="button">
+          <span>Ação rápida</span>
+          <strong>Nova viagem</strong>
+          <small>Adicionar percurso ao mapa</small>
+        </button>
+      </div>
+
+      <button id="mobileBackToMenuBtn" class="mobile-back-menu" type="button">← Menu principal</button>
 
       <button id="newTripBtn" class="primary-btn">+ Nova viagem</button>
 
@@ -345,9 +365,10 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.0";</script>
-  <script src="config.js?v=0.15.0"></script>
+  <script src="mobile-ui.js?v=0.15.1"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.1";</script>
+  <script src="config.js?v=0.15.1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.15.0"></script>
+  <script src="auth.js?v=0.15.1"></script>
 </body>
 </html>

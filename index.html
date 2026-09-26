@@ -9,12 +9,12 @@
   <meta name="apple-mobile-web-app-title" content="Minhas Viagens" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="manifest.webmanifest?v=0.15.7" />
-  <link rel="icon" href="app-icon.svg?v=0.15.7" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.7" />
+  <link rel="manifest" href="manifest.webmanifest?v=0.15.8" />
+  <link rel="icon" href="app-icon.svg?v=0.15.8" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.8" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
   <link rel="stylesheet" href="style.css?v=0.14.9" />
-  <link rel="stylesheet" href="mobile-ui.css?v=0.15.7" />
+  <link rel="stylesheet" href="mobile-ui.css?v=0.15.8" />
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -39,6 +39,9 @@
     <button id="mobileProfileBtn" class="mobile-profile-fab" type="button" aria-label="Perfil do usuário">
       <span id="mobileProfileAvatar" class="mobile-profile-avatar" aria-hidden="true">MV</span>
     </button>
+    <button id="mobileMapSizeBtn" class="mobile-map-size-btn" type="button" aria-label="Maximizar mapa" aria-pressed="false">
+      <span aria-hidden="true"></span>
+    </button>
     <label for="mobileSheetToggle" class="mobile-sheet-fab" aria-label="Abrir menu principal">
       <span class="mobile-sheet-fab-icon" aria-hidden="true"></span>
     </label>
@@ -49,7 +52,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.7</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.8</p>
         </div>
       </div>
 
@@ -376,15 +379,15 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script src="mobile-ui.js?v=0.15.7"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.7";</script>
-  <script src="config.js?v=0.15.7"></script>
+  <script src="mobile-ui.js?v=0.15.8"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.8";</script>
+  <script src="config.js?v=0.15.8"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.15.7"></script>
+  <script src="auth.js?v=0.15.8"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=0.15.7", { scope: "./" })
+        navigator.serviceWorker.register("./service-worker.js?v=0.15.8", { scope: "./" })
           .catch(error => console.warn("Service worker indisponível", error));
       });
     }

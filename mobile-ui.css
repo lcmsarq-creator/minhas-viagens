@@ -1,4 +1,4 @@
-/* v0.15.1 - mobile interface direction */
+/* v0.15.2 - mobile interface direction */
 :root {
   --bg: #f2e3d1;
   --panel: #fff7ec;
@@ -273,40 +273,33 @@ textarea:focus {
 
   .sidebar {
     position: fixed;
-    left: 10px;
-    right: 10px;
+    left: 0;
+    right: 0;
     bottom: 0;
     z-index: 1050;
-    height: auto;
-    max-height: min(78dvh, 690px);
-    padding: 22px 16px calc(18px + env(safe-area-inset-bottom));
+    height: 50dvh;
+    min-height: 50dvh;
+    max-height: 50dvh;
+    padding: 18px 16px calc(14px + env(safe-area-inset-bottom));
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
     border: 1px solid rgba(255, 106, 33, .32);
     border-bottom: 0;
-    border-radius: 28px 28px 0 0;
-    background: rgba(255, 247, 236, .96);
-    box-shadow: 0 -24px 64px rgba(0, 0, 0, .34);
+    border-radius: 24px 24px 0 0;
+    background: rgba(255, 247, 236, .97);
+    box-shadow: 0 -20px 54px rgba(0, 0, 0, .3);
     backdrop-filter: blur(14px);
-    transform: translateY(110%);
-    transition: transform .28s cubic-bezier(.2, .8, .2, 1), max-height .22s ease;
+    transform: translateY(calc(100% + 2px));
+    transition: transform .28s cubic-bezier(.2, .8, .2, 1);
   }
 
   .app.mobile-panel-detail .sidebar {
-    height: min(78dvh, 690px);
+    height: 50dvh;
   }
 
   .sidebar::before {
-    content: "";
-    position: sticky;
-    top: 0;
-    display: block;
-    width: 52px;
-    height: 5px;
-    margin: -8px auto 14px;
-    border-radius: 999px;
-    background: rgba(113, 88, 69, .42);
+    display: none;
   }
 
   .mobile-sheet-toggle {
@@ -319,18 +312,22 @@ textarea:focus {
 
   .mobile-sheet-fab {
     position: fixed;
-    right: 18px;
-    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 14px;
+    top: calc(14px + env(safe-area-inset-top));
     z-index: 1200;
     display: grid;
-    width: 58px;
-    height: 58px;
-    place-items: center;
-    border-radius: 18px;
-    background: var(--accent);
-    color: var(--text);
-    box-shadow: 0 18px 36px rgba(0, 0, 0, .28);
-    border: 1px solid rgba(21, 16, 12, .16);
+    grid-template-columns: auto auto;
+    gap: 9px;
+    align-items: center;
+    justify-content: center;
+    min-width: 82px;
+    height: 50px;
+    padding: 0 13px;
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--panel);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, .28);
+    border: 1px solid rgba(255, 176, 106, .28);
     transition: background .2s ease, color .2s ease, transform .2s ease;
   }
 
@@ -338,24 +335,35 @@ textarea:focus {
     transform: scale(.96);
   }
 
+  .mobile-sheet-fab::before {
+    content: "MV";
+    display: block;
+    font-family: var(--display-font);
+    font-size: 1.02rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: .02em;
+  }
+
   .mobile-sheet-fab-icon::before {
     content: "↗";
     display: block;
     font-family: var(--display-font);
-    font-size: 2rem;
+    font-size: 1.48rem;
     font-weight: 900;
     line-height: 1;
   }
 
+  .mobile-sheet-fab[data-mobile-state="home"] .mobile-sheet-fab-icon::before {
+    content: "↓";
+  }
+
+  .mobile-sheet-fab[data-mobile-state="detail"] .mobile-sheet-fab-icon::before {
+    content: "←";
+  }
+
   .mobile-sheet-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 1040;
-    display: block;
-    opacity: 0;
-    pointer-events: none;
-    background: rgba(13, 9, 6, .38);
-    transition: opacity .22s ease;
+    display: none;
   }
 
   .mobile-sheet-toggle:checked ~ .sidebar {
@@ -363,8 +371,8 @@ textarea:focus {
   }
 
   .mobile-sheet-toggle:checked ~ .mobile-sheet-scrim {
-    opacity: 1;
-    pointer-events: auto;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .mobile-sheet-toggle:checked ~ .mobile-sheet-fab {
@@ -373,9 +381,14 @@ textarea:focus {
   }
 
   .mobile-sheet-toggle:checked ~ .mobile-sheet-fab .mobile-sheet-fab-icon::before {
-    content: "×";
-    font-size: 2.2rem;
     transform: translateY(-1px);
+  }
+
+  .sidebar > .brand,
+  .sidebar > .account-area,
+  .mobile-back-menu,
+  .sidebar-tabs {
+    display: none !important;
   }
 
   .brand {
@@ -411,7 +424,7 @@ textarea:focus {
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
-    margin: 8px 0 2px;
+    margin: 0 0 2px;
   }
 
   .mobile-menu-tile {
@@ -491,7 +504,7 @@ textarea:focus {
   }
 
   .app.mobile-panel-detail .mobile-back-menu {
-    display: block;
+    display: none;
   }
 
   .app.mobile-panel-detail .sidebar > .primary-btn {

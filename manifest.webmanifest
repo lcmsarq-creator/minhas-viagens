@@ -1,0 +1,41 @@
+{
+  "name": "Minhas Viagens",
+  "short_name": "Viagens",
+  "description": "Seu mapa pessoal de caminhos percorridos.",
+  "id": "/minhas-viagens/",
+  "start_url": "/minhas-viagens/?source=pwa",
+  "scope": "/minhas-viagens/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff7ec",
+  "theme_color": "#21140f",
+  "categories": [
+    "travel",
+    "navigation",
+    "lifestyle"
+  ],
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Abrir mapa",
+      "short_name": "Mapa",
+      "description": "Abrir o mapa de viagens.",
+      "url": "/minhas-viagens/?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "app-icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}

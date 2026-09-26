@@ -1,4 +1,4 @@
-const CACHE_VERSION = "0.15.3";
+const CACHE_VERSION = "0.15.4";
 const CACHE_NAME = "minhas-viagens-" + CACHE_VERSION;
 const APP_BASE = "/minhas-viagens/";
 const STATIC_ASSETS = [
@@ -6,13 +6,15 @@ const STATIC_ASSETS = [
   APP_BASE + "index.html",
   APP_BASE + "manifest.webmanifest",
   APP_BASE + "app-icon.svg",
+  APP_BASE + "app-icon-192.png",
+  APP_BASE + "app-icon-512.png",
   APP_BASE + "vendor/leaflet/leaflet.css?v=1.9.4",
   APP_BASE + "vendor/leaflet/leaflet.js?v=1.9.4",
   APP_BASE + "style.css?v=0.14.9",
-  APP_BASE + "mobile-ui.css?v=0.15.3",
-  APP_BASE + "mobile-ui.js?v=0.15.3",
-  APP_BASE + "config.js?v=0.15.3",
-  APP_BASE + "auth.js?v=0.15.3"
+  APP_BASE + "mobile-ui.css?v=0.15.4",
+  APP_BASE + "mobile-ui.js?v=0.15.4",
+  APP_BASE + "config.js?v=0.15.4",
+  APP_BASE + "auth.js?v=0.15.4"
 ];
 
 self.addEventListener("install", event => {

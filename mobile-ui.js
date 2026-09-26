@@ -238,6 +238,8 @@
     });
     newTrip?.addEventListener("click", closeSheet);
 
+    let enhancingAchievements = false;
+
     function activateAchievementScreen(kind) {
       const tab = kind === "roads" ? document.getElementById("roadAchievementsTabBtn")
         : kind === "iconic" ? document.getElementById("iconicAchievementsTabBtn")
@@ -248,6 +250,9 @@
     }
 
     function enhanceAchievementScreens() {
+      if (enhancingAchievements) return;
+      enhancingAchievements = true;
+      try {
       const panel = document.getElementById("achievementsPanel");
       const summary = panel?.querySelector(".achievement-summary");
       const cityHeader = document.getElementById("cityAchievementHeader");
@@ -270,13 +275,16 @@
       });
 
       if (cityHeader && cityList) {
-        cityHeader.querySelectorAll(".mobile-city-screen-header, .mobile-city-toggle, .mobile-section-kicker").forEach(node => node.remove());
         const nativeBack = cityHeader.querySelector(".achievement-back-btn");
         const nativeTitle = cityHeader.querySelector(".achievement-browser-title h2")?.textContent?.trim() || "Cidades";
         const nativeCount = cityHeader.querySelector(".achievement-browser-title span")?.textContent?.trim() || (document.getElementById("cityAchievementCount")?.textContent || "0");
         const isStateDetail = Boolean(nativeBack);
         const titleText = isStateDetail ? nativeTitle : "Cidades";
         const countText = isStateDetail ? nativeCount.replace(/\D+/g, "") || nativeCount : (document.getElementById("cityAchievementCount")?.textContent || "0");
+        const signature = [isStateDetail ? "state" : "states", titleText, countText].join("|");
+        if (cityHeader.dataset.mobileSignature === signature) return;
+        cityHeader.dataset.mobileSignature = signature;
+        cityHeader.querySelectorAll(".mobile-city-screen-header, .mobile-city-toggle, .mobile-section-kicker").forEach(node => node.remove());
         const head = document.createElement("div");
         head.className = "mobile-city-screen-header";
         head.innerHTML = `
@@ -298,6 +306,9 @@
         kicker.className = "mobile-section-kicker";
         kicker.textContent = isStateDetail ? `Destinos em ${titleText}` : "Brasil · Estados";
         cityHeader.appendChild(kicker);
+      }
+      } finally {
+        enhancingAchievements = false;
       }
     }
 

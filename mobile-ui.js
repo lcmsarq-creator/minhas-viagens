@@ -16,6 +16,7 @@
     const profileBtn = document.getElementById("mobileProfileBtn");
     const profileAvatar = document.getElementById("mobileProfileAvatar");
     const accountEmail = document.getElementById("accountEmail");
+    const mapArea = document.querySelector(".map-area");
     const tripsTab = document.getElementById("tripsTabBtn");
     const achievementsTab = document.getElementById("achievementsTabBtn");
     const newTrip = document.getElementById("newTripBtn");
@@ -38,16 +39,33 @@
       syncFabLabel();
     }
 
-    function openSheet() {
+    let panelHistoryActive = false;
+    let touchStart = null;
+
+    function openSheet(options = {}) {
+      const wasClosed = !toggle.checked;
+      if (wasClosed && options.history !== false && window.history?.pushState) {
+        window.history.pushState({ minhasViagensPanel: true }, "", window.location.href);
+        panelHistoryActive = true;
+      }
       toggle.checked = true;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
       window.dispatchEvent(new Event("resize"));
     }
 
-    function closeSheet() {
+    function closeSheet(options = {}) {
+      if (!toggle.checked) return;
       toggle.checked = false;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
       window.dispatchEvent(new Event("resize"));
+      if (panelHistoryActive && !options.fromHistory) {
+        panelHistoryActive = false;
+        window.history?.back?.();
+      }
+    }
+
+    function isHomePanelOpen() {
+      return toggle.checked && app.classList.contains("mobile-panel-home");
     }
 
     function syncFabLabel() {
@@ -126,6 +144,32 @@
       setMode("home");
       openSheet();
     });
+
+    mapArea?.addEventListener("click", () => {
+      if (isHomePanelOpen()) closeSheet();
+    });
+
+    window.addEventListener("popstate", () => {
+      if (toggle.checked) {
+        panelHistoryActive = false;
+        closeSheet({ fromHistory: true });
+      }
+    });
+
+    window.addEventListener("touchstart", event => {
+      const touch = event.touches?.[0];
+      touchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    }, { passive: true });
+
+    window.addEventListener("touchend", event => {
+      if (!touchStart || !toggle.checked) return;
+      const touch = event.changedTouches?.[0];
+      if (!touch) return;
+      const dx = touch.clientX - touchStart.x;
+      const dy = touch.clientY - touchStart.y;
+      touchStart = null;
+      if (dx > 80 && Math.abs(dy) < 60) closeSheet();
+    }, { passive: true });
 
     fab?.addEventListener("click", event => {
       event.preventDefault();

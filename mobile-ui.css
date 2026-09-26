@@ -1,4 +1,4 @@
-/* v0.15.5 - mobile clean map screen */
+/* v0.15.6 - mobile map menu blocks */
 :root {
   --bg: #f2e3d1;
   --panel: #fff7ec;
@@ -295,6 +295,20 @@ textarea:focus {
     transition: transform .28s cubic-bezier(.2, .8, .2, 1);
   }
 
+  .app.mobile-panel-home .sidebar {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 0 16px calc(18px + env(safe-area-inset-bottom));
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+
   .app.mobile-panel-detail .sidebar {
     height: 50dvh;
   }
@@ -409,8 +423,12 @@ textarea:focus {
     color: var(--accent-light);
   }
 
+  .app.mobile-panel-home .mobile-sheet-toggle:checked ~ .mobile-sheet-fab {
+    display: none;
+  }
+
   .mobile-sheet-toggle:checked ~ .mobile-profile-fab {
-    opacity: .42;
+    opacity: 1;
   }
 
   .mobile-sheet-toggle:checked ~ .mobile-sheet-fab .mobile-sheet-fab-icon::before {
@@ -456,57 +474,60 @@ textarea:focus {
   .mobile-home-menu {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
-    margin: 0 0 2px;
+    gap: 8px;
+    margin: 0;
+    pointer-events: auto;
   }
 
   .mobile-menu-tile {
-    min-height: 74px;
+    min-height: 58px;
     border: 0;
-    border-radius: 18px;
-    padding: 14px 16px;
+    border-radius: 13px;
+    padding: 0 14px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 13px;
     align-items: center;
     text-align: left;
-    color: var(--text);
-    background: var(--accent);
-    box-shadow: inset 0 0 0 1px rgba(21, 16, 12, .14);
+    color: var(--surface);
+    background: #ffb368;
+    box-shadow: 0 10px 28px rgba(33, 20, 15, .16), inset 0 0 0 1px rgba(21, 16, 12, .08);
   }
 
   .mobile-menu-tile:nth-child(2) {
-    background: var(--accent-light);
+    background: #f47a23;
   }
 
   .mobile-menu-tile:nth-child(3) {
-    background: var(--surface);
-    color: var(--panel);
+    background: var(--accent);
+    color: var(--surface);
   }
 
   .mobile-menu-tile span {
-    font-size: .76rem;
-    text-transform: uppercase;
-    opacity: .78;
+    display: none;
   }
 
   .mobile-menu-tile strong {
     display: block;
-    margin-top: 2px;
-    font-size: 1.28rem;
-    line-height: .95;
+    min-width: 0;
+    font-size: 1.02rem;
+    line-height: 1;
     text-transform: uppercase;
   }
 
   .mobile-menu-tile small {
-    font-family: var(--body-font);
-    font-size: .72rem;
-    opacity: .76;
+    min-width: 24px;
+    font-family: var(--display-font);
+    font-size: .92rem;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    opacity: 1;
   }
 
   .mobile-menu-tile::after {
     content: "↗";
-    font-size: 1.65rem;
+    font-size: 1.55rem;
     font-weight: 900;
     line-height: 1;
   }

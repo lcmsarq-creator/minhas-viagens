@@ -13,6 +13,7 @@
     try { closeTripRoadHighlight(); } catch {}
     try { closeFullHighway(); } catch {}
     openTripDetails(tripId);
+    window.dispatchEvent(new CustomEvent("mv-open-trip-details", { detail: { tripId } }));
   }
 
   function patchTripLines() {

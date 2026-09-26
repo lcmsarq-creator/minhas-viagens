@@ -1591,6 +1591,12 @@ function renderTrips() {
         <input class="trip-toggle" type="checkbox" ${trip.visible !== false ? "checked" : ""} aria-label="Mostrar viagem ${escapeHtml(trip.name || "Viagem")}">
         <button type="button" class="trip-name-btn" title="Abrir detalhes de ${escapeHtml(trip.name || "Viagem")}">${escapeHtml(trip.name || "Viagem")}</button>
       </div>`;
+    const tripMeta = document.createElement("div");
+    tripMeta.className = "trip-compact-meta";
+    const startCity = trip.startPlace?.city || trip.startPlace?.label || trip.startAddress || "Partida não informada";
+    const endCity = trip.endPlace?.city || trip.endPlace?.label || trip.endAddress || "Chegada não informada";
+    tripMeta.textContent = `${startCity}  ·  ${endCity}`;
+    card.appendChild(tripMeta);
 
     const toggle = card.querySelector(".trip-toggle");
     toggle.style.accentColor = routeColor;

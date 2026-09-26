@@ -747,8 +747,87 @@ textarea:focus {
 }
 
 
-/* v0.15.8 - reference-led mobile sheets */
+/* v0.15.10 - mobile UI aligned to the supplied direction PDF */
 @media (max-width: 820px) {
+  .app.mobile-achievements-home .achievement-summary > div { grid-template-columns: 1fr; }
+  .app.mobile-achievements-home .achievement-summary strong { display: none; }
+  .app.mobile-achievements-home .achievement-summary::after { content: none; display: none; }
+
+  .app.mobile-panel-detail .sidebar {
+    background: rgba(242, 227, 209, .98);
+    border-color: rgba(200, 73, 21, .2);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -12px 32px rgba(33, 20, 15, .2);
+  }
+
+  .app.mobile-panel-detail #tripsPanel .panel-header {
+    margin: 2px 0 10px;
+    padding: 0 2px 8px;
+    border-bottom: 1px solid rgba(33, 20, 15, .18);
+  }
+
+  .app.mobile-panel-detail #tripsPanel .panel-header h2 {
+    font-size: clamp(1.15rem, 5.8vw, 1.6rem);
+    line-height: 1;
+  }
+
+  .app.mobile-panel-detail #tripsPanel .badge {
+    min-width: 32px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--accent);
+    font-family: var(--display-font);
+    font-size: .9rem;
+  }
+
+  .app.mobile-panel-detail #tripList {
+    display: grid;
+    gap: 0;
+  }
+
+  .app.mobile-panel-detail #tripList .trip-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 64px;
+    padding: 7px 2px 8px;
+    border: 0;
+    border-bottom: 1px solid rgba(33, 20, 15, .22);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .app.mobile-panel-detail #tripList .trip-compact-row {
+    min-height: 30px;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    padding: 0;
+  }
+
+  .app.mobile-panel-detail #tripList .trip-toggle { grid-column: 2; grid-row: 1; }
+  .app.mobile-panel-detail #tripList .trip-name-btn {
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
+    min-height: 30px;
+    padding: 0;
+    font-size: .93rem;
+    text-align: left;
+    text-transform: none;
+  }
+
+  .trip-compact-meta {
+    overflow: hidden;
+    padding: 1px 0 0;
+    color: var(--muted);
+    font-size: .65rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-city-toggle { background: var(--panel); }
+  .app.mobile-achievements-screen .achievement-list.state-achievement-grid { padding-bottom: 8px; }
+
   .mobile-map-size-btn {
     position: fixed;
     left: 12px;
@@ -885,15 +964,7 @@ textarea:focus {
     text-transform: uppercase;
   }
 
-  .app.mobile-achievements-home .achievement-summary::after {
-    content: "Contagens ilustrativas";
-    margin-top: -1px;
-    color: rgba(33, 20, 15, .64);
-    font-family: var(--display-font);
-    font-size: .54rem;
-    font-weight: 850;
-    text-transform: uppercase;
-  }
+  .app.mobile-achievements-home .achievement-summary::after { content: none; }
 
   .app.mobile-achievements-screen #achievementsPanel { display: block; }
   .app.mobile-achievements-screen .achievement-summary { display: none; }

@@ -299,7 +299,16 @@
         if (!isStateDetail) {
           const toggleWrap = document.createElement("div");
           toggleWrap.className = "mobile-city-toggle";
-          toggleWrap.innerHTML = '<button type="button" class="active">Destinos</button><button type="button">Cruzadas</button>';
+          toggleWrap.innerHTML = '<button type="button">Destinos</button><button type="button">Cruzadas</button>';
+          const nativeModes = document.querySelectorAll('#cityAchievementsView [data-city-mode]');
+          const activeIndex = [...nativeModes].findIndex(item => item.classList.contains("active"));
+          toggleWrap.querySelectorAll("button").forEach((button, index) => {
+            button.classList.toggle("active", index === (activeIndex < 0 ? 0 : activeIndex));
+            button.addEventListener("click", () => {
+              toggleWrap.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === button));
+              nativeModes[index]?.click();
+            });
+          });
           cityHeader.appendChild(toggleWrap);
         }
         const kicker = document.createElement("div");
@@ -325,6 +334,11 @@
 
     document.getElementById("tripList")?.addEventListener("click", event => {
       if (event.target.closest(".trip-name-btn")) setMode("detail");
+    });
+
+    window.addEventListener("mv-open-trip-details", () => {
+      setMode("detail");
+      openSheet();
     });
 
     const observer = new MutationObserver(updateCounts);

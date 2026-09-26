@@ -286,7 +286,7 @@
         const flag=group.flagUrl?`<img src="${escapeAttr(group.flagUrl)}" alt="Bandeira de ${escapeAttr(group.name)}" loading="lazy"><span class="state-achievement-icon-fallback hidden">${escapeAttr(group.code||group.uf)}</span>`:`<span class="state-achievement-icon-fallback">${escapeAttr(group.code||group.uf)}</span>`;
         card.innerHTML=`<span class="state-achievement-icon">${flag}</span><strong>${escapeAttr(group.name)}</strong><small>${group.cities.length} ${group.cities.length===1?"cidade":"cidades"}</small>`;
         card.querySelector("img")?.addEventListener("error",()=>{card.querySelector("img")?.classList.add("hidden");card.querySelector(".state-achievement-icon-fallback")?.classList.remove("hidden");});
-        card.addEventListener("click",()=>{state.achievementStateKey=group.key;renderAchievements();});
+        card.addEventListener("click",()=>{state.achievementStateKey=group.key;focusAchievementGroup(group);renderAchievements();});
         els.cityAchievementList.appendChild(card);
       });
     }

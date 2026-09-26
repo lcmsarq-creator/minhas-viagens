@@ -13,6 +13,9 @@
     const app = document.getElementById("application");
     const toggle = document.getElementById("mobileSheetToggle");
     const fab = document.querySelector(".mobile-sheet-fab");
+    const profileBtn = document.getElementById("mobileProfileBtn");
+    const profileAvatar = document.getElementById("mobileProfileAvatar");
+    const accountEmail = document.getElementById("accountEmail");
     const tripsTab = document.getElementById("tripsTabBtn");
     const achievementsTab = document.getElementById("achievementsTabBtn");
     const newTrip = document.getElementById("newTripBtn");
@@ -58,6 +61,30 @@
       }
     }
 
+    function initialsFromEmail(value) {
+      const text = String(value || "").trim();
+      if (!text) return "MV";
+      const local = text.split("@")[0].replace(/[._-]+/g, " ").trim();
+      const parts = local.split(/\s+/).filter(Boolean);
+      if (!parts.length) return text.slice(0, 2).toUpperCase();
+      return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
+    }
+
+    function syncProfileAvatar() {
+      if (!profileAvatar) return;
+      const user = window.MinhasViagensAuth?.getUser?.();
+      const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+      if (avatarUrl) {
+        profileAvatar.textContent = "";
+        profileAvatar.classList.add("has-image");
+        profileAvatar.style.backgroundImage = `url("${avatarUrl}")`;
+        return;
+      }
+      profileAvatar.classList.remove("has-image");
+      profileAvatar.style.backgroundImage = "";
+      profileAvatar.textContent = initialsFromEmail(accountEmail?.textContent || user?.email || "");
+    }
+
     function openTrips() {
       tripsTab?.click();
       setMode("detail");
@@ -88,10 +115,16 @@
     setMode("home");
     syncFabLabel();
     updateCounts();
+    syncProfileAvatar();
 
     toggle.addEventListener("change", () => {
       syncFabLabel();
       if (toggle.checked && !app.classList.contains("mobile-panel-detail")) setMode("home");
+    });
+
+    profileBtn?.addEventListener("click", () => {
+      setMode("home");
+      openSheet();
     });
 
     fab?.addEventListener("click", event => {
@@ -125,5 +158,10 @@
     [tripCount, cityCount, roadCount, iconicCount].forEach(node => {
       if (node) observer.observe(node, { childList: true, characterData: true, subtree: true });
     });
+
+    if (accountEmail) {
+      new MutationObserver(syncProfileAvatar).observe(accountEmail, { childList: true, characterData: true, subtree: true });
+    }
+    window.addEventListener("mv-auth-ready", syncProfileAvatar);
   });
 })();

@@ -148,6 +148,8 @@
       newTrip?.click();
     }
 
+    let enhancingAchievements = false;
+
     function updateCounts() {
       if (mobileTripCount && tripCount) mobileTripCount.textContent = tripCount.textContent.trim() || "0";
       enhanceAchievementScreens();
@@ -237,8 +239,6 @@
       setAchievementsHome(true);
     });
     newTrip?.addEventListener("click", closeSheet);
-
-    let enhancingAchievements = false;
 
     function activateAchievementScreen(kind) {
       const tab = kind === "roads" ? document.getElementById("roadAchievementsTabBtn")

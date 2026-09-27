@@ -38,7 +38,7 @@ function loadModule() {
   };
   context.window = context;
   context.globalThis = context;
-  context.MINHAS_VIAGENS_APP_VERSION = "0.15.10";
+  context.MINHAS_VIAGENS_APP_VERSION = "0.15.11";
   context.MINHAS_VIAGENS_CITY_SCANNER_GENERATION = "v0147";
   context.MinhasViagensCrossingDetection = core;
   context.MinhasViagensSync = {schedule:delay=>syncDelays.push(delay)};
@@ -104,7 +104,7 @@ test("resultados de um lote podem ser persistidos com uma única gravação", ()
   assert.equal(stats().renders,1);
 });
 
-test("loader seleciona v0.15.10 depois das camadas anteriores", () => {
+test("loader seleciona v0.15.11 depois das camadas anteriores", () => {
   const auth = fs.readFileSync("auth.js","utf8");
   assert.match(auth,/MINHAS_VIAGENS_CITY_SCANNER_GENERATION="v0147"/);
   const v146 = auth.indexOf('"v0146-crossed-cities-runtime.js"');

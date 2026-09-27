@@ -1294,6 +1294,99 @@ function newConquestsAgainstSnapshot(trip, snapshot) {
   return items;
 }
 
+function roadExportCityDistanceKm(a, b) {
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(Number(b[0]) - Number(a[0]));
+  const dLng = toRad(Number(b[1]) - Number(a[1]));
+  const lat1 = toRad(Number(a[0])), lat2 = toRad(Number(b[0]));
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 6371.0088 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+}
+
+function nearestRoadExportCity(point, cities) {
+  let closest = null;
+  for (const city of cities) {
+    const lat = Number(city.lat), lng = Number(city.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const distance = roadExportCityDistanceKm(point, [lat, lng]);
+    if (!closest || distance < closest.distance) closest = { city, distance };
+  }
+  return closest && closest.distance <= 35 ? (closest.city.city || closest.city.label || "") : "";
+}
+
+function longestRoadExportSegment(segments) {
+  let longest = null, longestKm = 0;
+  for (const line of segments || []) {
+    const length = lineLengthKm(line);
+    if (length > longestKm) { longest = line; longestKm = length; }
+  }
+  return longest;
+}
+
+async function exportRoadProgressExcel() {
+  const button = document.getElementById("exportRoadProgressBtn");
+  const status = document.getElementById("roadExportStatus");
+  const exporter = window.MinhasViagensRoadExport;
+  if (!button || !exporter) return;
+  const roads = [...getAchievementSnapshot().roads.values()].sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
+  if (!roads.length) {
+    status.textContent = "Cadastre uma viagem de carro ou moto com rodovias para exportar.";
+    return;
+  }
+
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Preparando…";
+  const cities = [...getAchievementSnapshot().cities.values()];
+  const rows = [];
+  let failed = 0;
+  try {
+    for (let index = 0; index < roads.length; index++) {
+      const item = roads[index];
+      status.textContent = `Calculando rodovia ${index + 1} de ${roads.length}: ${roadDisplayLabel(item.label)}…`;
+      button.textContent = `${index + 1}/${roads.length}`;
+      const descriptor = overpassRoadDescriptor(item);
+      try {
+        let entry = await cachedHighway(descriptor, true);
+        if (!entry?.lines?.length || entry.partial || entry.needsNetworkRefresh) {
+          entry = await fetchFullHighway(descriptor, null);
+        }
+        const progress = await highwayProgress(descriptor, entry);
+        const segment = longestRoadExportSegment(progress.segments);
+        rows.push({
+          road: roadDisplayLabel(item.label),
+          traveledKm: Number(progress.traveledKm) || 0,
+          totalKm: Number(progress.totalKm) || 0,
+          percent: Number(progress.percent) || 0,
+          startCity: segment?.length ? nearestRoadExportCity(segment[0], cities) : "",
+          endCity: segment?.length ? nearestRoadExportCity(segment[segment.length - 1], cities) : ""
+        });
+      } catch (error) {
+        console.warn(`Não foi possível calcular ${item.label} para a exportação`, error);
+        failed++;
+        rows.push({ road: roadDisplayLabel(item.label), traveledKm: "", totalKm: "", percent: "", startCity: "", endCity: "" });
+      }
+    }
+    const bytes = exporter.createWorkbook(rows);
+    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `progresso-rodovias-${date}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    status.textContent = failed
+      ? `Excel exportado. ${failed} rodovia(s) ficaram sem geometria disponível para cálculo.`
+      : `Excel exportado com ${rows.length} rodovia(s).`;
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
 function renderAchievements() {
   const snapshot = getAchievementSnapshot();
   const cityItems = [...snapshot.cities.values()];
@@ -3379,6 +3472,7 @@ els.roadAchievementsTabBtn.addEventListener("click", () => {
   state.achievementView = "roads";
   renderAchievements();
 });
+document.getElementById("exportRoadProgressBtn")?.addEventListener("click", exportRoadProgressExcel);
 els.iconicAchievementsTabBtn?.addEventListener("click", () => {
   state.achievementView = "iconic";
   renderAchievements();

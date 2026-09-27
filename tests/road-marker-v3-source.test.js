@@ -13,10 +13,10 @@ test("road marker v6 força reconstrução e mantém países de trânsito", () =
   assert.match(source, /extractRoadSegmentsFromRoute/);
 });
 
-test("loader publica v0.15.10", () => {
+test("loader publica v0.15.11", () => {
   const auth = fs.readFileSync("auth.js", "utf8");
   const index = fs.readFileSync("index.html", "utf8");
-  assert.match(auth, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.15\.10"/);
-  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.15\.10"/);
-  assert.match(index, /auth\.js\?v=0\.15\.10/);
+  assert.match(auth, /APP_VERSION=window\.MINHAS_VIAGENS_APP_VERSION\|\|"0\.15\.11"/);
+  assert.match(index, /MINHAS_VIAGENS_APP_VERSION = "0\.15\.11"/);
+  assert.match(index, /auth\.js\?v=0\.15\.11/);
 });

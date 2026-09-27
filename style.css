@@ -75,6 +75,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .achievement-tab.active { background: white; color: var(--text); box-shadow: 0 1px 4px rgba(20,30,25,.08); }
 .achievement-section { margin-top: 16px; }
 .achievement-section h2 { margin-bottom: 8px; }
+.road-achievements-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.road-achievements-heading h2 { margin: 0; }
+.road-achievements-heading .secondary-btn { flex: 0 0 auto; }
 .achievement-browser-header { margin-bottom: 9px; }
 .achievement-browser-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .achievement-browser-title h2 { margin: 0; }

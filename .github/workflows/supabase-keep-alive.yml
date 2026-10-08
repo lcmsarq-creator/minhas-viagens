@@ -4,10 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "23 9 * * *"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/supabase-keep-alive.yml"
 
 permissions:
   contents: read
@@ -19,12 +15,12 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - name: Baixar o projeto
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Consultar banco do Supabase
+      - name: Gerar atividade suficiente no Supabase
         shell: bash
         run: |
           set -euo pipefail
@@ -37,16 +33,13 @@ jobs:
             exit 1
           fi
 
-          RESPONSE="$(curl \
-            --fail-with-body \
-            --silent \
-            --show-error \
-            --retry 3 \
-            --retry-delay 10 \
-            --request POST \
-            --header "apikey: $SUPABASE_KEY" \
-            --header "Content-Type: application/json" \
-            --data '{}' \
-            "$SUPABASE_URL/rest/v1/rpc/keep_alive")"
+          for PING in 1 2 3 4 5 6; do
+            echo "Keep-alive $PING/6"
+            RESPONSE="$(curl               --fail-with-body               --silent               --show-error               --retry 2               --retry-all-errors               --retry-delay 5               --request POST               --header "apikey: $SUPABASE_KEY"               --header "Content-Type: application/json"               --header "User-Agent: minhas-viagens-keep-alive/1.1"               --data '{}'               "$SUPABASE_URL/rest/v1/rpc/keep_alive")"
+            echo "Resposta: $RESPONSE"
+            if [[ "$PING" -lt 6 ]]; then
+              sleep 8
+            fi
+          done
 
-          echo "Keep-alive concluído: $RESPONSE"
+          echo "Keep-alive diário concluído com 6 consultas ao banco."

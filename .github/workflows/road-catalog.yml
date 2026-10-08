@@ -24,12 +24,12 @@ jobs:
     timeout-minutes: 240
     steps:
       - name: Baixar o projeto
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Preparar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -42,32 +42,41 @@ jobs:
           python -m pip install --requirement scripts/requirements-road-catalog.txt
 
       - name: Baixar dados atuais do Brasil
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p .road-catalog-work
-          curl --fail --location --retry 5 --retry-delay 10 \
-            --output .road-catalog-work/brazil-latest.osm.pbf \
-            https://download.geofabrik.de/south-america/brazil-latest.osm.pbf
-          curl --fail --location --retry 5 --retry-delay 10 \
-            --output .road-catalog-work/brazil.osm.pbf.md5 \
-            https://download.geofabrik.de/south-america/brazil-latest.osm.pbf.md5
-          cd .road-catalog-work
-          md5sum --check brazil.osm.pbf.md5
+
+          INDEX_HTML="$(curl             --fail             --silent             --show-error             --location             --retry 5             --retry-all-errors             --retry-delay 10             https://download.geofabrik.de/south-america/brazil.html)"
+
+          PBF_NAME="$(printf '%s' "$INDEX_HTML"             | grep -oE 'brazil-[0-9]{6}\.osm\.pbf'             | sort -u             | tail -n 1)"
+
+          if [[ -z "$PBF_NAME" ]]; then
+            echo "Não foi possível identificar o extrato mais recente do Brasil na Geofabrik."
+            exit 1
+          fi
+
+          echo "Extrato selecionado: $PBF_NAME"
+
+          curl             --fail             --location             --retry 5             --retry-all-errors             --retry-delay 10             --output ".road-catalog-work/$PBF_NAME"             "https://download.geofabrik.de/south-america/$PBF_NAME"
+
+          curl             --fail             --location             --retry 5             --retry-all-errors             --retry-delay 10             --output ".road-catalog-work/$PBF_NAME.md5"             "https://download.geofabrik.de/south-america/$PBF_NAME.md5"
+
+          (
+            cd .road-catalog-work
+            md5sum --check "$PBF_NAME.md5"
+            mv "$PBF_NAME" brazil-latest.osm.pbf
+          )
 
       - name: Reduzir aos dados rodoviários
         run: |
-          osmium tags-filter .road-catalog-work/brazil-latest.osm.pbf \
-            r/route=road w/highway \
-            --output .road-catalog-work/brazil-roads.osm.pbf \
-            --overwrite
+          osmium tags-filter .road-catalog-work/brazil-latest.osm.pbf             r/route=road w/highway             --output .road-catalog-work/brazil-roads.osm.pbf             --overwrite
 
       - name: Gerar catálogo compacto
         run: |
           rm -rf road-catalog/v1
           SOURCE_DATE="$(date -u +%Y-%m-%d)"
-          python scripts/build_road_catalog.py \
-            --input .road-catalog-work/brazil-roads.osm.pbf \
-            --output road-catalog/v1 \
-            --source-date "$SOURCE_DATE"
+          python scripts/build_road_catalog.py             --input .road-catalog-work/brazil-roads.osm.pbf             --output road-catalog/v1             --source-date "$SOURCE_DATE"
 
       - name: Validar catálogo
         run: |

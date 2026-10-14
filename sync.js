@@ -278,6 +278,7 @@
     const client = auth.getClient();
     const userId = session.user.id;
     const keys = userStorageKeys(userId);
+    const localMode = win.document.documentElement.dataset.mvLocalMode === "true" || !client;
     const tombstoneKey = keys.tombstones;
     const migrationKey = keys.migration;
     const syncStateKey = keys.syncState;
@@ -525,6 +526,19 @@
         }
       };
       dialog.showModal();
+    }
+
+    if (localMode) {
+      setStatus("Modo local · sincronização indisponível", "offline");
+      win.MinhasViagensSync = {
+        schedule: () => setStatus("Modo local · sincronização indisponível", "offline"),
+        syncNow: async () => setStatus("Modo local · sincronização indisponível", "offline"),
+        recordDeletion,
+        serializeTripForCloud,
+        stats
+      };
+      win.document.getElementById("syncNowBtn")?.addEventListener("click", () => setStatus("Modo local · sincronização indisponível", "offline"));
+      return { get initialized() { return false; }, localMode: true };
     }
 
     win.MinhasViagensSync = { schedule, syncNow, recordDeletion, serializeTripForCloud, stats };

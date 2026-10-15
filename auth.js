@@ -19,7 +19,7 @@
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.19";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.21";
   const APP_URL = "https://lcmsarq-creator.github.io/minhas-viagens/";
 
   let client = null;

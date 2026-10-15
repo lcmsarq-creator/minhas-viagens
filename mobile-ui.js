@@ -115,10 +115,18 @@
       syncProfileButtonVisibility();
     }
 
-    function toggleMapSize() {
+    function toggleMapSize(event) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const sidebar = document.querySelector(".sidebar");
+      const scrollTop = sidebar?.scrollTop || 0;
       app.classList.toggle("mobile-map-expanded");
       syncMapSizeButton();
       window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new CustomEvent("mv-mobile-layout-change"));
+      requestAnimationFrame(() => {
+        if (sidebar) sidebar.scrollTop = scrollTop;
+      });
     }
 
     function setAchievementsHome(active) {

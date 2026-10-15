@@ -1263,3 +1263,40 @@ textarea:focus {
     transform: none !important;
   }
 }
+
+
+/* v0.15.26 - single mobile back control and working trip menu */
+@media (max-width: 820px) {
+  /* Há sempre apenas um controle de retorno: o botão global no topo da caixa. */
+  .app.mobile-panel-detail #backToTripsBtn,
+  .app.mobile-panel-detail .achievement-back-btn,
+  .app.mobile-panel-detail .mobile-city-back {
+    display: none !important;
+  }
+
+  .app.mobile-panel-detail .mobile-city-screen-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-left: 0;
+  }
+
+  /* O seletor Destinos/Cruzadas nativo é o único exibido. */
+  .app.mobile-panel-detail .mobile-city-toggle {
+    display: none !important;
+  }
+
+  /* Em detalhes de viagem o FAB volta a ser menu, não botão de retornar. */
+  body.mv-trip-detail-active .mobile-sheet-fab {
+    display: grid !important;
+  }
+
+  .mobile-sheet-fab[data-mobile-state="detail"] .mobile-sheet-fab-icon::before {
+    content: "☰";
+    font-size: 1.65rem;
+    transform: none;
+  }
+
+  body.mv-trip-detail-active .mobile-sheet-fab[data-mobile-state="detail"] {
+    background: var(--surface);
+    color: var(--accent-light);
+  }
+}

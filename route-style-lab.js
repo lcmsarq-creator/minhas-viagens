@@ -8,7 +8,7 @@
 
   const VERSION = 1;
   const DEFAULTS = Object.freeze({
-    common: Object.freeze({ h: 152, s: 29, l: 31, width: 5 }),
+    common: Object.freeze({ h: 25, s: 91, l: 55, width: 2.5 }),
     gold: Object.freeze({ h: 43, s: 75, l: 48, width: 6 }),
     silver: Object.freeze({ h: 204, s: 8, l: 71, width: 5 })
   });

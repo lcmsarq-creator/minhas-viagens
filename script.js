@@ -67,6 +67,7 @@ const state = {
   activeTripDetailId: null,
   tripLineLayers: new Map(),
   tripDensityLayers: [],
+  tripTrafficHaloLayers: [],
   editingPlacesTripId: null,
   editStartPlace: null,
   editEndPlace: null,
@@ -1099,7 +1100,9 @@ async function highwayProgress(descriptor, entry) {
 }
 
 function setTripsSecondary(secondary) {
-  state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .22 : .9 }));
+  state.tripLineLayers.forEach(line => line.setStyle({ opacity: secondary ? .22 : .72 }));
+  state.tripDensityLayers.forEach(line => line?.setStyle?.({ opacity: secondary ? .03 : .115 }));
+  state.tripTrafficHaloLayers.forEach(line => line?.setStyle?.({ opacity: secondary ? .006 : .025 }));
 }
 
 function refreshRouteStyles() {
@@ -1110,6 +1113,11 @@ function refreshRouteStyles() {
     color: commonStyle.color,
     weight: commonStyle.width,
     opacity: .115
+  }));
+  state.tripTrafficHaloLayers.forEach(line => line?.setStyle?.({
+    color: commonStyle.color,
+    weight: window.matchMedia?.("(max-width: 820px)")?.matches ? 18 : 14,
+    opacity: .025
   }));
   state.tripLineLayers.forEach((line, tripId) => {
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === tripId;
@@ -1760,6 +1768,7 @@ function renderTrips() {
   pointLayers.clearLayers();
   state.tripLineLayers.clear();
   state.tripDensityLayers = [];
+  state.tripTrafficHaloLayers = [];
   state.roadMapMarkers = [];
   els.tripList.innerHTML = "";
   els.tripCount.textContent = String(state.trips.length);
@@ -1818,6 +1827,14 @@ function renderTrips() {
       // Onde várias viagens coincidem, o contorno se torna mais escuro e parece
       // progressivamente mais grosso, mas nunca ultrapassa a espessura normal atual.
       if (!state.newTripFocusMode && !hasFocusedTrip && trip.mode !== "aviao") {
+        const trafficHalo = L.polyline(latlngs, {
+          color: commonStyle.color,
+          weight: window.matchMedia?.("(max-width: 820px)")?.matches ? 18 : 14,
+          opacity: .025,
+          interactive: false,
+          lineCap: "round",
+          lineJoin: "round"
+        });
         const densityLine = L.polyline(latlngs, {
           color: commonStyle.color,
           weight: commonStyle.width,
@@ -1826,7 +1843,9 @@ function renderTrips() {
           lineCap: "round",
           lineJoin: "round"
         });
+        tripLayers.addLayer(trafficHalo);
         tripLayers.addLayer(densityLine);
+        state.tripTrafficHaloLayers.push(trafficHalo);
         state.tripDensityLayers.push(densityLine);
       }
 

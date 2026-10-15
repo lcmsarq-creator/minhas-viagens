@@ -10,7 +10,7 @@
 
   const EXCLUDED_KEYS = new Set([
     "roadSegments", "matchingRoadSegments", "highwayCache", "highwayProgress",
-    "overpassCache", "media", "photos", "videos", "photoBytes", "videoBytes"
+    "overpassCache", "media", "photos", "videos", "photoBytes", "videoBytes", "visible"
   ]);
   const LEGACY_KEYS = [
     "minhasViagens.v0.6.7", "minhasViagens.v0.6.6", "minhasViagens.v0.6.5",

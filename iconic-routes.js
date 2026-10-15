@@ -4,7 +4,7 @@
   const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.9";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
-    common: { color: "#2f6d50", width: 2.5 },
+    common: { color: "#f47a23", width: 2.5 },
     gold: { color: "#d6a21f", width: 2.5 },
     silver: { color: "#aeb5ba", width: 2.25 }
   };

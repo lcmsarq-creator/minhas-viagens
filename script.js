@@ -12,6 +12,7 @@ const AIRPORTS_CSV_URLS = [
   "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
 ];
 const DEFAULT_ROUTE_COLOR = "#2f6d50";
+const NEW_TRIP_BACKGROUND_COLOR = "#4a4a4a";
 const ROUTE_INTERACTION = window.MinhasViagensRouteInteraction;
 const ROUTE_STYLE = window.MinhasViagensRouteStyleLab;
 const OVERPASS_ENDPOINTS = [
@@ -39,6 +40,7 @@ const state = {
   routeAlternatives: [],
   selectedRouteIndex: null,
   previewLayers: [],
+  newTripFocusMode: false,
   drawing: false,
   draft: null,
   draftPoints: [],
@@ -1101,21 +1103,38 @@ function refreshRouteStyles() {
   const hasFocusedTrip = Boolean(state.activeTripDetailId);
   state.tripLineLayers.forEach((line, tripId) => {
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === tripId;
-    line.setStyle({
+    line.setStyle(state.newTripFocusMode ? {
+      color: NEW_TRIP_BACKGROUND_COLOR,
+      weight: Math.max(1.25, Math.min(1.8, commonStyle.width * .38)),
+      opacity: .56
+    } : {
       color: commonStyle.color,
-      weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width
+      weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width,
+      opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9
     });
   });
   els.tripList?.querySelectorAll(".trip-toggle").forEach(toggle => { toggle.style.accentColor = commonStyle.color; });
   state.previewLayers.forEach((line, index) => line?.setStyle?.({
-    color: index === state.selectedRouteIndex ? commonStyle.color : "#7a827d",
-    weight: index === state.selectedRouteIndex ? commonStyle.width + 2 : Math.max(2, commonStyle.width - 1)
+    color: index === state.selectedRouteIndex ? commonStyle.color : NEW_TRIP_BACKGROUND_COLOR,
+    weight: index === state.selectedRouteIndex ? Math.max(5, commonStyle.width + 2) : 2,
+    opacity: index === state.selectedRouteIndex ? .98 : .45
   }));
-  state.draftLine?.setStyle?.({ color: commonStyle.color, weight: commonStyle.width });
+  state.draftLine?.setStyle?.({ color: commonStyle.color, weight: Math.max(5, commonStyle.width + 1), opacity: .95 });
   state.editVisibleLine?.setStyle?.({ color: commonStyle.color, weight: commonStyle.width + 1 });
   state.editHitLine?.setStyle?.({ weight: Math.max(28, commonStyle.width + 18) });
   document.querySelectorAll(".route-adjust-marker").forEach(marker => marker.style.setProperty("--route-color", commonStyle.color));
   state.tripRoadLayer?.eachLayer?.(layer => layer.setStyle?.({ color: commonStyle.color, weight: commonStyle.width }));
+}
+
+function setNewTripFocusMode(active) {
+  const next = Boolean(active);
+  if (state.newTripFocusMode === next) {
+    refreshRouteStyles();
+    return;
+  }
+  state.newTripFocusMode = next;
+  renderTrips();
+  refreshRouteStyles();
 }
 
 function fitHighwayBounds() {
@@ -1678,7 +1697,10 @@ function renderTrips() {
     const startAddress = trip.startPlace?.label || trip.startAddress || "Partida não informada";
     const endAddress = trip.endPlace?.label || trip.endAddress || "Chegada não informada";
     const commonStyle = currentRouteStyle("common");
-    const routeColor = commonStyle.color;
+    const routeColor = state.newTripFocusMode ? NEW_TRIP_BACKGROUND_COLOR : commonStyle.color;
+    const routeWeight = state.newTripFocusMode
+      ? Math.max(1.25, Math.min(1.8, commonStyle.width * .38))
+      : commonStyle.width;
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === trip.id;
 
     const card = document.createElement("article");
@@ -1706,12 +1728,14 @@ function renderTrips() {
     els.tripList.appendChild(card);
 
     if (trip.visible !== false && latlngs.length >= 2 && state.editingTripId !== trip.id) {
-      const routeIsInteractive = !hasFocusedTrip || isFocused;
+      const routeIsInteractive = !state.newTripFocusMode && (!hasFocusedTrip || isFocused);
       const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("trip-route-hit", 24, routeIsInteractive));
       const line = L.polyline(latlngs, {
         color: routeColor,
-        weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width,
-        opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9,
+        weight: state.newTripFocusMode
+          ? routeWeight
+          : (hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : routeWeight),
+        opacity: state.newTripFocusMode ? .56 : (hasFocusedTrip ? (isFocused ? .98 : .22) : .9),
         dashArray: trip.mode === "aviao" ? "12 10" : null,
         interactive: routeIsInteractive
       });
@@ -1738,7 +1762,7 @@ function renderTrips() {
         line.bringToFront();
       }
 
-      const endpointOpacity = hasFocusedTrip && !isFocused ? .25 : 1;
+      const endpointOpacity = state.newTripFocusMode ? .18 : (hasFocusedTrip && !isFocused ? .25 : 1);
       tripLayers.addLayer(L.circleMarker(latlngs[0], {
         radius: hasFocusedTrip && isFocused ? 7 : 6,
         weight: 2,
@@ -1757,7 +1781,7 @@ function renderTrips() {
       }));
 
       // Quando uma viagem está selecionada, apenas as placas dela permanecem no mapa.
-      if ((!hasFocusedTrip || isFocused) && trip.mode !== "aviao") {
+      if (!state.newTripFocusMode && (!hasFocusedTrip || isFocused) && trip.mode !== "aviao") {
         for (const badge of trip.roadLabels || []) {
           if (!Number.isFinite(Number(badge.lat)) || !Number.isFinite(Number(badge.lng))) continue;
           tripLayers.addLayer(L.marker([badge.lat, badge.lng], {
@@ -1765,7 +1789,7 @@ function renderTrips() {
             icon: roadMapIcon(badge.label)
           }));
         }
-      } else if ((!hasFocusedTrip || isFocused) && trip.mode === "aviao" && trip.flightAirports?.length) {
+      } else if (!state.newTripFocusMode && (!hasFocusedTrip || isFocused) && trip.mode === "aviao" && trip.flightAirports?.length) {
         for (const airport of trip.flightAirports) {
           const marker = L.marker([airport.lat, airport.lng], {
             icon: L.divIcon({ className: "", html: '<div class="flight-airport-marker">✈</div>', iconSize: [24,24], iconAnchor: [12,12] })
@@ -1777,7 +1801,7 @@ function renderTrips() {
     }
 
     // Ao destacar uma viagem, também escondemos os pontos das demais para reduzir ruído visual.
-    if (trip.visible !== false && (!hasFocusedTrip || isFocused)) {
+    if (!state.newTripFocusMode && trip.visible !== false && (!hasFocusedTrip || isFocused)) {
       for (const point of trip.pointsOfInterest) {
         const marker = L.marker([point.lat, point.lng], {
           icon: L.divIcon({ className: "", html: '<div class="route-poi-marker"></div>', iconSize: [24, 24], iconAnchor: [12, 12] })
@@ -2699,6 +2723,7 @@ function showRouteChooser() {
   els.routeChooserTitle.textContent = "Escolha a rota percorrida";
   els.manualRouteBtn.classList.remove("hidden");
   els.saveSelectedRouteBtn.textContent = "Salvar rota escolhida";
+  setNewTripFocusMode(true);
   renderRouteAlternatives();
   els.routeChooserEndpoints.textContent = [state.pendingTrip.startPlace, ...(state.pendingTrip.stopPlaces || []), state.pendingTrip.endPlace]
     .map(place => place?.label || place?.city)
@@ -2733,9 +2758,9 @@ function renderRouteAlternatives() {
     const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("route-option-hit", 24)).addTo(previewGroup);
     const line = L.polyline(latlngs, {
-      color: selected ? commonStyle.color : "#7a827d",
-      weight: selected ? commonStyle.width + 2 : Math.max(2, commonStyle.width - 1),
-      opacity: selected ? .95 : .55
+      color: selected ? commonStyle.color : NEW_TRIP_BACKGROUND_COLOR,
+      weight: selected ? Math.max(5, commonStyle.width + 2) : 2,
+      opacity: selected ? .98 : .45
     }).addTo(previewGroup);
     line._routeHitLine = hitLine;
     hitLine.on("click", () => selectRoute(index));
@@ -2809,6 +2834,7 @@ function cleanupRouteChooser() {
   state.selectedRouteIndex = null;
   state.pendingTrip = null;
   els.routeChooser.classList.add("hidden");
+  setNewTripFocusMode(false);
 }
 
 function beginManualFromForm() {
@@ -2828,6 +2854,7 @@ function beginManualFromChooser() {
 function beginManualDrawing(trip) {
   state.draft = trip;
   state.drawing = true;
+  setNewTripFocusMode(true);
   state.draftManualHistory = [];
   const fixedPlaces = [trip.startPlace, ...(trip.stopPlaces || []), trip.endPlace].filter(Boolean);
   state.draftPoints = fixedPlaces.map((place, index) => ({
@@ -2974,6 +3001,7 @@ function stopDrawing() {
   state.draftPoints = [];
   state.draft = null;
   state.drawing = false;
+  setNewTripFocusMode(false);
   els.drawBanner.classList.add("hidden");
   map.getContainer().style.cursor = "";
 }

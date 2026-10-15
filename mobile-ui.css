@@ -1187,3 +1187,22 @@ textarea:focus {
     transform: translateY(3px);
   }
 }
+
+
+/* v0.15.23 — ao focar uma rodovia, manter o cartão de progresso visível */
+@media (max-width: 820px) {
+  .app.highway-focus .mobile-profile-fab {
+    display: none !important;
+  }
+
+  .app.highway-focus .highway-banner:not(.hidden) {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto;
+  }
+
+  .app.highway-focus .highway-progress:not(.hidden) {
+    display: grid !important;
+  }
+}

@@ -66,6 +66,7 @@ const state = {
   achievementStateKey: null,
   activeTripDetailId: null,
   tripLineLayers: new Map(),
+  tripDensityLayers: [],
   editingPlacesTripId: null,
   editStartPlace: null,
   editEndPlace: null,
@@ -1102,6 +1103,12 @@ function setTripsSecondary(secondary) {
 function refreshRouteStyles() {
   const commonStyle = currentRouteStyle("common");
   const hasFocusedTrip = Boolean(state.activeTripDetailId);
+  const baseTrafficWeight = Math.max(1.15, commonStyle.width * .56);
+  state.tripDensityLayers.forEach(line => line?.setStyle?.({
+    color: commonStyle.color,
+    weight: commonStyle.width,
+    opacity: .115
+  }));
   state.tripLineLayers.forEach((line, tripId) => {
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === tripId;
     line.setStyle(state.newTripFocusMode ? {
@@ -1110,8 +1117,10 @@ function refreshRouteStyles() {
       opacity: .56
     } : {
       color: commonStyle.color,
-      weight: hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : commonStyle.width,
-      opacity: hasFocusedTrip ? (isFocused ? .98 : .22) : .9
+      weight: hasFocusedTrip
+        ? (isFocused ? commonStyle.width : Math.max(1, baseTrafficWeight * .72))
+        : baseTrafficWeight,
+      opacity: hasFocusedTrip ? (isFocused ? .98 : .20) : .72
     });
   });
   els.tripList?.querySelectorAll(".trip-toggle").forEach(toggle => { toggle.style.accentColor = commonStyle.color; });
@@ -1747,6 +1756,7 @@ function renderTrips() {
   tripLayers.clearLayers();
   pointLayers.clearLayers();
   state.tripLineLayers.clear();
+  state.tripDensityLayers = [];
   state.roadMapMarkers = [];
   els.tripList.innerHTML = "";
   els.tripCount.textContent = String(state.trips.length);
@@ -1771,7 +1781,7 @@ function renderTrips() {
     const routeColor = state.newTripFocusMode ? NEW_TRIP_BACKGROUND_COLOR : commonStyle.color;
     const routeWeight = state.newTripFocusMode
       ? Math.max(1.25, Math.min(1.8, commonStyle.width * .38))
-      : commonStyle.width;
+      : Math.max(1.15, commonStyle.width * .56);
     const isFocused = !hasFocusedTrip || state.activeTripDetailId === trip.id;
 
     const card = document.createElement("article");
@@ -1800,13 +1810,30 @@ function renderTrips() {
 
     if (trip.visible !== false && latlngs.length >= 2 && state.editingTripId !== trip.id) {
       const routeIsInteractive = !state.newTripFocusMode && (!hasFocusedTrip || isFocused);
+
+      // Densidade de uso: cada passagem adiciona uma camada laranja muito leve.
+      // Onde várias viagens coincidem, o contorno se torna mais escuro e parece
+      // progressivamente mais grosso, mas nunca ultrapassa a espessura normal atual.
+      if (!state.newTripFocusMode && !hasFocusedTrip && trip.mode !== "aviao") {
+        const densityLine = L.polyline(latlngs, {
+          color: commonStyle.color,
+          weight: commonStyle.width,
+          opacity: .115,
+          interactive: false,
+          lineCap: "round",
+          lineJoin: "round"
+        });
+        tripLayers.addLayer(densityLine);
+        state.tripDensityLayers.push(densityLine);
+      }
+
       const hitLine = L.polyline(latlngs, ROUTE_INTERACTION.hitLineOptions("trip-route-hit", 24, routeIsInteractive));
       const line = L.polyline(latlngs, {
         color: routeColor,
         weight: state.newTripFocusMode
           ? routeWeight
-          : (hasFocusedTrip ? (isFocused ? commonStyle.width + 2 : Math.max(1, commonStyle.width - 2)) : routeWeight),
-        opacity: state.newTripFocusMode ? .56 : (hasFocusedTrip ? (isFocused ? .98 : .22) : .9),
+          : (hasFocusedTrip ? (isFocused ? commonStyle.width : Math.max(1, routeWeight * .72)) : routeWeight),
+        opacity: state.newTripFocusMode ? .56 : (hasFocusedTrip ? (isFocused ? .98 : .20) : .72),
         dashArray: trip.mode === "aviao" ? "12 10" : null,
         interactive: routeIsInteractive
       });

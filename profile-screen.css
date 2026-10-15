@@ -312,7 +312,7 @@
   font-size: .72rem;
 }
 .profile-password-status.error { color: #a23b3b; }
-.profile-password-status.success { color: #356947; }
+.profile-password-status.success { color: #b5531e; }
 
 @media (min-width: 821px) {
   .profile-screen {

@@ -79,13 +79,35 @@
       return toggle.checked && app.classList.contains("mobile-panel-home");
     }
 
+    function hasActiveMapFlow() {
+      const activeIds = ["highwayBanner", "drawBanner", "editBanner", "routeChooser"];
+      if (activeIds.some(id => {
+        const node = document.getElementById(id);
+        return node && !node.classList.contains("hidden");
+      })) return true;
+      if (app.classList.contains("mobile-panel-detail")) return true;
+      if (app.classList.contains("highway-focus")) return true;
+      if (!document.getElementById("mobileProfileScreen")?.classList.contains("hidden")) return true;
+      return [...document.querySelectorAll("dialog")].some(dialog => dialog.open);
+    }
+
+    function syncProfileButtonVisibility() {
+      if (!profileBtn) return;
+      const blankHome = !toggle.checked &&
+        app.classList.contains("mobile-panel-home") &&
+        !hasActiveMapFlow();
+      profileBtn.hidden = !blankHome;
+      profileBtn.setAttribute("aria-hidden", String(!blankHome));
+    }
+
     function syncMapSizeButton() {
       if (!mapSizeBtn) return;
       const expanded = app.classList.contains("mobile-map-expanded");
       const open = toggle.checked;
-      mapSizeBtn.hidden = !open;
+      mapSizeBtn.hidden = !open || app.classList.contains("highway-focus");
       mapSizeBtn.setAttribute("aria-pressed", String(expanded));
       mapSizeBtn.setAttribute("aria-label", expanded ? "Minimizar mapa" : "Maximizar mapa");
+      syncProfileButtonVisibility();
     }
 
     function toggleMapSize() {
@@ -170,6 +192,7 @@
     syncFabLabel();
     updateCounts();
     syncProfileAvatar();
+    syncProfileButtonVisibility();
 
     toggle.addEventListener("change", () => {
       syncFabLabel();
@@ -360,7 +383,21 @@
     if (accountEmail) {
       new MutationObserver(syncProfileAvatar).observe(accountEmail, { childList: true, characterData: true, subtree: true });
     }
+
+    const floatingVisibilityObserver = new MutationObserver(syncProfileButtonVisibility);
+    ["highwayBanner", "drawBanner", "editBanner", "routeChooser", "mobileProfileScreen"].forEach(id => {
+      const node = document.getElementById(id);
+      if (node) floatingVisibilityObserver.observe(node, { attributes: true, attributeFilter: ["class", "open"] });
+    });
+    document.querySelectorAll("dialog").forEach(dialog => {
+      floatingVisibilityObserver.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+    });
+    floatingVisibilityObserver.observe(app, { attributes: true, attributeFilter: ["class"] });
+
     window.addEventListener("mv-auth-ready", syncProfileAvatar);
+    window.addEventListener("mv-highway-open", syncProfileButtonVisibility);
+    window.addEventListener("mv-highway-close", syncProfileButtonVisibility);
     syncMapSizeButton();
+    syncProfileButtonVisibility();
   });
 })();

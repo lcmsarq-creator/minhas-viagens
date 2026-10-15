@@ -4,9 +4,9 @@
   const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.9";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
-    common: { color: "#2f6d50", width: 5 },
-    gold: { color: "#d6a21f", width: 6 },
-    silver: { color: "#aeb5ba", width: 5 }
+    common: { color: "#2f6d50", width: 3 },
+    gold: { color: "#d6a21f", width: 3.5 },
+    silver: { color: "#aeb5ba", width: 3 }
   };
   const PANAM_EMBLEMS = Object.freeze({
     CO: Object.freeze({ name: "COLÔMBIA" }),
@@ -240,7 +240,7 @@
   function paintTraveled(layer, segments, kind) {
     const routePaint = routeStyle(kind);
     for (const line of segments || []) {
-      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: routePaint.width + 4, opacity: .94 });
+      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: routePaint.width + 2, opacity: .94 });
       addStyledLine(layer, line, { pane: "iconicRouteMain", color: routePaint.color, weight: routePaint.width, opacity: 1 });
     }
   }
@@ -346,11 +346,11 @@
     const traveledOnly = result.route?.previewTraveledOnly === true;
     if (!traveledOnly) {
       for (const line of result.geometry.lines) {
-        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: commonStyle.width + 4, opacity: .88 });
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: commonStyle.width + 2, opacity: .88 });
         addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: commonStyle.color, weight: commonStyle.width, opacity: .55 });
       }
       for (const line of result.geometry.alternateLines) {
-        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: silverStyle.width + 4, opacity: .82 });
+        addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: "#fff", weight: silverStyle.width + 2, opacity: .82 });
         addStyledLine(state.iconicPreviewLayer, line, { pane: "iconicRoutePreview", color: silverStyle.color, weight: silverStyle.width, opacity: .65, dashArray: "7 7" });
       }
     }

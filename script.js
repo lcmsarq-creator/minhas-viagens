@@ -3526,7 +3526,11 @@ ROUTE_STYLE?.subscribe?.(refreshRouteStyles);
 window.MinhasViagensApp = {
   getTrips: () => state.trips,
   replaceTrips: trips => {
-    state.trips = trips.map(ensureTripSchema);
+    state.trips = trips.map(trip => {
+      const normalized = ensureTripSchema(trip);
+      normalized.visible = true;
+      return normalized;
+    });
     saveTrips();
     renderTrips();
   },

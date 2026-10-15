@@ -85,7 +85,7 @@ const state = {
   cityHighlightTimer: null
 };
 
-const map = L.map("map", { zoomControl: true }).setView([-14.235, -51.9253], 4);
+const map = L.map("map", { zoomControl: false }).setView([-14.235, -51.9253], 4);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
   attribution: '&copy; OpenStreetMap contributors'
@@ -438,7 +438,11 @@ function loadTrips() {
     const raw = localStorage.getItem(STORAGE_KEY);
     state.trips = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(state.trips)) state.trips = [];
-    state.trips = state.trips.map(ensureTripSchema);
+    state.trips = state.trips.map(trip => {
+      const normalized = ensureTripSchema(trip);
+      normalized.visible = true;
+      return normalized;
+    });
     if (raw) saveTrips();
   } catch {
     state.trips = [];

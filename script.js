@@ -1259,7 +1259,9 @@ async function showFullHighway(item) {
   closeTripRoadHighlight(); closeFullHighway();
   const selection = state.highwaySelection, controller = new AbortController();
   state.highwayRequest = controller; state.highwayKey = requestedKey;
-  els.highwayBanner.classList.remove("hidden", "is-error"); els.highwayProgress.classList.add("hidden");
+  els.highwayBanner.classList.remove("hidden", "is-error");
+  els.highwayBanner.removeAttribute("hidden");
+  els.highwayProgress.classList.add("hidden");
   document.getElementById("application")?.classList.add("highway-focus");
   window.dispatchEvent(new CustomEvent("mv-highway-open"));
   requestAnimationFrame(() => requestAnimationFrame(() => fitHighwayBounds()));

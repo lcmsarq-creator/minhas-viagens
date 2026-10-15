@@ -60,6 +60,7 @@
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
       syncMapSizeButton();
       window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new CustomEvent("mv-mobile-layout-change"));
     }
 
     function closeSheet(options = {}) {
@@ -69,6 +70,7 @@
       app.classList.remove("mobile-map-expanded", "mobile-achievements-home", "mobile-achievements-screen");
       syncMapSizeButton();
       window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new CustomEvent("mv-mobile-layout-change"));
       if (panelHistoryActive && !options.fromHistory) {
         panelHistoryActive = false;
         window.history?.back?.();

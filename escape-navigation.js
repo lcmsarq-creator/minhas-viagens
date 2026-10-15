@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.19";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.21";
   const GUARD_KEY = "minhasViagensEscapeGuard";
 
   function isEditingText(target) {
@@ -130,9 +130,16 @@
   }
 
   function installHistoryGuard() {
-    if (!history?.pushState) return;
-    if (history.state?.[GUARD_KEY]) return;
-    history.pushState({ ...(history.state || {}), [GUARD_KEY]: true }, "", location.href);
+    if (!history?.pushState || !history?.replaceState) return;
+
+    // Mantém sempre duas entradas consecutivas desta mesma página:
+    // uma âncora e, acima dela, o guard. Assim o gesto nativo "Voltar"
+    // do Android cai primeiro na âncora e pode ser convertido em Esc
+    // antes que o navegador deixe o aplicativo.
+    const current = { ...(history.state || {}) };
+    delete current[GUARD_KEY];
+    history.replaceState({ ...current, minhasViagensEscapeAnchor: true }, "", location.href);
+    history.pushState({ ...current, [GUARD_KEY]: true }, "", location.href);
   }
 
   function handleHistoryBack() {
@@ -143,13 +150,18 @@
 
     const handled = performEscapeAction({ source: "history" });
     if (handled) {
-      history.pushState({ ...(history.state || {}), [GUARD_KEY]: true }, "", location.href);
+      // Recoloca imediatamente o guard sobre a âncora. O usuário permanece
+      // na mesma página e o gesto funciona como Esc.
+      history.pushState({
+        ...(history.state || {}),
+        [GUARD_KEY]: true
+      }, "", location.href);
       return;
     }
 
-    // O primeiro "voltar" consumiu apenas o guard interno; sem algo aberto,
-    // continue para a navegação anterior real do navegador.
-    if (!history.state?.[GUARD_KEY]) {
+    // Sem seleção/tela aberta, o gesto pode enfim sair do aplicativo.
+    // Quando estamos na âncora, um segundo back leva à página anterior real.
+    if (history.state?.minhasViagensEscapeAnchor) {
       setTimeout(() => history.back(), 0);
     }
   }

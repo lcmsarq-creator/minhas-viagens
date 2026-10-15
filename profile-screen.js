@@ -199,7 +199,10 @@
   });
 
   window.addEventListener("popstate", () => {
-    if (!screen.classList.contains("hidden")) close({ fromHistory: true });
+    if (!screen.classList.contains("hidden")) {
+      window.__mvBackConsumed = true;
+      close({ fromHistory: true });
+    }
   });
 
   window.MinhasViagensProfile = { open, close, refresh };

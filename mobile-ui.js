@@ -25,6 +25,8 @@
     const mobileAchievements = document.getElementById("mobileOpenAchievementsBtn");
     const mobileNewTrip = document.getElementById("mobileNewTripBtn");
     const mobileBack = document.getElementById("mobileBackToMenuBtn");
+    const tripDetailPanel = document.getElementById("tripDetailPanel");
+    const backToTripsBtn = document.getElementById("backToTripsBtn");
     const tripCount = document.getElementById("tripCount");
     const mobileTripCount = document.getElementById("mobileTripCount");
     const cityCount = document.getElementById("cityAchievementCount");
@@ -106,9 +108,10 @@
       if (!mapSizeBtn) return;
       const expanded = app.classList.contains("mobile-map-expanded");
       const open = toggle.checked;
-      mapSizeBtn.hidden = !open || app.classList.contains("highway-focus");
+      const tripDetailOpen = Boolean(tripDetailPanel && !tripDetailPanel.classList.contains("hidden"));
+      mapSizeBtn.hidden = !open || !tripDetailOpen || app.classList.contains("highway-focus");
       mapSizeBtn.setAttribute("aria-pressed", String(expanded));
-      mapSizeBtn.setAttribute("aria-label", expanded ? "Minimizar mapa" : "Maximizar mapa");
+      mapSizeBtn.setAttribute("aria-label", expanded ? "Aumentar caixa de detalhes" : "Reduzir caixa de detalhes");
       syncProfileButtonVisibility();
     }
 
@@ -260,6 +263,12 @@
     mobileNewTrip?.addEventListener("click", openNewTripDialog);
     mapSizeBtn?.addEventListener("click", toggleMapSize);
     mobileBack?.addEventListener("click", () => {
+      if (tripDetailPanel && !tripDetailPanel.classList.contains("hidden")) {
+        backToTripsBtn?.click();
+        setMode("detail");
+        syncMapSizeButton();
+        return;
+      }
       if (app.classList.contains("mobile-achievements-screen")) {
         setAchievementsHome(true);
         return;
@@ -375,7 +384,11 @@
     window.addEventListener("mv-open-trip-details", () => {
       setMode("detail");
       openSheet();
+      syncMapSizeButton();
     });
+
+    const tripDetailObserver = new MutationObserver(syncMapSizeButton);
+    if (tripDetailPanel) tripDetailObserver.observe(tripDetailPanel, { attributes: true, attributeFilter: ["class"] });
 
     const observer = new MutationObserver(updateCounts);
     [tripCount, cityCount, roadCount, iconicCount].forEach(node => {

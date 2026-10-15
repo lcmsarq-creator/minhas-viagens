@@ -835,6 +835,8 @@ function focusCityAchievement(city) {
 
 function mobileSheetVisibleHeight() {
   if (!window.matchMedia("(max-width: 820px)").matches) return 0;
+  const toggle = document.getElementById("mobileSheetToggle");
+  if (toggle && !toggle.checked) return 0;
   const sheet = document.querySelector(".sidebar");
   const height = sheet?.getBoundingClientRect?.().height;
   return Number.isFinite(height) && height > 0 ? height : window.innerHeight * .5;
@@ -1637,8 +1639,9 @@ function openTripDetails(tripId) {
   els.tripsTabBtn.setAttribute("aria-selected", "true");
   els.achievementsTabBtn.setAttribute("aria-selected", "false");
   renderTrips();
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar) sidebar.scrollTop = 0;
   focusTrip(trip);
-  els.tripDetailPanel.scrollIntoView({ block: "start" });
 }
 
 function switchSidebarTab(tab) {
@@ -1977,7 +1980,9 @@ map.on("zoomend moveend", () => requestAnimationFrame(refreshRoadMapMarkerVisibi
 function focusTrip(trip) {
   const latlngs = tripLatLngs(trip);
   if (!latlngs.length) return;
-  map.fitBounds(L.latLngBounds(latlngs).pad(.15), { maxZoom: 14 });
+  const bounds = L.latLngBounds(latlngs).pad(.08);
+  map.fitBounds(bounds, mobileMapFitOptions(14));
+  requestAnimationFrame(refreshRoadMapMarkerVisibility);
 }
 
 function resetPlaceSelection(kind) {
@@ -3706,7 +3711,14 @@ window.addEventListener("resize", () => {
   if (state.highwayBounds?.isValid()) requestAnimationFrame(() => fitHighwayBounds());
 });
 window.addEventListener("mv-mobile-layout-change", () => {
-  if (state.highwayBounds?.isValid()) requestAnimationFrame(() => fitHighwayBounds());
+  if (state.highwayBounds?.isValid()) {
+    requestAnimationFrame(() => fitHighwayBounds());
+    return;
+  }
+  if (state.activeTripDetailId) {
+    const trip = state.trips.find(item => item.id === state.activeTripDetailId);
+    if (trip) requestAnimationFrame(() => focusTrip(trip));
+  }
 });
 
 loadTrips();

@@ -1,13 +1,17 @@
 (() => {
   "use strict";
 
-  const HIT_OPACITY = .01;
+  const HIT_OPACITY = .0001;
   const EDIT_HIT_TOLERANCE_PX = 18;
 
-  function hitLineOptions(className, weight = 24, interactive = true) {
+  function hitLineOptions(className, weight = 32, interactive = true) {
+    const mobile = window.matchMedia?.("(max-width: 820px)")?.matches;
+    const minimum = className === "edit-route-hit"
+      ? (mobile ? 34 : 28)
+      : (mobile ? 44 : 34);
     return {
-      color: "#000",
-      weight,
+      color: "#f47a23",
+      weight: Math.max(Number(weight) || 0, minimum),
       opacity: HIT_OPACITY,
       interactive,
       bubblingMouseEvents: false,

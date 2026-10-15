@@ -189,6 +189,7 @@
 
     window.addEventListener("popstate", () => {
       if (toggle.checked) {
+        window.__mvBackConsumed = true;
         panelHistoryActive = false;
         closeSheet({ fromHistory: true });
       }

@@ -538,6 +538,7 @@
         stats
       };
       win.document.getElementById("syncNowBtn")?.addEventListener("click", () => setStatus("Modo local · sincronização indisponível", "offline"));
+      win.MinhasViagensInitialSyncReady = Promise.resolve();
       return { get initialized() { return false; }, localMode: true };
     }
 
@@ -545,10 +546,12 @@
     win.document.getElementById("syncNowBtn")?.addEventListener("click", syncNow);
     win.addEventListener("offline", () => setStatus("Offline"));
     win.addEventListener("online", () => schedule(100));
-    (async () => {
+    const initialReady = (async () => {
       await syncNow();
       await offerLegacyMigration();
     })();
+    win.MinhasViagensInitialSyncReady = initialReady;
+    initialReady.catch(error => console.warn("Sincronização inicial adiada", error));
     return { get initialized() { return initialized; } };
   }
 

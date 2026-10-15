@@ -19,7 +19,7 @@
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.15";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.16";
   const APP_URL = "https://lcmsarq-creator.github.io/minhas-viagens/";
 
   let client = null;
@@ -249,6 +249,9 @@
           await loadScript(`${src}?v=${APP_VERSION}`);
           if (src === "script.js" && (!window.MinhasViagensApp || !document.querySelector(".leaflet-map-pane"))) {
             throw new Error("O núcleo do mapa não concluiu a inicialização");
+          }
+          if (src === "geometry-compact-hotfix.js") {
+            window.MinhasViagensApp?.render?.();
           }
           if (src === "iconic-route-catalog.js" && window.MinhasViagensIconicRouteCatalogReady) {
             markStartup("loading-iconic-catalog");

@@ -135,6 +135,51 @@
       enhanceAchievementScreens();
     }
 
+    function cityStateDetailOpen() {
+      return Boolean(document.querySelector("#cityAchievementHeader .achievement-back-btn"));
+    }
+
+    function navigateBackOneLevel(options = {}) {
+      const fromHistory = Boolean(options.fromHistory);
+
+      if (tripDetailPanel && !tripDetailPanel.classList.contains("hidden")) {
+        backToTripsBtn?.click();
+        setMode("detail");
+        syncMapSizeButton();
+        return true;
+      }
+
+      if (cityStateDetailOpen()) {
+        document.querySelector("#cityAchievementHeader .achievement-back-btn")?.click();
+        enhanceAchievementScreens();
+        return true;
+      }
+
+      if (app.classList.contains("mobile-achievements-screen")) {
+        setAchievementsHome(true);
+        return true;
+      }
+
+      if (app.classList.contains("mobile-achievements-home")) {
+        setMode("home");
+        openSheet({ history: false });
+        return true;
+      }
+
+      if (toggle.checked && app.classList.contains("mobile-panel-detail")) {
+        setMode("home");
+        openSheet({ history: false });
+        return true;
+      }
+
+      if (toggle.checked && app.classList.contains("mobile-panel-home")) {
+        closeSheet({ fromHistory: true });
+        return true;
+      }
+
+      return false;
+    }
+
     function syncFabLabel() {
       const expanded = toggle.checked;
       const detailMode = app.classList.contains("mobile-panel-detail");
@@ -142,7 +187,7 @@
       toggle.setAttribute("aria-expanded", String(expanded));
       if (fab) {
         fab.dataset.mobileState = state;
-        fab.setAttribute("aria-label", !expanded ? "Abrir menu principal" : detailMode ? "Voltar ao menu principal" : "Recolher menu principal");
+        fab.setAttribute("aria-label", !expanded ? "Abrir menu principal" : detailMode ? "Abrir menu principal" : "Recolher menu principal");
       }
     }
 
@@ -229,10 +274,13 @@
     });
 
     window.addEventListener("popstate", () => {
-      if (toggle.checked) {
-        window.__mvBackConsumed = true;
-        panelHistoryActive = false;
-        closeSheet({ fromHistory: true });
+      if (!toggle.checked) return;
+      window.__mvBackConsumed = true;
+      panelHistoryActive = false;
+      const handled = navigateBackOneLevel({ fromHistory: true });
+      if (handled && toggle.checked && window.history?.pushState) {
+        window.history.pushState({ minhasViagensPanel: true }, "", window.location.href);
+        panelHistoryActive = true;
       }
     });
 
@@ -248,7 +296,7 @@
       const dx = touch.clientX - touchStart.x;
       const dy = touch.clientY - touchStart.y;
       touchStart = null;
-      if (dx > 80 && Math.abs(dy) < 60) closeSheet();
+      if (dx > 80 && Math.abs(dy) < 60) navigateBackOneLevel();
     }, { passive: true });
 
     fab?.addEventListener("click", event => {
@@ -260,7 +308,7 @@
       }
       if (app.classList.contains("mobile-panel-detail")) {
         setMode("home");
-        openSheet();
+        openSheet({ history: false });
         return;
       }
       closeSheet();
@@ -271,17 +319,7 @@
     mobileNewTrip?.addEventListener("click", openNewTripDialog);
     mapSizeBtn?.addEventListener("click", toggleMapSize);
     mobileBack?.addEventListener("click", () => {
-      if (tripDetailPanel && !tripDetailPanel.classList.contains("hidden")) {
-        backToTripsBtn?.click();
-        setMode("detail");
-        syncMapSizeButton();
-        return;
-      }
-      if (app.classList.contains("mobile-achievements-screen")) {
-        setAchievementsHome(true);
-        return;
-      }
-      setMode("home");
+      navigateBackOneLevel();
     });
     tripsTab?.addEventListener("click", () => {
       setMode("detail");
@@ -341,29 +379,9 @@
         const head = document.createElement("div");
         head.className = "mobile-city-screen-header";
         head.innerHTML = `
-          <button type="button" class="mobile-city-back" aria-label="Voltar">←</button>
           <strong>${titleText}</strong>
           <span>${countText}</span>`;
-        head.querySelector("button")?.addEventListener("click", () => {
-          if (nativeBack) nativeBack.click();
-          else setAchievementsHome(true);
-        });
         cityHeader.prepend(head);
-        if (!isStateDetail) {
-          const toggleWrap = document.createElement("div");
-          toggleWrap.className = "mobile-city-toggle";
-          toggleWrap.innerHTML = '<button type="button">Destinos</button><button type="button">Cruzadas</button>';
-          const nativeModes = document.querySelectorAll('#cityAchievementsView [data-city-mode]');
-          const activeIndex = [...nativeModes].findIndex(item => item.classList.contains("active"));
-          toggleWrap.querySelectorAll("button").forEach((button, index) => {
-            button.classList.toggle("active", index === (activeIndex < 0 ? 0 : activeIndex));
-            button.addEventListener("click", () => {
-              toggleWrap.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === button));
-              nativeModes[index]?.click();
-            });
-          });
-          cityHeader.appendChild(toggleWrap);
-        }
         const kicker = document.createElement("div");
         kicker.className = "mobile-section-kicker";
         kicker.textContent = isStateDetail ? `Destinos em ${titleText}` : "Brasil · Estados";
@@ -422,5 +440,13 @@
     window.addEventListener("mv-highway-close", syncProfileButtonVisibility);
     syncMapSizeButton();
     syncProfileButtonVisibility();
+
+    window.MinhasViagensMobileNavigation = Object.freeze({
+      backOneLevel: navigateBackOneLevel,
+      openMainMenu: () => {
+        setMode("home");
+        openSheet({ history: false });
+      }
+    });
   });
 })();

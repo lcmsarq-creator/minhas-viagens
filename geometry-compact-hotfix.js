@@ -331,5 +331,11 @@
     stats
   };
 
+  // O núcleo faz um primeiro render antes do decodificador compacto existir.
+  // Redesenha imediatamente para exibir todas as viagens já no primeiro quadro útil.
+  try { window.MinhasViagensApp?.render?.(); } catch (error) {
+    console.warn("Não foi possível redesenhar as rotas compactadas imediatamente", error);
+  }
+
   console.info(`Minhas Viagens ${APP_VERSION}: rotas simplificadas a ${TRIP_TOLERANCE_M} m e rodovias completas a ${HIGHWAY_TOLERANCE_M} m com armazenamento Polyline5.`);
 })();

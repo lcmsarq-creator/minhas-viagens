@@ -37,7 +37,9 @@
     function setMode(mode) {
       app.classList.toggle("mobile-panel-home", mode === "home");
       app.classList.toggle("mobile-panel-detail", mode === "detail");
-      if (mode === "home") app.classList.remove("mobile-achievements-home", "mobile-achievements-screen");
+      if (mode === "home") {
+        app.classList.remove("mobile-achievements-home", "mobile-achievements-screen", "mobile-map-expanded");
+      }
       syncFabLabel();
       syncMapSizeButton();
     }
@@ -47,6 +49,9 @@
 
     function openSheet(options = {}) {
       const wasClosed = !toggle.checked;
+      if (app.classList.contains("mobile-panel-home")) {
+        app.classList.remove("mobile-map-expanded");
+      }
       if (wasClosed && options.history !== false && window.history?.pushState) {
         window.history.pushState({ minhasViagensPanel: true }, "", window.location.href);
         panelHistoryActive = true;

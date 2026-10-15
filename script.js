@@ -84,7 +84,8 @@ const state = {
   highwayQueueKeys: new Set(),
   highwayQueueRunning: false,
   cityHighlight: null,
-  cityHighlightTimer: null
+  cityHighlightTimer: null,
+  roadMapMarkers: []
 };
 
 const map = L.map("map", { zoomControl: false }).setView([-14.235, -51.9253], 4);
@@ -1744,6 +1745,7 @@ function renderTrips() {
   tripLayers.clearLayers();
   pointLayers.clearLayers();
   state.tripLineLayers.clear();
+  state.roadMapMarkers = [];
   els.tripList.innerHTML = "";
   els.tripCount.textContent = String(state.trips.length);
 
@@ -1851,10 +1853,19 @@ function renderTrips() {
       if (!state.newTripFocusMode && (!hasFocusedTrip || isFocused) && trip.mode !== "aviao") {
         for (const badge of trip.roadLabels || []) {
           if (!Number.isFinite(Number(badge.lat)) || !Number.isFinite(Number(badge.lng))) continue;
-          tripLayers.addLayer(L.marker([badge.lat, badge.lng], {
+          const roadMarker = L.marker([badge.lat, badge.lng], {
             interactive: false,
+            opacity: 0,
             icon: roadMapIcon(badge.label)
-          }));
+          });
+          tripLayers.addLayer(roadMarker);
+          state.roadMapMarkers.push({
+            marker: roadMarker,
+            label: badge.label,
+            lat: Number(badge.lat),
+            lng: Number(badge.lng),
+            distanceKm: Number(badge.distanceKm) || 0
+          });
         }
       } else if (!state.newTripFocusMode && (!hasFocusedTrip || isFocused) && trip.mode === "aviao" && trip.flightAirports?.length) {
         for (const airport of trip.flightAirports) {
@@ -1883,7 +1894,56 @@ function renderTrips() {
   renderAchievements();
   if (state.activeTripDetailId) renderTripDetail();
   window.MinhasViagensIconicRoutes?.scheduleMapRender?.();
+  requestAnimationFrame(refreshRoadMapMarkerVisibility);
 }
+
+function roadMarkerPriority(item) {
+  const label = String(item?.label || "").toUpperCase();
+  const federal = /^BR[-\s]/.test(label) || /^INT:/.test(label);
+  return (federal ? 100000 : 0) + (Number(item?.distanceKm) || 0);
+}
+
+function roadMarkerBoxesOverlap(a, b) {
+  return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+}
+
+function refreshRoadMapMarkerVisibility() {
+  const markers = Array.isArray(state.roadMapMarkers) ? state.roadMapMarkers : [];
+  if (!markers.length) return;
+
+  const detailActive = Boolean(state.activeTripDetailId);
+  const zoom = map.getZoom();
+  if (!detailActive || zoom < 6) {
+    markers.forEach(item => item.marker?.setOpacity?.(0));
+    return;
+  }
+
+  const size = zoom >= 11 ? 46 : zoom >= 9 ? 50 : 54;
+  const gap = zoom >= 11 ? 5 : zoom >= 9 ? 7 : 9;
+  const occupied = [];
+  const sorted = [...markers].sort((a, b) => roadMarkerPriority(b) - roadMarkerPriority(a));
+
+  for (const item of sorted) {
+    const marker = item.marker;
+    if (!marker || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)) continue;
+    const point = map.latLngToContainerPoint([item.lat, item.lng]);
+    const halfW = size / 2 + gap;
+    const halfH = size * 0.58 + gap;
+    const box = {
+      left: point.x - halfW,
+      right: point.x + halfW,
+      top: point.y - halfH,
+      bottom: point.y + halfH
+    };
+    const inside = point.x >= 0 && point.x <= map.getSize().x && point.y >= 0 && point.y <= map.getSize().y;
+    const collides = occupied.some(previous => roadMarkerBoxesOverlap(previous, box));
+    const visible = inside && !collides;
+    marker.setOpacity(visible ? 1 : 0);
+    if (visible) occupied.push(box);
+  }
+}
+
+map.on("zoomend moveend", () => requestAnimationFrame(refreshRoadMapMarkerVisibility));
 
 function focusTrip(trip) {
   const latlngs = tripLatLngs(trip);

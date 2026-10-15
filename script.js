@@ -220,7 +220,7 @@ function shortText(text, max = 82) {
 }
 
 function currentRouteStyle(kind = "common") {
-  return ROUTE_STYLE?.style?.(kind) || { color: DEFAULT_ROUTE_COLOR, width: 3 };
+  return ROUTE_STYLE?.style?.(kind) || { color: DEFAULT_ROUTE_COLOR, width: 2.5 };
 }
 
 function formatDate(dateStr) {

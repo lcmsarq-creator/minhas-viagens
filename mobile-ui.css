@@ -1137,3 +1137,53 @@ textarea:focus {
     display: none !important;
   }
 }
+
+
+/* v0.15.22 - trip detail sheet controls */
+@media (max-width: 820px) {
+  body.mv-trip-detail-active .detail-back-btn {
+    display: none !important;
+  }
+
+  body.mv-trip-detail-active .mobile-sheet-fab {
+    display: none !important;
+  }
+
+  body.mv-trip-detail-active .app.mobile-panel-detail .mobile-back-menu {
+    display: inline-grid !important;
+  }
+
+  body.mv-trip-detail-active .mobile-map-size-btn {
+    left: 50%;
+    right: auto;
+    top: calc(50dvh - 12px);
+    width: 58px;
+    height: 24px;
+    transform: translateX(-50%);
+    border: 1px solid rgba(33, 20, 15, .16);
+    border-radius: 999px;
+    background: rgba(255, 247, 236, .98);
+    box-shadow: 0 4px 12px rgba(33, 20, 15, .16);
+    transition: top .28s cubic-bezier(.2, .8, .2, 1), transform .2s ease;
+  }
+
+  body.mv-trip-detail-active .mobile-map-size-btn:active {
+    transform: translateX(-50%) scale(.94);
+  }
+
+  body.mv-trip-detail-active .mobile-map-size-btn span::before {
+    content: "⌄";
+    font-size: 1.25rem;
+    line-height: .8;
+    transform: translateY(-3px);
+  }
+
+  body.mv-trip-detail-active .app.mobile-map-expanded .mobile-map-size-btn {
+    top: calc(72dvh - 12px);
+  }
+
+  body.mv-trip-detail-active .app.mobile-map-expanded .mobile-map-size-btn span::before {
+    content: "⌃";
+    transform: translateY(3px);
+  }
+}

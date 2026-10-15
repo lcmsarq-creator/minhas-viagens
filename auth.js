@@ -19,7 +19,7 @@
   const signOut = document.getElementById("signOutBtn");
   const config = window.MINHAS_VIAGENS_CONFIG || {};
 
-  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.16";
+  const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.15.17";
   const APP_URL = "https://lcmsarq-creator.github.io/minhas-viagens/";
 
   let client = null;
@@ -211,6 +211,7 @@
           "road-marker-layout.js",
           "road-export-core.js",
           "script.js",
+          "geometry-compact-hotfix.js",
           "profile-screen.js",
           "hotfix.js",
           "road-threshold-hotfix.js",
@@ -224,7 +225,6 @@
           "place-search-hotfix.js",
           "edit-dialog-hotfix.js",
           "route-click-hotfix.js",
-          "geometry-compact-hotfix.js",
           "highway-render-hotfix.js",
           "road-progress-core.js",
           "road-network-hotfix.js",
@@ -260,13 +260,13 @@
           }
         }
 
-        const localTrips = window.MinhasViagensApp?.getTrips?.() || [];
-        if (!localMode && !localTrips.length && window.MinhasViagensInitialSyncReady) {
+        if (!localMode && window.MinhasViagensInitialSyncReady) {
           markStartup("loading-trips");
           await Promise.race([
             Promise.resolve(window.MinhasViagensInitialSyncReady).catch(() => undefined),
             wait(5000)
           ]);
+          window.MinhasViagensApp?.render?.();
         }
 
         markStartup("ready");

@@ -1122,3 +1122,18 @@ textarea:focus {
     text-transform: uppercase;
   }
 }
+
+
+/* v0.15.22 — controles flutuantes só na tela inicial limpa */
+@media (max-width: 820px) {
+  .mobile-profile-fab[hidden],
+  .app.highway-focus .mobile-profile-fab,
+  .app.mobile-panel-detail .mobile-profile-fab,
+  .mobile-sheet-toggle:checked ~ .mobile-profile-fab {
+    display: none !important;
+  }
+
+  .app.highway-focus .mobile-map-size-btn {
+    display: none !important;
+  }
+}

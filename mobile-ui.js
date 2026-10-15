@@ -174,6 +174,11 @@
     });
 
     profileBtn?.addEventListener("click", () => {
+      if (toggle.checked) closeSheet({ fromHistory: true });
+      if (window.MinhasViagensProfile?.open) {
+        window.MinhasViagensProfile.open();
+        return;
+      }
       setMode("home");
       openSheet();
     });

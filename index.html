@@ -9,12 +9,17 @@
   <meta name="apple-mobile-web-app-title" content="Minhas Viagens" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="manifest.webmanifest?v=0.15.13" />
-  <link rel="icon" href="app-icon.svg?v=0.15.13" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.13" />
+  <link rel="manifest" href="manifest.webmanifest?v=0.15.14" />
+  <link rel="icon" href="app-icon.svg?v=0.15.14" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.14" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
   <link rel="stylesheet" href="style.css?v=0.14.9" />
-  <link rel="stylesheet" href="mobile-ui.css?v=0.15.13" />
+  <link rel="stylesheet" href="mobile-ui.css?v=0.15.14" />
+  <link rel="stylesheet" href="profile-screen.css?v=0.15.14" />
+  <style>
+    .leaflet-tile-pane { filter: grayscale(1) saturate(0) contrast(.94) brightness(1.04); }
+    .leaflet-control-zoom { display: none !important; }
+  </style>
 </head>
 <body>
   <section id="authGate" class="auth-gate" aria-live="polite">
@@ -24,11 +29,22 @@
     </div>
     <div id="authPanel" class="auth-card hidden">
       <div class="auth-brand"><div class="brand-mark">MV</div><h1>Minhas Viagens</h1></div>
-      <p class="auth-intro">Entre com um link seguro enviado ao seu e-mail para acessar seu mapa pessoal.</p>
+      <p class="auth-intro">Entre com seu e-mail e senha para acessar seu mapa pessoal.</p>
       <form id="authForm" novalidate>
         <label for="authEmail">E-mail</label>
-        <input id="authEmail" type="email" autocomplete="email" required placeholder="voce@exemplo.com" />
-        <button id="authSubmit" class="primary-btn" type="submit">Enviar link de acesso</button>
+        <input id="authEmail" type="email" autocomplete="username" required placeholder="voce@exemplo.com" />
+        <label for="authPassword">Senha</label>
+        <input id="authPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="Sua senha" />
+        <button id="authSubmit" class="primary-btn" type="submit">Entrar</button>
+        <button id="authResetBtn" class="ghost-btn" type="button">Definir ou redefinir senha</button>
+      </form>
+      <form id="passwordRecoveryForm" class="hidden" novalidate>
+        <p class="auth-intro">Crie uma nova senha para sua conta.</p>
+        <label for="recoveryPassword">Nova senha</label>
+        <input id="recoveryPassword" type="password" autocomplete="new-password" minlength="8" required placeholder="Mínimo de 8 caracteres" />
+        <label for="recoveryPasswordConfirm">Confirmar nova senha</label>
+        <input id="recoveryPasswordConfirm" type="password" autocomplete="new-password" minlength="8" required placeholder="Repita a senha" />
+        <button id="recoverySubmit" class="primary-btn" type="submit">Salvar nova senha</button>
       </form>
       <p id="authStatus" class="auth-status" role="status"></p>
     </div>
@@ -47,12 +63,66 @@
     </label>
     <label for="mobileSheetToggle" class="mobile-sheet-scrim" aria-hidden="true"></label>
 
+    <section id="mobileProfileScreen" class="profile-screen hidden" aria-hidden="true">
+      <header class="profile-screen-head">
+        <button id="closeProfileScreenBtn" type="button" aria-label="Voltar ao mapa">←</button>
+        <div><small>Conta</small><h2>Meu perfil</h2></div>
+        <span aria-hidden="true"></span>
+      </header>
+      <div class="profile-screen-scroll">
+        <section class="profile-identity">
+          <div id="profileAvatarLarge" class="profile-avatar-large">MV</div>
+          <div class="profile-identity-copy">
+            <strong id="profileDisplayName">Usuário</strong>
+            <span id="profileEmail"></span>
+            <span id="profileSyncState" class="profile-sync-pill">Conta conectada</span>
+          </div>
+        </section>
+
+        <section class="profile-distance-card">
+          <span>Distância total registrada</span>
+          <strong id="profileDistance">0 km</strong>
+        </section>
+
+        <section class="profile-stats-grid" aria-label="Estatísticas da conta">
+          <article class="profile-stat-card"><strong id="profileTripStat">0</strong><span>Viagens</span></article>
+          <article class="profile-stat-card"><strong id="profileCityStat">0</strong><span>Cidades</span></article>
+          <article class="profile-stat-card"><strong id="profileRoadStat">0</strong><span>Rodovias</span></article>
+          <article class="profile-stat-card"><strong id="profileIconicStat">0</strong><span>Rotas icônicas</span></article>
+          <article class="profile-stat-card"><strong id="profileStateStat">0</strong><span>Estados</span></article>
+          <article class="profile-stat-card"><strong id="profileCountryStat">0</strong><span>Países</span></article>
+        </section>
+
+        <section class="profile-section">
+          <div class="profile-section-head"><h3>Viagens recentes</h3><span>Últimas 5</span></div>
+          <div id="profileRecentTrips" class="profile-recent-list"></div>
+        </section>
+
+        <section class="profile-section">
+          <div class="profile-section-head"><h3>Conta</h3><span>Segurança e sincronização</span></div>
+          <div class="profile-account-actions">
+            <button id="profileSyncBtn" class="profile-action-btn primary" type="button">Sincronizar agora</button>
+            <details class="profile-password-panel">
+              <summary>Alterar senha</summary>
+              <form id="profilePasswordForm" class="profile-password-form">
+                <label>Nova senha<input id="profileNewPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+                <label>Confirmar senha<input id="profileConfirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+                <button type="submit">Salvar nova senha</button>
+                <p id="profilePasswordStatus" class="profile-password-status" role="status"></p>
+              </form>
+            </details>
+            <button id="profileSignOutBtn" class="profile-action-btn danger" type="button">Sair da conta</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.13</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.14</p>
         </div>
       </div>
 
@@ -383,15 +453,15 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script src="mobile-ui.js?v=0.15.13"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.13";</script>
-  <script src="config.js?v=0.15.13"></script>
+  <script src="mobile-ui.js?v=0.15.14"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.14";</script>
+  <script src="config.js?v=0.15.14"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.15.13"></script>
+  <script src="auth.js?v=0.15.14"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=0.15.13", { scope: "./" })
+        navigator.serviceWorker.register("./service-worker.js?v=0.15.14", { scope: "./" })
           .catch(error => console.warn("Service worker indisponível", error));
       });
     }

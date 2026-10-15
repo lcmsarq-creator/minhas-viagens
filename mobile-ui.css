@@ -867,7 +867,12 @@ textarea:focus {
   }
 
   .app.mobile-map-expanded.mobile-panel-home .sidebar {
-    transform: translateY(calc(100% - 86px));
+    transform: translateY(0);
+  }
+
+  .app.mobile-panel-home .mobile-home-menu {
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
+    overflow: visible;
   }
 
   .app.mobile-panel-detail .sidebar {

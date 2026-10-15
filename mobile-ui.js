@@ -109,7 +109,7 @@
       const expanded = app.classList.contains("mobile-map-expanded");
       const open = toggle.checked;
       const tripDetailOpen = Boolean(tripDetailPanel && !tripDetailPanel.classList.contains("hidden"));
-      mapSizeBtn.hidden = !open || !tripDetailOpen || app.classList.contains("highway-focus");
+      mapSizeBtn.hidden = !open || !tripDetailOpen;
       mapSizeBtn.setAttribute("aria-pressed", String(expanded));
       mapSizeBtn.setAttribute("aria-label", expanded ? "Aumentar caixa de detalhes" : "Reduzir caixa de detalhes");
       syncProfileButtonVisibility();

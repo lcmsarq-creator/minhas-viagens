@@ -11,7 +11,7 @@ const AIRPORTS_CSV_URLS = [
   "https://davidmegginson.github.io/ourairports-data/airports.csv",
   "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
 ];
-const DEFAULT_ROUTE_COLOR = "#2f6d50";
+const DEFAULT_ROUTE_COLOR = "#f47a23";
 const NEW_TRIP_BACKGROUND_COLOR = "#4a4a4a";
 const ROUTE_INTERACTION = window.MinhasViagensRouteInteraction;
 const ROUTE_STYLE = window.MinhasViagensRouteStyleLab;

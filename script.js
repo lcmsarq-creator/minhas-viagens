@@ -1138,7 +1138,69 @@ function setNewTripFocusMode(active) {
 }
 
 function fitHighwayBounds() {
-  if (state.highwayBounds?.isValid()) map.fitBounds(state.highwayBounds, { padding: [28, 28], maxZoom: 10 });
+  if (!state.highwayBounds?.isValid()) return;
+
+  const mapNode = map.getContainer();
+  const mapRect = mapNode.getBoundingClientRect();
+  const margin = 22;
+  let top = margin;
+  let right = margin;
+  let bottom = margin;
+  let left = margin;
+
+  const visibleOverlays = [
+    els.highwayBanner,
+    document.querySelector(".sidebar"),
+    document.getElementById("mobileSheetFab"),
+    document.querySelector(".mobile-sheet-fab")
+  ].filter(Boolean);
+
+  for (const overlay of visibleOverlays) {
+    const style = getComputedStyle(overlay);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) continue;
+    if (overlay.classList?.contains("hidden")) continue;
+
+    const rect = overlay.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    const overlapsMap = rect.right > mapRect.left && rect.left < mapRect.right && rect.bottom > mapRect.top && rect.top < mapRect.bottom;
+    if (!overlapsMap) continue;
+
+    const horizontalCoverage = Math.max(0, Math.min(rect.right, mapRect.right) - Math.max(rect.left, mapRect.left));
+    const verticalCoverage = Math.max(0, Math.min(rect.bottom, mapRect.bottom) - Math.max(rect.top, mapRect.top));
+
+    if (horizontalCoverage > mapRect.width * .45) {
+      if (rect.top <= mapRect.top + mapRect.height * .5) {
+        top = Math.max(top, rect.bottom - mapRect.top + margin);
+      }
+      if (rect.bottom >= mapRect.top + mapRect.height * .5) {
+        bottom = Math.max(bottom, mapRect.bottom - rect.top + margin);
+      }
+    }
+
+    if (verticalCoverage > mapRect.height * .35) {
+      if (rect.left <= mapRect.left + mapRect.width * .5) {
+        left = Math.max(left, rect.right - mapRect.left + margin);
+      }
+      if (rect.right >= mapRect.left + mapRect.width * .5) {
+        right = Math.max(right, mapRect.right - rect.left + margin);
+      }
+    }
+  }
+
+  const maxHorizontal = Math.max(24, Math.floor(mapRect.width * .42));
+  const maxVertical = Math.max(24, Math.floor(mapRect.height * .42));
+  left = Math.min(left, maxHorizontal);
+  right = Math.min(right, maxHorizontal);
+  top = Math.min(top, maxVertical);
+  bottom = Math.min(bottom, maxVertical);
+
+  map.invalidateSize(false);
+  map.fitBounds(state.highwayBounds.pad(.03), {
+    paddingTopLeft: [left, top],
+    paddingBottomRight: [right, bottom],
+    maxZoom: 10,
+    animate: false
+  });
 }
 
 async function drawFullHighway(entry, item, descriptor) {
@@ -1180,6 +1242,8 @@ function closeFullHighway(restoreFocus = false) {
   state.highwayStyleLabel = ""; state.highwayStyleMedal = "";
   setTripsSecondary(false);
   els.highwayBanner.classList.add("hidden"); els.highwayBanner.classList.remove("is-error"); els.highwayProgress.classList.add("hidden");
+  document.getElementById("application")?.classList.remove("highway-focus");
+  window.dispatchEvent(new CustomEvent("mv-highway-close"));
   if (restoreFocus) {
     const visiblePoints = state.trips.filter(trip => trip.visible !== false).flatMap(tripLatLngs);
     if (visiblePoints.length) map.fitBounds(L.latLngBounds(visiblePoints).pad(.12), { maxZoom: 14 });
@@ -1195,6 +1259,9 @@ async function showFullHighway(item) {
   const selection = state.highwaySelection, controller = new AbortController();
   state.highwayRequest = controller; state.highwayKey = requestedKey;
   els.highwayBanner.classList.remove("hidden", "is-error"); els.highwayProgress.classList.add("hidden");
+  document.getElementById("application")?.classList.add("highway-focus");
+  window.dispatchEvent(new CustomEvent("mv-highway-open"));
+  requestAnimationFrame(() => requestAnimationFrame(() => fitHighwayBounds()));
   els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
   try {
     let entry = await cachedHighway(descriptor);
@@ -3545,7 +3612,13 @@ map.getContainer().addEventListener("pointerdown", startEditPointer, true);
 map.getContainer().addEventListener("pointermove", updateEditPointer, true);
 map.getContainer().addEventListener("pointerup", finishEditPointer, true);
 map.getContainer().addEventListener("pointercancel", cancelEditPointer, true);
-window.addEventListener("resize", () => map.invalidateSize());
+window.addEventListener("resize", () => {
+  map.invalidateSize();
+  if (state.highwayBounds?.isValid()) requestAnimationFrame(() => fitHighwayBounds());
+});
+window.addEventListener("mv-mobile-layout-change", () => {
+  if (state.highwayBounds?.isValid()) requestAnimationFrame(() => fitHighwayBounds());
+});
 
 loadTrips();
 saveTrips();

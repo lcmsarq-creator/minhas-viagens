@@ -4,9 +4,9 @@
   const APP_VERSION = window.MINHAS_VIAGENS_APP_VERSION || "0.14.9";
   const STYLE_LAB = window.MinhasViagensRouteStyleLab;
   const FALLBACK_STYLES = {
-    common: { color: "#2f6d50", width: 3 },
-    gold: { color: "#d6a21f", width: 3.5 },
-    silver: { color: "#aeb5ba", width: 3 }
+    common: { color: "#2f6d50", width: 2.5 },
+    gold: { color: "#d6a21f", width: 2.5 },
+    silver: { color: "#aeb5ba", width: 2.25 }
   };
   const PANAM_EMBLEMS = Object.freeze({
     CO: Object.freeze({ name: "COLÔMBIA" }),
@@ -240,7 +240,7 @@
   function paintTraveled(layer, segments, kind) {
     const routePaint = routeStyle(kind);
     for (const line of segments || []) {
-      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: routePaint.width + 2, opacity: .94 });
+      addStyledLine(layer, line, { pane: "iconicRouteOutline", color: "#fff", weight: routePaint.width + 1, opacity: .88 });
       addStyledLine(layer, line, { pane: "iconicRouteMain", color: routePaint.color, weight: routePaint.width, opacity: 1 });
     }
   }

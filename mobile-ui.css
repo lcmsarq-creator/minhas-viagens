@@ -1300,3 +1300,203 @@ textarea:focus {
     color: var(--accent-light);
   }
 }
+
+
+/* v0.15.27 - compact roads screen and highway card */
+@media (max-width: 820px) {
+  /* Tela de rodovias: mais mapa, lista mais baixa e sem botões flutuantes redundantes. */
+  .app.mobile-roads-screen.mobile-panel-detail .sidebar {
+    height: 36dvh !important;
+    min-height: 36dvh !important;
+    max-height: 36dvh !important;
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .app.mobile-roads-screen .mobile-back-menu,
+  .app.mobile-roads-screen .mobile-sheet-fab,
+  .app.mobile-roads-screen .mobile-map-size-btn {
+    display: none !important;
+  }
+
+  .app.mobile-roads-screen #roadAchievementsView {
+    margin-top: 0;
+  }
+
+  .app.mobile-roads-screen #roadAchievementsView .road-achievements-heading {
+    min-height: 30px;
+    margin: 0 0 3px;
+  }
+
+  .app.mobile-roads-screen #roadAchievementsView .road-achievements-heading h2 {
+    margin: 0;
+    font-size: .92rem;
+    line-height: 1;
+  }
+
+  .app.mobile-roads-screen #roadAchievementsView #exportRoadProgressBtn {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: .64rem;
+  }
+
+  .app.mobile-roads-screen #roadExportStatus {
+    margin: 0 0 2px;
+    font-size: .58rem;
+    line-height: 1.1;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList {
+    gap: 0 !important;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card {
+    min-height: 38px !important;
+    height: 38px;
+    grid-template-columns: minmax(0, 1fr) auto 18px !important;
+    gap: 8px !important;
+    padding: 0 2px !important;
+    border: 0 !important;
+    border-bottom: 1px solid rgba(33, 20, 15, .19) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card .achievement-icon {
+    display: none !important;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card > div {
+    display: contents !important;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card strong {
+    grid-column: 1;
+    font-size: .78rem !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card small {
+    grid-column: 2;
+    grid-row: 1;
+    color: rgba(33, 20, 15, .72) !important;
+    font-size: .69rem !important;
+    font-weight: 850;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .app.mobile-roads-screen #roadAchievementList .road-achievement-card::after {
+    content: "↗";
+    grid-column: 3;
+    justify-self: end;
+    font-size: 1rem !important;
+    line-height: 1;
+  }
+
+  /* Cartão da rodovia selecionada: compacto e sem texto redundante. */
+  .highway-banner {
+    left: 12px !important;
+    right: 12px !important;
+    top: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    padding: 11px 48px 11px 13px !important;
+    gap: 4px !important;
+    border-radius: 16px !important;
+  }
+
+  .highway-banner .draw-copy {
+    gap: 2px !important;
+  }
+
+  .highway-banner .draw-copy > strong {
+    font-size: 1rem !important;
+    line-height: 1.05 !important;
+  }
+
+  #highwayBannerStatus:empty {
+    display: none !important;
+  }
+
+  #highwayBannerStatus {
+    margin: 0 !important;
+    font-size: .66rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .highway-progress {
+    margin-top: 3px !important;
+    gap: 2px !important;
+  }
+
+  .highway-progress > strong {
+    font-size: .87rem !important;
+    line-height: 1.05 !important;
+  }
+
+  .highway-progress > span {
+    font-size: .68rem !important;
+    line-height: 1.05 !important;
+  }
+
+  .highway-progress-track {
+    height: 6px !important;
+    margin-top: 4px !important;
+  }
+
+  #closeHighwayBtn {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: rgba(255, 208, 163, .48) !important;
+    color: var(--surface) !important;
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    box-shadow: none !important;
+  }
+
+  /* Dentro de um estado, a lista de cidades mostra somente o nome. */
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card {
+    min-height: 38px !important;
+    grid-template-columns: minmax(0, 1fr) 18px !important;
+    gap: 8px !important;
+    padding: 0 2px !important;
+  }
+
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card > div {
+    display: contents !important;
+  }
+
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card strong {
+    grid-column: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: .8rem !important;
+    line-height: 1.05 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card small,
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card .achievement-icon {
+    display: none !important;
+  }
+
+  .app.mobile-achievements-screen #cityAchievementList .achievement-card::after {
+    grid-column: 2 !important;
+    font-size: 1rem !important;
+  }
+}

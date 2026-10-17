@@ -40,7 +40,10 @@
       const banner = document.getElementById("highwayBanner");
       const open = Boolean(window.state?.highwayLayer) || Boolean(banner && !banner.classList.contains("hidden"));
       if (!open) return;
-      try { window.closeFullHighway?.(); } catch {}
+      try {
+        if (typeof window.closeFullHighway === "function") window.closeFullHighway();
+        else document.getElementById("closeHighwayBtn")?.click();
+      } catch {}
     }
 
     function setRoadsScreen(active) {

@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-title" content="Minhas Viagens" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="manifest.webmanifest?v=0.15.26" />
-  <link rel="icon" href="app-icon.svg?v=0.15.26" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.26" />
+  <link rel="manifest" href="manifest.webmanifest?v=0.15.27" />
+  <link rel="icon" href="app-icon.svg?v=0.15.27" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.27" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
-  <link rel="stylesheet" href="style.css?v=0.15.26" />
-  <link rel="stylesheet" href="mobile-ui.css?v=0.15.26" />
-  <link rel="stylesheet" href="profile-screen.css?v=0.15.26" />
+  <link rel="stylesheet" href="style.css?v=0.15.27" />
+  <link rel="stylesheet" href="mobile-ui.css?v=0.15.27" />
+  <link rel="stylesheet" href="profile-screen.css?v=0.15.27" />
   <style>
     .leaflet-tile-pane { filter: grayscale(1) saturate(0) contrast(.94) brightness(1.04); }
     .leaflet-control-zoom { display: none !important; }
@@ -122,7 +122,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.26</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.27</p>
         </div>
       </div>
 
@@ -274,7 +274,7 @@
             <div class="highway-progress-track" role="progressbar" aria-label="Progresso percorrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="highwayProgressBar"></i></div>
           </div>
         </div>
-        <button id="closeHighwayBtn" class="ghost-btn small" type="button">Fechar rodovia</button>
+        <button id="closeHighwayBtn" class="ghost-btn small" type="button" aria-label="Fechar rodovia" title="Fechar rodovia">×</button>
       </section>
 
       <div id="achievementToast" class="achievement-toast hidden" aria-live="assertive">
@@ -453,15 +453,15 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script src="mobile-ui.js?v=0.15.26"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.26";</script>
-  <script src="config.js?v=0.15.26"></script>
+  <script src="mobile-ui.js?v=0.15.27"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.27";</script>
+  <script src="config.js?v=0.15.27"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.15.26"></script>
+  <script src="auth.js?v=0.15.27"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=0.15.26", { scope: "./" })
+        navigator.serviceWorker.register("./service-worker.js?v=0.15.27", { scope: "./" })
           .catch(error => console.warn("Service worker indisponível", error));
       });
     }

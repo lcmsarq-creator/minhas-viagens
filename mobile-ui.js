@@ -36,11 +36,24 @@
 
     if (!app || !toggle) return;
 
+    function closeHighwayIfOpen() {
+      const banner = document.getElementById("highwayBanner");
+      const open = Boolean(window.state?.highwayLayer) || Boolean(banner && !banner.classList.contains("hidden"));
+      if (!open) return;
+      try { window.closeFullHighway?.(); } catch {}
+    }
+
+    function setRoadsScreen(active) {
+      app.classList.toggle("mobile-roads-screen", Boolean(active));
+      if (!active) closeHighwayIfOpen();
+    }
+
     function setMode(mode) {
       app.classList.toggle("mobile-panel-home", mode === "home");
       app.classList.toggle("mobile-panel-detail", mode === "detail");
       if (mode === "home") {
         app.classList.remove("mobile-achievements-home", "mobile-achievements-screen", "mobile-map-expanded");
+        setRoadsScreen(false);
       }
       syncFabLabel();
       syncMapSizeButton();
@@ -67,6 +80,7 @@
 
     function closeSheet(options = {}) {
       if (!toggle.checked) return;
+      if (app.classList.contains("mobile-roads-screen")) setRoadsScreen(false);
       toggle.checked = false;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
       app.classList.remove("mobile-map-expanded", "mobile-achievements-home", "mobile-achievements-screen");
@@ -132,6 +146,7 @@
     function setAchievementsHome(active) {
       app.classList.toggle("mobile-achievements-home", Boolean(active));
       app.classList.toggle("mobile-achievements-screen", !active && app.classList.contains("mobile-panel-detail"));
+      if (active) setRoadsScreen(false);
       enhanceAchievementScreens();
     }
 
@@ -216,6 +231,7 @@
     }
 
     function openTrips() {
+      setRoadsScreen(false);
       tripsTab?.click();
       setMode("detail");
       openSheet();
@@ -322,6 +338,7 @@
       navigateBackOneLevel();
     });
     tripsTab?.addEventListener("click", () => {
+      setRoadsScreen(false);
       setMode("detail");
       app.classList.remove("mobile-achievements-home", "mobile-achievements-screen");
     });
@@ -332,6 +349,7 @@
     newTrip?.addEventListener("click", closeSheet);
 
     function activateAchievementScreen(kind) {
+      setRoadsScreen(kind === "roads");
       const tab = kind === "roads" ? document.getElementById("roadAchievementsTabBtn")
         : kind === "iconic" ? document.getElementById("iconicAchievementsTabBtn")
         : document.getElementById("cityAchievementsTabBtn");
@@ -393,9 +411,10 @@
     }
 
     document.addEventListener("click", event => {
-      if (event.target.closest("#cityAchievementsTabBtn, #roadAchievementsTabBtn, #iconicAchievementsTabBtn")) {
-        setAchievementsHome(false);
-      }
+      const tab = event.target.closest("#cityAchievementsTabBtn, #roadAchievementsTabBtn, #iconicAchievementsTabBtn");
+      if (!tab) return;
+      setRoadsScreen(tab.id === "roadAchievementsTabBtn");
+      setAchievementsHome(false);
     });
 
     const achievementPanelObserver = new MutationObserver(enhanceAchievementScreens);

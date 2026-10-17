@@ -121,13 +121,14 @@
           }).addTo(map)
         : L.layerGroup().addTo(map);
 
-      els.highwayBannerStatus.textContent = entry.partial ? "Geometria parcial encontrada" : "Rodovia carregada";
+      els.highwayBannerStatus.textContent = "";
       els.highwayProgress.classList.remove("hidden");
       els.highwayProgressPercent.textContent = `${Math.round(progress.percent)}% concluída`;
       els.highwayProgressDistance.textContent = `${progress.traveledKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km de ${progress.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km percorridos`;
       els.highwayProgressBar.style.width = `${progress.percent}%`;
       els.highwayProgressBar.style.background = palette.progress;
       els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
+      requestAnimationFrame(() => fitHighwayBounds());
     };
   }
 

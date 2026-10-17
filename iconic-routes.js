@@ -537,10 +537,11 @@
     if (!element.classList.contains("road-achievement-card")) return;
     const status = element.querySelector("small");
     if (!status) return;
-    status.dataset.baseText ||= status.textContent;
-    status.textContent = medal
-      ? `${status.dataset.baseText} · ${medal === "gold" ? "Ouro" : "Prata"}${Number.isFinite(percent) ? ` ${Math.round(percent)}%` : ""}`
-      : status.dataset.baseText;
+    if (Number.isFinite(Number(percent))) {
+      status.textContent = `${Math.round(Number(percent))}%`;
+      return;
+    }
+    status.textContent = "…";
   }
 
   async function roadCoveragePercent(label) {
@@ -580,7 +581,13 @@
       const iconic = iconicRoads.has(normalized);
       if (iconic) {
         roadMedals.set(normalized, "gold");
-        applyMedal(element, "gold");
+        if (element.classList.contains("road-achievement-card")) {
+          const percent = await roadCoveragePercent(label).catch(() => null);
+          if (generation !== medalGeneration) return;
+          applyMedal(element, "gold", percent);
+        } else {
+          applyMedal(element, "gold");
+        }
         continue;
       }
       if (state.achievementView !== "roads" && element.classList.contains("road-achievement-card")) continue;

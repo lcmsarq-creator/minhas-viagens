@@ -84,7 +84,7 @@
     const card = document.createElement("button");
     card.type = "button";
     card.className = "achievement-card";
-    card.innerHTML = `<span class="achievement-icon">●</span><div><strong>${escapeHtml(item.city || item.label)}</strong><small>${escapeHtml(item.tripName || "Trajeto cruzado")}${item.date ? ` · ${formatDate(item.date)}` : ""}</small></div>`;
+    card.innerHTML = `<div><strong>${escapeHtml(item.city || item.label)}</strong></div>`;
     card.addEventListener("click", () => window.focusCityAchievement?.(item));
     window.MinhasViagensCityFlags?.decorate?.(card.querySelector(".achievement-icon"), item);
     return card;

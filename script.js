@@ -1162,57 +1162,75 @@ function fitHighwayBounds() {
 
   const mapNode = map.getContainer();
   const mapRect = mapNode.getBoundingClientRect();
-  const margin = 22;
+  const mobile = window.matchMedia("(max-width: 820px)").matches;
+  const margin = mobile ? 14 : 22;
   let top = margin;
   let right = margin;
   let bottom = margin;
   let left = margin;
 
-  const visibleOverlays = [
-    els.highwayBanner,
-    document.querySelector(".sidebar"),
-    document.getElementById("mobileSheetFab"),
-    document.querySelector(".mobile-sheet-fab")
-  ].filter(Boolean);
+  if (mobile) {
+    const banner = els.highwayBanner;
+    if (banner && !banner.classList.contains("hidden")) {
+      const style = getComputedStyle(banner);
+      if (style.display !== "none" && style.visibility !== "hidden") {
+        const rect = banner.getBoundingClientRect();
+        if (rect.height > 0 && rect.bottom > mapRect.top && rect.top < mapRect.bottom) {
+          top = Math.max(top, Math.ceil(rect.bottom - mapRect.top + 10));
+        }
+      }
+    }
 
+    const toggle = document.getElementById("mobileSheetToggle");
+    const sidebar = document.querySelector(".sidebar");
+    if ((!toggle || toggle.checked) && sidebar) {
+      const style = getComputedStyle(sidebar);
+      if (style.display !== "none" && style.visibility !== "hidden") {
+        const rect = sidebar.getBoundingClientRect();
+        if (rect.height > 0 && rect.bottom > mapRect.top && rect.top < mapRect.bottom) {
+          bottom = Math.max(bottom, Math.ceil(mapRect.bottom - rect.top + 10));
+        }
+      }
+    }
+
+    // Garante uma faixa útil real entre o cartão superior e a caixa inferior.
+    const minVisibleHeight = Math.min(180, Math.max(110, Math.round(mapRect.height * .18)));
+    const maximumInsets = Math.max(0, mapRect.height - minVisibleHeight);
+    if (top + bottom > maximumInsets) {
+      const overflow = top + bottom - maximumInsets;
+      bottom = Math.max(margin, bottom - overflow);
+    }
+
+    map.invalidateSize(false);
+    map.fitBounds(state.highwayBounds.pad(.025), {
+      paddingTopLeft: [left, top],
+      paddingBottomRight: [right, bottom],
+      maxZoom: 10,
+      animate: false
+    });
+    return;
+  }
+
+  const visibleOverlays = [els.highwayBanner, document.querySelector(".sidebar")].filter(Boolean);
   for (const overlay of visibleOverlays) {
     const style = getComputedStyle(overlay);
     if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) continue;
     if (overlay.classList?.contains("hidden")) continue;
-
     const rect = overlay.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) continue;
     const overlapsMap = rect.right > mapRect.left && rect.left < mapRect.right && rect.bottom > mapRect.top && rect.top < mapRect.bottom;
     if (!overlapsMap) continue;
-
     const horizontalCoverage = Math.max(0, Math.min(rect.right, mapRect.right) - Math.max(rect.left, mapRect.left));
     const verticalCoverage = Math.max(0, Math.min(rect.bottom, mapRect.bottom) - Math.max(rect.top, mapRect.top));
-
     if (horizontalCoverage > mapRect.width * .45) {
-      if (rect.top <= mapRect.top + mapRect.height * .5) {
-        top = Math.max(top, rect.bottom - mapRect.top + margin);
-      }
-      if (rect.bottom >= mapRect.top + mapRect.height * .5) {
-        bottom = Math.max(bottom, mapRect.bottom - rect.top + margin);
-      }
+      if (rect.top <= mapRect.top + mapRect.height * .5) top = Math.max(top, rect.bottom - mapRect.top + margin);
+      if (rect.bottom >= mapRect.top + mapRect.height * .5) bottom = Math.max(bottom, mapRect.bottom - rect.top + margin);
     }
-
     if (verticalCoverage > mapRect.height * .35) {
-      if (rect.left <= mapRect.left + mapRect.width * .5) {
-        left = Math.max(left, rect.right - mapRect.left + margin);
-      }
-      if (rect.right >= mapRect.left + mapRect.width * .5) {
-        right = Math.max(right, mapRect.right - rect.left + margin);
-      }
+      if (rect.left <= mapRect.left + mapRect.width * .5) left = Math.max(left, rect.right - mapRect.left + margin);
+      if (rect.right >= mapRect.left + mapRect.width * .5) right = Math.max(right, mapRect.right - rect.left + margin);
     }
   }
-
-  const maxHorizontal = Math.max(24, Math.floor(mapRect.width * .42));
-  const maxVertical = Math.max(24, Math.floor(mapRect.height * .42));
-  left = Math.min(left, maxHorizontal);
-  right = Math.min(right, maxHorizontal);
-  top = Math.min(top, maxVertical);
-  bottom = Math.min(bottom, maxVertical);
 
   map.invalidateSize(false);
   map.fitBounds(state.highwayBounds.pad(.03), {
@@ -1241,7 +1259,7 @@ async function drawFullHighway(entry, item, descriptor) {
   fitHighwayBounds();
   els.highwayBannerTitle.textContent = roadDisplayLabel(item.label);
   els.highwayBanner.style.borderColor = palette.banner;
-  els.highwayBannerStatus.textContent = entry.partial ? "Geometria parcial encontrada" : "Rodovia carregada";
+  els.highwayBannerStatus.textContent = "";
   const progress = await highwayProgress(descriptor, entry);
   if (state.highwayKey !== highwayCacheKey(descriptor)) return;
   state.highwayProgressLayer = L.featureGroup(progress.segments.map(line => L.polyline(line, { pane: "fullHighwayMain", color: palette.progress, weight: routeWidth, opacity: 1, interactive: false, smoothFactor: 1.2 }))).addTo(map);
@@ -1251,6 +1269,7 @@ async function drawFullHighway(entry, item, descriptor) {
   els.highwayProgressBar.style.width = `${progress.percent}%`;
   els.highwayProgressBar.style.background = palette.progress;
   els.highwayProgressBar.parentElement.setAttribute("aria-valuenow", String(Math.round(progress.percent)));
+  requestAnimationFrame(() => fitHighwayBounds());
 }
 
 function closeFullHighway(restoreFocus = false) {
@@ -1513,20 +1532,16 @@ function renderAchievements() {
       return;
     }
     items.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { numeric: true })).forEach(item => {
-      const cityGroup = type === "city" ? window.MinhasViagensAchievements?.groupForCity(item) : null;
-      const citySuffix = cityGroup && !cityGroup.unknown ? ` — ${cityGroup.code || cityGroup.uf}` : "";
-      const visibleLabel = type === "city" ? `${item.city || item.label}${citySuffix}` : roadDisplayLabel(item.label);
+      const visibleLabel = type === "city" ? (item.city || item.label) : roadDisplayLabel(item.label);
       const card = document.createElement("button");
       card.type = "button";
       card.className = `achievement-card${type === "road" ? " road-achievement-card" : ""}`;
       if (type === "road") card.dataset.road = item.label;
       card.setAttribute("aria-label", type === "city" ? `Focar ${item.label} no mapa` : `Mostrar a rodovia ${roadDisplayLabel(item.label)} inteira`);
-      card.innerHTML = `
-        <span class="achievement-icon">${type === "city" ? "●" : roadShieldMarkup(item.label, "achievement")}</span>
-        <div>
-          <strong>${escapeHtml(visibleLabel)}</strong>
-          <small>${type === "road" ? "Rodovia conquistada" : `${escapeHtml(item.tripName || "Viagem")}${item.date ? ` · ${formatDate(item.date)}` : ""}`}</small>
-        </div>`;
+      card.innerHTML = type === "city"
+        ? `<div><strong>${escapeHtml(visibleLabel)}</strong></div>`
+        : `<span class="achievement-icon">${roadShieldMarkup(item.label, "achievement")}</span>
+           <div><strong>${escapeHtml(visibleLabel)}</strong><small>…</small></div>`;
       card.addEventListener("click", () => {
         if (type === "city") {
           focusCityAchievement(item);

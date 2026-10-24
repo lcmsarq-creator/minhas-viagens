@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-title" content="Minhas Viagens" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="manifest.webmanifest?v=0.15.28" />
-  <link rel="icon" href="app-icon.svg?v=0.15.28" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.28" />
+  <link rel="manifest" href="manifest.webmanifest?v=0.15.29" />
+  <link rel="icon" href="app-icon.svg?v=0.15.29" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="app-icon-192.png?v=0.15.29" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4" />
-  <link rel="stylesheet" href="style.css?v=0.15.28" />
-  <link rel="stylesheet" href="mobile-ui.css?v=0.15.28" />
-  <link rel="stylesheet" href="profile-screen.css?v=0.15.28" />
+  <link rel="stylesheet" href="style.css?v=0.15.29" />
+  <link rel="stylesheet" href="mobile-ui.css?v=0.15.29" />
+  <link rel="stylesheet" href="profile-screen.css?v=0.15.29" />
   <style>
     .leaflet-tile-pane { filter: grayscale(1) saturate(0) contrast(.94) brightness(1.04); }
     .leaflet-control-zoom { display: none !important; }
@@ -122,7 +122,7 @@
         <div class="brand-mark">MV</div>
         <div>
           <h1>Minhas Viagens</h1>
-          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.28</p>
+          <p>Seu mapa pessoal de caminhos percorridos. · v0.15.29</p>
         </div>
       </div>
 
@@ -453,16 +453,41 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
-  <script src="mobile-ui.js?v=0.15.28"></script>
-  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.28";</script>
-  <script src="config.js?v=0.15.28"></script>
+  <script src="mobile-ui.js?v=0.15.29"></script>
+  <script>window.MINHAS_VIAGENS_APP_VERSION = "0.15.29";</script>
+  <script src="config.js?v=0.15.29"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="auth.js?v=0.15.28"></script>
+  <script src="auth.js?v=0.15.29"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=0.15.28", { scope: "./" })
-          .catch(error => console.warn("Service worker indisponível", error));
+      window.addEventListener("load", async () => {
+        let reloadingForUpdate = false;
+        const applyController = () => {
+          if (reloadingForUpdate) return;
+          reloadingForUpdate = true;
+          window.location.reload();
+        };
+
+        navigator.serviceWorker.addEventListener("controllerchange", applyController);
+
+        try {
+          const registration = await navigator.serviceWorker.register(
+            "./service-worker.js?v=0.15.29",
+            { scope: "./", updateViaCache: "none" }
+          );
+
+          const checkForUpdate = () => registration.update().catch(() => {});
+          checkForUpdate();
+
+          window.addEventListener("focus", checkForUpdate);
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") checkForUpdate();
+          });
+
+          window.setInterval(checkForUpdate, 5 * 60 * 1000);
+        } catch (error) {
+          console.warn("Service worker indisponível", error);
+        }
       });
     }
   </script>

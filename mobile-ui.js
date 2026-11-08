@@ -247,9 +247,27 @@
       openSheet();
     }
 
-    function openNewTripDialog() {
-      closeSheet();
-      newTrip?.click();
+    function openNewTripDialog(event) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+
+      // Fechar o menu sem history.back(): no APK/WebView, a navegação assíncrona
+      // podia ocorrer depois da abertura do dialog e cancelar o fluxo de nova viagem.
+      panelHistoryActive = false;
+      closeSheet({ fromHistory: true });
+      setMode("home");
+
+      requestAnimationFrame(() => {
+        if (window.MinhasViagensApp?.openNewTrip) {
+          window.MinhasViagensApp.openNewTrip();
+          return;
+        }
+        if (typeof window.openTripDialog === "function") {
+          window.openTripDialog();
+          return;
+        }
+        newTrip?.click();
+      });
     }
 
     let enhancingAchievements = false;
@@ -349,7 +367,7 @@
       setMode("detail");
       setAchievementsHome(true);
     });
-    newTrip?.addEventListener("click", closeSheet);
+    newTrip?.addEventListener("click", () => closeSheet({ fromHistory: true }));
 
     function activateAchievementScreen(kind) {
       setRoadsScreen(kind === "roads");

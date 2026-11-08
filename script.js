@@ -2882,7 +2882,16 @@ async function requestRoutes() {
   setFormMessage("");
   try {
     const routePoints = [state.startPlace, ...pendingStops(), state.endPlace];
-    const routes = await fetchOsrmRoute(routePoints, true);
+    let routes = [];
+    try {
+      routes = await fetchOsrmRoute(routePoints, true);
+    } catch (alternativesError) {
+      console.warn("Alternativas automáticas indisponíveis; tentando rota única.", alternativesError);
+      const fallbackRoute = await fetchRouteResilient(routePoints);
+      if (fallbackRoute) routes = [fallbackRoute];
+    }
+    if (!routes.length) throw new Error("Nenhuma rota foi encontrada.");
+
     state.pendingTrip = capturePendingTrip();
     state.routeAlternatives = routes;
     state.selectedRouteIndex = 0;
@@ -2890,7 +2899,8 @@ async function requestRoutes() {
     showRouteChooser();
   } catch (error) {
     console.error("Falha ao criar rota:", error);
-    setFormMessage("Os roteadores automáticos não responderam. Você ainda pode usar “Desenhar manualmente” e salvar a viagem normalmente.");
+    const reason = error?.message ? ` Motivo: ${error.message}` : "";
+    setFormMessage(`Não foi possível calcular a rota automaticamente.${reason} Você ainda pode usar “Desenhar manualmente” e salvar a viagem normalmente.`);
   } finally {
     els.suggestRoutesBtn.textContent = "Sugerir rotas";
     updateRouteButtons();
@@ -3761,6 +3771,7 @@ renderTrips();
 ROUTE_STYLE?.subscribe?.(refreshRouteStyles);
 window.MinhasViagensApp = {
   getTrips: () => state.trips,
+  openNewTrip: () => openTripDialog(),
   replaceTrips: trips => {
     state.trips = trips.map(trip => {
       const normalized = ensureTripSchema(trip);
